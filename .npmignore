@@ -1,0 +1,44 @@
+# Tests
+tests/
+coverage/
+*.test.ts
+*.spec.ts
+vitest.config.ts
+
+# Development
+.vscode/
+.idea/
+*.log
+npm-debug.log*
+.DS_Store
+
+# Git
+.git/
+.gitignore
+
+# Documentation plans (not needed in package)
+PHASE_*.md
+IMPLEMENTATION_PLAN.md
+ARCHITECTURE_FIX_PLAN.md
+ULTRATHINK_SUMMARY.md
+*.md
+!README.md
+!CHANGELOG.md
+!LICENSE
+
+# CI/CD (workflows are for development, not package)
+.github/
+
+# Source TypeScript (dist/ contains compiled JS)
+src/
+tsconfig.json
+
+# Development tools
+.prettierrc
+eslint.config.js
+CLAUDE.md
+
+# Test artifacts
+test-*/
+my-test-app/
+*.tgz

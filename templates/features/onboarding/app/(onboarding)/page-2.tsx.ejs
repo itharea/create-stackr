@@ -1,0 +1,52 @@
+import React from 'react';
+import { View, Image, StyleSheet } from 'react-native';
+import { router } from 'expo-router';
+import OnboardingLayout from '@/components/ui/OnboardingLayout';
+import { responsive } from '@/utils/responsive';
+
+export default function OnboardingPage2() {
+  const handleContinue = () => {
+    <% if (features.onboarding.pages === 2) { %>
+      <% if (features.paywall) { %>
+    router.replace('/paywall');
+      <% } else { %>
+    router.replace('/(tabs)');
+      <% } %>
+    <% } else { %>
+    router.replace('/(onboarding)/page-3');
+    <% } %>
+  };
+
+  return (
+    <OnboardingLayout
+      title="Powerful Features"
+      subtitle="Unlock advanced capabilities and streamlined workflows to boost your productivity."
+      pageIndicators={2}
+      totalPages={<%= features.onboarding.pages %>}
+      onContinue={handleContinue}
+    >
+      <View style={styles.imageContainer}>
+        <Image
+          source={require('@/assets/images/onboarding_page_2.png')}
+          style={styles.onboardingImage}
+          resizeMode="contain"
+        />
+      </View>
+    </OnboardingLayout>
+  );
+}
+
+const imageSize = responsive.getImageContainerSize();
+
+const styles = StyleSheet.create({
+  imageContainer: {
+    width: imageSize.width,
+    height: imageSize.height,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  onboardingImage: {
+    width: '100%',
+    height: '100%',
+  },
+});

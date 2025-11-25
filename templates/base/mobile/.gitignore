@@ -1,0 +1,167 @@
+# React Native/Expo Mobile App - Git Ignore
+
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-store/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native build directories and files
+ios/
+android/
+.kotlin/
+
+# Metro
+.metro-health-check*
+.metro/
+
+# Debug files
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# TypeScript
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# EAS
+build/
+*.ipa
+*.apk
+*.aab
+.eas/
+
+# React Native
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.keystore
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Logs
+logs/
+*.log
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Editor and IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Cache directories
+.cache/
+.eslintcache
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Archive files
+*.zip
+*.tar.gz
+*.rar
+
+# Simulator files
+*.trace
+
+# Flipper
+Flipper/
+
+# CocoaPods (iOS)
+ios/Pods/
+ios/Podfile.lock
+*.xcworkspace
+
+# Gradle (Android)
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+fastlane/readme.md
+
+# Bundle artifacts
+*.jsbundle
+
+# Watchman
+.watchmanconfig
+
+# Xcode
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+!*.xcodeproj/project.xcworkspace/
+*.xcworkspace/*
+!*.xcworkspace/contents.xcworkspacedata
+/*.gcno
+
+# Android Studio
+.gradle
+/build/
+/captures
+.externalNativeBuild
+
+# Detox
+e2e/*.js
+e2e/artifacts/
+
+# Storybook
+storybook-static/
+
+# Firebase
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+
+# React Native Debugger
+rndebugger_log.txt
+
+# CodePush
+CodePush/
+
+# App Center
+AppCenter/

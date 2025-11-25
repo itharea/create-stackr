@@ -1,0 +1,95 @@
+{
+  "name": "create-core-stack",
+  "version": "0.1.0",
+  "description": "Create production-ready full-stack mobile apps with React Native (Expo) and Node.js backend",
+  "type": "module",
+  "bin": {
+    "create-core-stack": "./bin/cli.js"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "templates",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "VITEST_WATCH=1 vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:e2e": "vitest run tests/e2e --exclude tests/e2e/build-verification.test.ts",
+    "test:e2e:all": "vitest run tests/e2e",
+    "test:build": "vitest run tests/e2e/build-verification.test.ts",
+    "test:ui": "vitest --ui",
+    "lint": "eslint src tests",
+    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "keywords": [
+    "react-native",
+    "expo",
+    "fullstack",
+    "mobile",
+    "backend",
+    "cli",
+    "generator",
+    "scaffold",
+    "boilerplate",
+    "fastify",
+    "prisma",
+    "revenuecat",
+    "adjust",
+    "scate",
+    "typescript",
+    "nodejs",
+    "postgresql",
+    "docker"
+  ],
+  "author": "itharea",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/itharea/create-core-stack"
+  },
+  "bugs": {
+    "url": "https://github.com/itharea/create-core-stack/issues"
+  },
+  "homepage": "https://github.com/itharea/create-core-stack#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "boxen": "^8.0.0",
+    "chalk": "^5.0.0",
+    "commander": "^12.0.0",
+    "ejs": "^3.1.10",
+    "execa": "^9.0.0",
+    "fs-extra": "^11.3.2",
+    "globby": "^16.0.0",
+    "inquirer": "^10.0.0",
+    "ora": "^8.0.0",
+    "validate-npm-package-name": "^5.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@types/ejs": "^3.1.5",
+    "@types/fs-extra": "^11.0.4",
+    "@types/inquirer": "^9.0.0",
+    "@types/node": "^22.0.0",
+    "@types/validate-npm-package-name": "^4.0.2",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "@vitest/coverage-v8": "^2.0.0",
+    "eslint": "^9.0.0",
+    "memfs": "^4.51.0",
+    "prettier": "^3.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.0.0"
+  }
+}

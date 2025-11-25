@@ -1,0 +1,36 @@
+<% if (integrations.att.enabled) { %>import { Platform } from 'react-native';
+import { useATTStore } from '@/store/att.store';
+<% } %><% if (integrations.revenueCat.enabled) { %>import { revenueCatService } from './revenuecatService';
+<% } %><% if (integrations.adjust.enabled) { %>import { adjustService } from './adjustService';
+<% } %><% if (integrations.scate.enabled) { %>import { scateService } from './scateService';
+<% } %>
+export const initializeSDKs = async () => {
+  try {
+<% if (integrations.revenueCat.enabled) { %>    // Initialize RevenueCat
+    revenueCatService.initialize();
+<% } %>
+<% if (integrations.adjust.enabled) { %>    // Initialize Adjust
+<% if (integrations.att.enabled) { %>    // Handle ATT permissions on iOS first
+    if (Platform.OS === 'ios') {
+      const attStore = useATTStore.getState();
+      await attStore.initialize();
+      await attStore.requestPermissions();
+    }
+<% } %>    adjustService.initialize();
+<% } %>
+<% if (integrations.scate.enabled) { %>    // Initialize Scate
+    scateService.initialize();
+<% } %>
+<% if (integrations.adjust.enabled && (integrations.revenueCat.enabled || integrations.scate.enabled)) { %>
+    // Distribute ADID to other SDKs
+    const adid = await adjustService.getAdid();
+    if (adid) {
+<% if (integrations.revenueCat.enabled) { %>      // Set Adjust ID in RevenueCat
+      revenueCatService.setAdjustId(adid);
+<% } %><% if (integrations.scate.enabled) { %>      // Set ADID in Scate
+      scateService.setAdid(adid);
+<% } %>    }
+<% } %>  } catch (error) {
+    console.error('SDK initialization error:', error);
+  }
+};

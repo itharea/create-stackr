@@ -1,0 +1,75 @@
+{
+  "expo": {
+    "name": "<%= projectName %>",
+    "slug": "<%= projectName.toLowerCase().replace(/[^a-z0-9-]/g, '-') %>",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yourcompany.<%= projectName.toLowerCase().replace(/[^a-z0-9]/g, '') %>"<% if (integrations.att.enabled) { %>,
+      "infoPlist": {
+        "NSUserTrackingUsageDescription": "This identifier will be used to deliver personalized ads to you."
+      }<% } %>
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.yourcompany.<%= projectName.toLowerCase().replace(/[^a-z0-9]/g, '') %>"<% if (integrations.adjust.enabled || integrations.scate.enabled) { %>,
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE"
+      ]<% } %>
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router"<% if (integrations.att.enabled) { %>,
+      "expo-tracking-transparency"<% } %>
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "your-eas-project-id-here"
+      },
+      "features": {
+        "onboarding": {
+          "enabled": <%= features.onboarding.enabled %>
+        },
+        "authentication": <%= features.authentication %>,
+        "paywall": <%= features.paywall %>,
+        "tabs": <%= features.tabs %>
+      }<% if (integrations.revenueCat.enabled) { %>,
+      "revenueCat": {
+        "iosKey": "<%= integrations.revenueCat.iosKey || 'YOUR_IOS_API_KEY_HERE' %>",
+        "androidKey": "<%= integrations.revenueCat.androidKey || 'YOUR_ANDROID_API_KEY_HERE' %>"
+      }<% } %><% if (integrations.adjust.enabled) { %>,
+      "adjust": {
+        "appToken": "<%= integrations.adjust.appToken || 'YOUR_ADJUST_APP_TOKEN_HERE' %>",
+        "environment": "<%= integrations.adjust.environment || 'sandbox' %>"
+      }<% } %><% if (integrations.scate.enabled) { %>,
+      "scate": {
+        "apiKey": "<%= integrations.scate.apiKey || 'YOUR_SCATE_API_KEY_HERE' %>"
+      }<% } %>
+    }
+  }
+}

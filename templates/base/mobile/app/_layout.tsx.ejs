@@ -1,0 +1,72 @@
+import { Stack, router } from 'expo-router';
+import { useEffect } from 'react';
+import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+<% if (integrations.revenueCat.enabled || integrations.adjust.enabled || integrations.scate.enabled) { %>import { initializeSDKs } from '@/services/sdkInitializer';
+<% } %>import { useSessionActions, useSession } from '../src/store/session.store';
+import { logger } from '../src/utils/logger';
+
+export default function RootLayout() {
+  const { initializeSession } = useSessionActions();
+  const { isSessionChecked } = useSession();
+
+  // Get feature flags from app.json
+  const onboardingEnabled = Constants.expoConfig?.extra?.features?.onboarding?.enabled ?? false;
+
+  useEffect(() => {
+<% if (integrations.revenueCat.enabled || integrations.adjust.enabled || integrations.scate.enabled) { %>    // Initialize SDKs
+    initializeSDKs().catch(console.error);
+
+<% } %>    // Session initialization and navigation
+    const checkAndInitSession = async () => {
+      // Skip if session already checked
+      if (isSessionChecked) {
+        logger.debug('RootLayout: Session already checked, skipping');
+        return;
+      }
+
+      try {
+        logger.info('RootLayout: Checking session and onboarding status...');
+
+        // Check onboarding completion
+        const onboardingCompleted = await AsyncStorage.getItem('onboarding_completed');
+
+        if (onboardingEnabled) {
+          // Full-Featured Config: Check onboarding first
+          if (onboardingCompleted !== 'true') {
+            // Onboarding not completed - navigate to onboarding WITHOUT creating session
+            logger.info('RootLayout: Onboarding not completed, navigating to onboarding');
+<% if (features.onboarding.enabled) { %>            router.replace('/(onboarding)/page-1');
+<% } %>            return;
+          }
+
+          // Onboarding completed - initialize session if needed
+          logger.info('RootLayout: Onboarding completed, initializing session');
+          await initializeSession();
+          router.replace('/(tabs)');
+        } else {
+          // Minimal Config: Always initialize session
+          logger.info('RootLayout: Minimal config, initializing session');
+          await initializeSession();
+          router.replace('/(tabs)');
+        }
+      } catch (error) {
+        logger.error('RootLayout: Failed to initialize session or navigate', { error });
+        // Fallback to tabs on error
+        router.replace('/(tabs)');
+      }
+    };
+
+    checkAndInitSession();
+  }, [isSessionChecked, onboardingEnabled, initializeSession]);
+
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+<% if (features.onboarding.enabled) { %>      <Stack.Screen name="(onboarding)" />
+<% } %><% if (features.authentication) { %>      <Stack.Screen name="(auth)" />
+<% } %><% if (features.paywall) { %>      <Stack.Screen name="paywall" options={{ presentation: 'modal' }} />
+<% } %><% if (features.tabs) { %>      <Stack.Screen name="(tabs)" />
+<% } %>      <Stack.Screen name="+not-found" />
+    </Stack>
+  );
+}

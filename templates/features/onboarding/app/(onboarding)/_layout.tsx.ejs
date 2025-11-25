@@ -1,0 +1,11 @@
+import { Stack } from 'expo-router';
+
+export default function OnboardingLayout() {
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <% for (let i = 1; i <= features.onboarding.pages && i <= 3; i++) { %>
+      <Stack.Screen name="page-<%= i %>" />
+      <% } %>
+    </Stack>
+  );
+}

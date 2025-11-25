@@ -1,0 +1,19 @@
+// UI Store (always included)
+export * from './ui.store';
+
+<% if (features.authentication) { %>// Auth Stores
+export * from './auth.store';
+export * from './session.store';
+<% } %>
+<% if (integrations.revenueCat.enabled) { %>// RevenueCat Store
+export * from './revenuecat.store';
+<% } %>
+<% if (integrations.adjust.enabled) { %>// Adjust Store
+export * from './adjust.store';
+<% } %>
+<% if (integrations.scate.enabled) { %>// Scate Store
+export * from './scate.store';
+<% } %>
+<% if (integrations.att.enabled) { %>// ATT Store
+export * from './att.store';
+<% } %>

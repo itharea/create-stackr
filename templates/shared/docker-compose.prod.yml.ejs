@@ -1,0 +1,120 @@
+# Simplified Docker Compose for Production Deployment
+# Essential services with basic security practices
+
+version: '3.8'
+
+services:
+<% if (backend.eventQueue) { %>
+  # =============================================================================
+  # Redis Cache & Job Queue (Production)
+  # =============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: auth_boilerplate_redis_prod
+    restart: always
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    ports:
+      - "127.0.0.1:6379:6379"  # Bind to localhost only
+    volumes:
+      - redis_prod_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+<% } %>
+  # =============================================================================
+  # PostgreSQL Database (Production)
+  # =============================================================================
+  database:
+    image: postgres:16-alpine
+    container_name: auth_boilerplate_db_prod
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-auth_boilerplate}
+    ports:
+      - "127.0.0.1:5432:5432"  # Bind to localhost only
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-auth_boilerplate}"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  # =============================================================================
+  # REST API Service (Production)
+  # =============================================================================
+  rest-api:
+    build:
+      context: ./backend
+      target: rest-api-prod
+      dockerfile: Dockerfile
+    container_name: auth_boilerplate_rest_api_prod
+    restart: always
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD}@database:5432/${DB_NAME:-auth_boilerplate}?schema=public
+      JWT_SECRET: ${JWT_SECRET}
+      API_HOST: 0.0.0.0
+      API_PORT: 8080
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "127.0.0.1:8080:8080"  # Bind to localhost only (use reverse proxy if needed)
+    depends_on:
+      database:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "bun", "-e", "const res = await fetch('http://localhost:8080/'); process.exit(res.ok ? 0 : 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+<% if (backend.eventQueue) { %>
+  # =============================================================================
+  # Event Queue Service (Production)
+  # =============================================================================
+  event-queue:
+    build:
+      context: ./backend
+      target: event-queue-prod
+      dockerfile: Dockerfile
+    container_name: auth_boilerplate_event_queue_prod
+    restart: always
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD}@database:5432/${DB_NAME:-auth_boilerplate}?schema=public
+      JWT_SECRET: ${JWT_SECRET}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+<% } %>
+# =============================================================================
+# Production Volumes
+# =============================================================================
+volumes:
+  postgres_prod_data:
+    driver: local
+<% if (backend.eventQueue) { %>
+  redis_prod_data:
+    driver: local
+<% } %>

@@ -1,0 +1,124 @@
+# Simplified Multi-stage Dockerfile for Node.js/Fastify Backend
+# Clean architecture with explicit service stages
+# Supports npm, yarn, and bun package managers
+
+# =============================================================================
+# Base Stage - Common setup for all services
+# =============================================================================
+<% if (packageManager === 'bun') { %>FROM oven/bun:alpine AS base<% } else { %>FROM node:alpine AS base<% } %>
+
+# Install essential packages
+RUN apk --no-cache add dumb-init ca-certificates
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files and lock file for dependency installation
+COPY package*.json ./
+<% if (packageManager === 'bun') { %>COPY bun.lockb ./<% } else if (packageManager === 'npm') { %>COPY package-lock.json ./<% } else { %>COPY yarn.lock ./<% } %>
+COPY prisma/schema.prisma ./prisma/
+
+# Install dependencies and generate Prisma client
+<% if (packageManager === 'bun') { %>RUN bun install \
+    && bun prisma generate<% } else if (packageManager === 'npm') { %>RUN npm ci \
+    && npm run db:generate<% } else { %>RUN yarn install --frozen-lockfile \
+    && yarn db:generate<% } %>
+
+# Copy source code
+COPY . .
+
+# =============================================================================
+# Development Stages - For local development with hot reload
+# =============================================================================
+FROM base AS rest-api-dev
+EXPOSE 8080
+<% if (packageManager === 'bun') { %>CMD ["dumb-init", "bun", "run", "dev:rest-api"]<% } else if (packageManager === 'npm') { %>CMD ["dumb-init", "npm", "run", "dev:rest-api"]<% } else { %>CMD ["dumb-init", "yarn", "dev:rest-api"]<% } %>
+
+FROM base AS event-queue-dev
+<% if (packageManager === 'bun') { %>CMD ["dumb-init", "bun", "run", "dev:event-queue"]<% } else if (packageManager === 'npm') { %>CMD ["dumb-init", "npm", "run", "dev:event-queue"]<% } else { %>CMD ["dumb-init", "yarn", "dev:event-queue"]<% } %>
+
+# =============================================================================
+# Production Stages - Optimized for production deployment
+# =============================================================================
+<% if (packageManager === 'bun') { %>FROM oven/bun:alpine AS rest-api-prod<% } else { %>FROM node:alpine AS rest-api-prod<% } %>
+
+# Install essential packages and create non-root user
+RUN apk --no-cache add dumb-init ca-certificates \
+<% if (packageManager === 'bun') { %>    && addgroup -g 1001 -S bunjs \
+    && adduser -S backend -u 1001 -G bunjs<% } else { %>    && addgroup -g 1001 -S nodejs \
+    && adduser -S backend -u 1001 -G nodejs<% } %>
+
+# Set production environment
+ENV NODE_ENV=production
+WORKDIR /app
+
+# Copy package files and lock file first (for better layer caching)
+COPY package*.json ./
+<% if (packageManager === 'bun') { %>COPY bun.lockb ./<% } else if (packageManager === 'npm') { %>COPY package-lock.json ./<% } else { %>COPY yarn.lock ./<% } %>
+
+# Install production dependencies only (clean install)
+<% if (packageManager === 'bun') { %>RUN bun install --production<% } else if (packageManager === 'npm') { %>RUN npm ci --production<% } else { %>RUN yarn install --production --frozen-lockfile<% } %>
+
+# Copy Prisma schema and generate client
+COPY prisma/schema.prisma ./prisma/
+<% if (packageManager === 'bun') { %>RUN bun prisma generate<% } else if (packageManager === 'npm') { %>RUN npm run db:generate<% } else { %>RUN yarn db:generate<% } %>
+
+# Copy source code
+COPY . .
+
+# Build the TypeScript application
+<% if (packageManager === 'bun') { %>RUN bun run build<% } else if (packageManager === 'npm') { %>RUN npm run build<% } else { %>RUN yarn build<% } %>
+
+# Change ownership to non-root user
+<% if (packageManager === 'bun') { %>RUN chown -R backend:bunjs /app<% } else { %>RUN chown -R backend:nodejs /app<% } %>
+
+# Switch to non-root user
+USER backend
+
+# Expose port and add health check
+EXPOSE 8080
+<% if (packageManager === 'bun') { %>HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD bun -e "const res = await fetch('http://localhost:8080/'); process.exit(res.ok ? 0 : 1)"<% } else { %>HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD node -e "fetch('http://localhost:8080/').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"<% } %>
+
+# Start the REST API service
+<% if (packageManager === 'bun') { %>CMD ["dumb-init", "bun", "run", "start:rest-api"]<% } else if (packageManager === 'npm') { %>CMD ["dumb-init", "npm", "run", "start:rest-api"]<% } else { %>CMD ["dumb-init", "yarn", "start:rest-api"]<% } %>
+
+# =============================================================================
+<% if (packageManager === 'bun') { %>FROM oven/bun:alpine AS event-queue-prod<% } else { %>FROM node:alpine AS event-queue-prod<% } %>
+
+# Install essential packages and create non-root user
+RUN apk --no-cache add dumb-init ca-certificates \
+<% if (packageManager === 'bun') { %>    && addgroup -g 1001 -S bunjs \
+    && adduser -S backend -u 1001 -G bunjs<% } else { %>    && addgroup -g 1001 -S nodejs \
+    && adduser -S backend -u 1001 -G nodejs<% } %>
+
+# Set production environment
+ENV NODE_ENV=production
+WORKDIR /app
+
+# Copy package files and lock file first (for better layer caching)
+COPY package*.json ./
+<% if (packageManager === 'bun') { %>COPY bun.lockb ./<% } else if (packageManager === 'npm') { %>COPY package-lock.json ./<% } else { %>COPY yarn.lock ./<% } %>
+
+# Install production dependencies only (clean install)
+<% if (packageManager === 'bun') { %>RUN bun install --production<% } else if (packageManager === 'npm') { %>RUN npm ci --production<% } else { %>RUN yarn install --production --frozen-lockfile<% } %>
+
+# Copy Prisma schema and generate client
+COPY prisma/schema.prisma ./prisma/
+<% if (packageManager === 'bun') { %>RUN bun prisma generate<% } else if (packageManager === 'npm') { %>RUN npm run db:generate<% } else { %>RUN yarn db:generate<% } %>
+
+# Copy source code
+COPY . .
+
+# Build the TypeScript application
+<% if (packageManager === 'bun') { %>RUN bun run build<% } else if (packageManager === 'npm') { %>RUN npm run build<% } else { %>RUN yarn build<% } %>
+
+# Change ownership to non-root user
+<% if (packageManager === 'bun') { %>RUN chown -R backend:bunjs /app<% } else { %>RUN chown -R backend:nodejs /app<% } %>
+
+# Switch to non-root user
+USER backend
+
+# Start the event queue service
+<% if (packageManager === 'bun') { %>CMD ["dumb-init", "bun", "run", "start:event-queue"]<% } else if (packageManager === 'npm') { %>CMD ["dumb-init", "npm", "run", "start:event-queue"]<% } else { %>CMD ["dumb-init", "yarn", "start:event-queue"]<% } %>

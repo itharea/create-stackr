@@ -1,0 +1,100 @@
+# <%= projectName %>
+
+Generated with [create-fullstack-app](https://github.com/yourusername/create-fullstack-app)
+
+## Features
+
+<% if (features.onboarding.enabled) { %>- ✅ Onboarding Flow (<%= features.onboarding.pages %> pages)
+<% } %><% if (features.authentication) { %>- ✅ JWT Authentication
+<% } %><% if (features.paywall) { %>- ✅ Subscription Paywall
+<% } %><% if (integrations.revenueCat.enabled) { %>- ✅ RevenueCat Integration
+<% } %><% if (integrations.adjust.enabled) { %>- ✅ Adjust Attribution & Analytics
+<% } %><% if (integrations.scate.enabled) { %>- ✅ Scate User Engagement
+<% } %>
+## Getting Started
+
+### 1. Configure API Keys
+
+```bash
+cp mobile/.env.example mobile/.env
+cp backend/.env.example backend/.env
+# Edit .env files with your API keys
+```
+
+### 2. Start Docker Services
+
+```bash
+./scripts/setup.sh
+```
+
+### 3. Start Mobile App
+
+```bash
+cd mobile
+<%= packageManager %> install
+<%= packageManager %> start
+```
+
+### 4. Start Backend
+
+```bash
+cd backend
+<%= packageManager %> install
+<%= packageManager %> run dev:rest-api
+```
+
+## Building for Production
+
+This project uses Expo Application Services (EAS) for native builds:
+
+### One-time Setup
+
+1. Install EAS CLI globally:
+   ```bash
+   npm install -g eas-cli
+   ```
+
+2. Create an Expo account and log in:
+   ```bash
+   eas login
+   ```
+
+3. Configure your project:
+   ```bash
+   cd mobile
+   eas build:configure
+   ```
+
+### Building
+
+Build for both iOS and Android:
+```bash
+eas build --platform all
+```
+
+Build for specific platform:
+```bash
+eas build --platform ios
+eas build --platform android
+```
+
+For more information, see the [EAS Build documentation](https://docs.expo.dev/build/introduction/).
+
+## Project Structure
+
+```
+<%= projectName %>/
+├── mobile/          # React Native (Expo) mobile app
+├── backend/         # Node.js backend API
+├── scripts/         # Setup and utility scripts
+└── docker-compose.yml
+```
+
+## Documentation
+
+- [Mobile App Documentation](./mobile/README.md)
+- [Backend API Documentation](./backend/README.md)
+
+## License
+
+MIT

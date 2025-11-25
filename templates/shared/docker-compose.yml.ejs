@@ -1,0 +1,122 @@
+# Simplified Docker Compose for Backend Development
+# Clean setup with database and microservices
+
+version: '3.8'
+
+services:
+<% if (backend.eventQueue) { %>
+  # =============================================================================
+  # Redis Cache & Job Queue
+  # =============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: auth_boilerplate_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis-password}
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis-password}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+<% } %>
+  # =============================================================================
+  # PostgreSQL Database
+  # =============================================================================
+  database:
+    image: postgres:16-alpine
+    container_name: auth_boilerplate_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # =============================================================================
+  # REST API Service (Development)
+  # =============================================================================
+  rest-api:
+    build:
+      context: ./backend
+      target: rest-api-dev
+      dockerfile: Dockerfile
+    container_name: auth_boilerplate_rest_api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@database:5432/${DB_NAME}?schema=public
+      JWT_SECRET: ${JWT_SECRET}
+      API_HOST: 0.0.0.0
+      API_PORT: 8080
+      LOG_LEVEL: debug
+    ports:
+      - "8080:8080"
+    volumes:
+      # Hot reload for development
+      - ./backend:/app:cached
+      - /app/node_modules
+    depends_on:
+      database:
+        condition: service_healthy
+    # Optional environment file
+    env_file:
+      - ./backend/.env
+
+<% if (backend.eventQueue) { %>
+  # =============================================================================
+  # Event Queue Service (Development)
+  # =============================================================================
+  event-queue:
+    build:
+      context: ./backend
+      target: event-queue-dev
+      dockerfile: Dockerfile
+    container_name: auth_boilerplate_event_queue
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@database:5432/${DB_NAME}?schema=public
+      JWT_SECRET: ${JWT_SECRET}
+      LOG_LEVEL: debug
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis-password}
+    volumes:
+      # Hot reload for development
+      - ./backend:/app:cached
+      - /app/node_modules
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # Optional environment file
+    env_file:
+      - ./backend/.env
+
+<% } %>
+# =============================================================================
+# Volumes for data persistence
+# =============================================================================
+volumes:
+  postgres_data:
+    driver: local
+<% if (backend.eventQueue) { %>
+  redis_data:
+    driver: local
+<% } %>

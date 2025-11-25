@@ -1,0 +1,96 @@
+import validateNpmPackageName from 'validate-npm-package-name';
+import type { ProjectConfig } from '../types/index.js';
+
+export interface ValidationResult {
+  valid: boolean;
+  error?: string;
+}
+
+export function validateProjectName(name: string): ValidationResult {
+  // Check if empty
+  if (!name || name.trim().length === 0) {
+    return {
+      valid: false,
+      error: 'Project name cannot be empty',
+    };
+  }
+
+  // Check npm package name validity
+  const npmValidation = validateNpmPackageName(name);
+  if (!npmValidation.validForNewPackages) {
+    const errors = [
+      ...(npmValidation.errors || []),
+      ...(npmValidation.warnings || []),
+    ];
+    return {
+      valid: false,
+      error: errors.join(', '),
+    };
+  }
+
+  // Additional checks
+  if (name.length > 214) {
+    return {
+      valid: false,
+      error: 'Project name must be less than 214 characters',
+    };
+  }
+
+  if (!/^[a-z0-9-]+$/.test(name)) {
+    return {
+      valid: false,
+      error: 'Project name must contain only lowercase letters, numbers, and hyphens',
+    };
+  }
+
+  return { valid: true };
+}
+
+export function validateConfiguration(config: ProjectConfig): ValidationResult {
+  // Validate project name
+  const nameValidation = validateProjectName(config.projectName);
+  if (!nameValidation.valid) {
+    return nameValidation;
+  }
+
+  // Validate package manager
+  const validPackageManagers = ['npm', 'yarn', 'bun'];
+  if (!validPackageManagers.includes(config.packageManager)) {
+    return {
+      valid: false,
+      error: 'Package manager must be one of: npm, yarn, bun',
+    };
+  }
+
+  // Validate paywall requires RevenueCat
+  if (config.features.paywall && !config.integrations.revenueCat.enabled) {
+    return {
+      valid: false,
+      error: 'Paywall feature requires RevenueCat integration',
+    };
+  }
+
+  // Validate onboarding pages
+  if (config.features.onboarding.enabled) {
+    const pages = config.features.onboarding.pages;
+    if (pages < 1 || pages > 5) {
+      return {
+        valid: false,
+        error: 'Onboarding pages must be between 1 and 5',
+      };
+    }
+  }
+
+  // Validate onboarding paywall requires RevenueCat
+  if (
+    config.features.onboarding.showPaywall &&
+    !config.integrations.revenueCat.enabled
+  ) {
+    return {
+      valid: false,
+      error: 'Onboarding paywall requires RevenueCat integration',
+    };
+  }
+
+  return { valid: true };
+}
