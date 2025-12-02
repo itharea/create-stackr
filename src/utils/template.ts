@@ -48,9 +48,7 @@ export function shouldIncludeFile(
     return false;
   }
 
-  if (filePath.includes('features/tabs') && !config.features.tabs) {
-    return false;
-  }
+  // Note: Tabs templates are always included (not conditional)
 
   if (filePath.includes('integrations/revenuecat') && !config.integrations.revenueCat.enabled) {
     return false;

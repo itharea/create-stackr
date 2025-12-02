@@ -154,7 +154,7 @@ describe('Integration Tests - Prompt Flows', () => {
         .mockResolvedValueOnce({ preset: 'custom' }) // Select custom
         .mockResolvedValueOnce({
           // Feature selection
-          features: ['onboarding', 'authentication', 'paywall', 'sessionManagement', 'tabs'],
+          features: ['onboarding', 'authentication', 'paywall', 'sessionManagement'],
         })
         .mockResolvedValueOnce({
           // SDK selection
@@ -189,7 +189,7 @@ describe('Integration Tests - Prompt Flows', () => {
       inquirer.prompt
         .mockResolvedValueOnce({ preset: 'custom' })
         .mockResolvedValueOnce({
-          features: ['authentication', 'sessionManagement', 'tabs'],
+          features: ['authentication', 'sessionManagement'],
         })
         .mockResolvedValueOnce({ sdks: [] })
         .mockResolvedValueOnce({ packageManager: 'npm' });

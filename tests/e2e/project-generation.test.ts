@@ -37,7 +37,6 @@ describe('E2E: Full Project Generation', () => {
         authentication: true,
         paywall: false,
         sessionManagement: true,
-        tabs: true,
       },
       integrations: {
         revenueCat: { enabled: false, iosKey: '', androidKey: '' },
@@ -100,7 +99,6 @@ describe('E2E: Full Project Generation', () => {
         authentication: true,
         paywall: true,
         sessionManagement: true,
-        tabs: true,
       },
       integrations: {
         revenueCat: { enabled: true, iosKey: 'test-ios-key', androidKey: 'test-android-key' },
@@ -174,7 +172,6 @@ describe('E2E: Full Project Generation', () => {
         authentication: true,
         paywall: false,
         sessionManagement: true,
-        tabs: true,
       },
       integrations: {
         revenueCat: { enabled: false, iosKey: '', androidKey: '' },
@@ -224,7 +221,6 @@ describe('E2E: Full Project Generation', () => {
         authentication: true,
         paywall: false,
         sessionManagement: true,
-        tabs: true,
       },
       integrations: {
         revenueCat: { enabled: false, iosKey: '', androidKey: '' },

@@ -16,7 +16,6 @@ export const PRESETS: PresetDefinition[] = [
         authentication: true,
         paywall: false,
         sessionManagement: true,
-        tabs: true,
       },
       integrations: {
         revenueCat: {
@@ -61,7 +60,6 @@ export const PRESETS: PresetDefinition[] = [
         authentication: true,
         paywall: true,
         sessionManagement: true,
-        tabs: true,
       },
       integrations: {
         revenueCat: {
@@ -106,7 +104,6 @@ export const PRESETS: PresetDefinition[] = [
         authentication: true,
         paywall: false,
         sessionManagement: true,
-        tabs: true,
       },
       integrations: {
         revenueCat: {

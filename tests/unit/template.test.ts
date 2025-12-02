@@ -11,7 +11,6 @@ describe('Template Utils', () => {
       authentication: true,
       paywall: false,
       sessionManagement: true,
-      tabs: true,
     },
     integrations: {
       revenueCat: { enabled: false, iosKey: '', androidKey: '' },
@@ -197,7 +196,6 @@ describe('Template Utils', () => {
         expect(parsed.expo.extra.features.onboarding.enabled).toBe(true);
         expect(parsed.expo.extra.features.authentication).toBe(true);
         expect(parsed.expo.extra.features.paywall).toBe(false);
-        expect(parsed.expo.extra.features.tabs).toBe(true);
       });
 
       it('should include revenueCat config in extra when enabled', async () => {

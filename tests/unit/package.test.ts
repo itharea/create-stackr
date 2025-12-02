@@ -11,7 +11,6 @@ describe('Package Utils', () => {
       authentication: false,
       paywall: false,
       sessionManagement: false,
-      tabs: false,
     },
     integrations: {
       revenueCat: { enabled: false, iosKey: '', androidKey: '' },

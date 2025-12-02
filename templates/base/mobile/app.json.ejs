@@ -56,8 +56,7 @@
           "enabled": <%= features.onboarding.enabled %>
         },
         "authentication": <%= features.authentication %>,
-        "paywall": <%= features.paywall %>,
-        "tabs": <%= features.tabs %>
+        "paywall": <%= features.paywall %>
       }<% if (integrations.revenueCat.enabled) { %>,
       "revenueCat": {
         "iosKey": "<%= integrations.revenueCat.iosKey || 'YOUR_IOS_API_KEY_HERE' %>",

@@ -37,7 +37,6 @@ describe('ProjectGenerator', () => {
         authentication: true,
         paywall: false,
         sessionManagement: true,
-        tabs: true,
       },
       integrations: {
         revenueCat: { enabled: false, iosKey: '', androidKey: '' },
@@ -85,7 +84,6 @@ describe('ProjectGenerator', () => {
         authentication: true,
         paywall: false,
         sessionManagement: true,
-        tabs: true,
       },
       integrations: {
         revenueCat: { enabled: false, iosKey: '', androidKey: '' },
@@ -127,7 +125,6 @@ describe('ProjectGenerator', () => {
         authentication: true,
         paywall: true,
         sessionManagement: true,
-        tabs: true,
       },
       integrations: {
         revenueCat: { enabled: true, iosKey: 'test-ios-key', androidKey: 'test-android-key' },
@@ -173,7 +170,6 @@ describe('ProjectGenerator', () => {
         authentication: true,
         paywall: false,
         sessionManagement: true,
-        tabs: true,
       },
       integrations: {
         revenueCat: { enabled: false, iosKey: '', androidKey: '' },

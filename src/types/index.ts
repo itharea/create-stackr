@@ -14,7 +14,6 @@ export interface ProjectConfig {
     authentication: boolean;
     paywall: boolean;
     sessionManagement: boolean;
-    tabs: boolean;
   };
 
   // SDK integrations

@@ -8,7 +8,6 @@ export const fullFeaturedConfig: Readonly<ProjectConfig> = {
     authentication: true,
     paywall: true,
     sessionManagement: true,
-    tabs: true,
   },
   integrations: {
     revenueCat: { enabled: true, iosKey: 'test_ios_key', androidKey: 'test_android_key' },

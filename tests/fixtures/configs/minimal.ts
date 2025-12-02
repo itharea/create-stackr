@@ -8,7 +8,6 @@ export const minimalConfig: Readonly<ProjectConfig> = {
     authentication: true,
     paywall: false,
     sessionManagement: true,
-    tabs: true,
   },
   integrations: {
     revenueCat: { enabled: false, iosKey: '', androidKey: '' },

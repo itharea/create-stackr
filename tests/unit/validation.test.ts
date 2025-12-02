@@ -53,7 +53,6 @@ describe('validateConfiguration', () => {
       authentication: true,
       paywall: false,
       sessionManagement: true,
-      tabs: true,
     },
     integrations: {
       revenueCat: {

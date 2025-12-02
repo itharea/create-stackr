@@ -42,7 +42,6 @@ describe('Preset Edge Cases', () => {
         authentication: true,
         paywall: false,
         sessionManagement: true,
-        tabs: true,
       },
       integrations: {
         revenueCat: { enabled: false, iosKey: '', androidKey: '' },

@@ -16,7 +16,6 @@ describe('Copy Utils', () => {
       authentication: true,
       paywall: false,
       sessionManagement: true,
-      tabs: true,
     },
     integrations: {
       revenueCat: { enabled: false, iosKey: '', androidKey: '' },

@@ -46,7 +46,6 @@ describe('Presets', () => {
       expect(preset.config.features.authentication).toBeDefined();
       expect(preset.config.features.paywall).toBeDefined();
       expect(preset.config.features.sessionManagement).toBeDefined();
-      expect(preset.config.features.tabs).toBeDefined();
     });
   });
 

@@ -27,11 +27,6 @@ export async function promptFeatures(): Promise<any> {
           value: 'sessionManagement',
           checked: true,
         },
-        {
-          name: 'Tab Navigation - Main tab-based navigation',
-          value: 'tabs',
-          checked: true,
-        },
       ],
     },
   ]);
@@ -46,6 +41,5 @@ export async function promptFeatures(): Promise<any> {
     authentication: answers.features.includes('authentication'),
     paywall: answers.features.includes('paywall'),
     sessionManagement: answers.features.includes('sessionManagement'),
-    tabs: answers.features.includes('tabs'),
   };
 }

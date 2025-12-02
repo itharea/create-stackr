@@ -25,7 +25,6 @@ describe('Onboarding Generator', () => {
         authentication: true,
         paywall: false,
         sessionManagement: true,
-        tabs: true,
       },
       integrations: {
         revenueCat: { enabled: false, iosKey: '', androidKey: '' },
@@ -57,7 +56,6 @@ describe('Onboarding Generator', () => {
         authentication: true,
         paywall: false,
         sessionManagement: true,
-        tabs: true,
       },
       integrations: {
         revenueCat: { enabled: false, iosKey: '', androidKey: '' },
@@ -90,7 +88,6 @@ describe('Onboarding Generator', () => {
         authentication: true,
         paywall: false,
         sessionManagement: true,
-        tabs: true,
       },
       integrations: {
         revenueCat: { enabled: false, iosKey: '', androidKey: '' },
@@ -137,7 +134,6 @@ describe('Onboarding Generator', () => {
         authentication: true,
         paywall: false,
         sessionManagement: true,
-        tabs: true,
       },
       integrations: {
         revenueCat: { enabled: false, iosKey: '', androidKey: '' },
@@ -174,7 +170,6 @@ describe('Onboarding Generator', () => {
         authentication: true,
         paywall: true,
         sessionManagement: true,
-        tabs: true,
       },
       integrations: {
         revenueCat: { enabled: true, iosKey: 'test-key', androidKey: 'test-key' },
@@ -210,7 +205,6 @@ describe('Onboarding Generator', () => {
         authentication: true,
         paywall: false,
         sessionManagement: true,
-        tabs: true,
       },
       integrations: {
         revenueCat: { enabled: false, iosKey: '', androidKey: '' },
