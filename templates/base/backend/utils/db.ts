@@ -1,4 +1,5 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "../prisma/generated/prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 
 let db: PrismaClient;
 
@@ -6,15 +7,21 @@ declare global {
   var __db: PrismaClient | undefined;
 }
 
+// Create adapter with connection string
+const createAdapter = () =>
+  new PrismaPg({
+    connectionString: process.env.DATABASE_URL,
+  });
+
 // Use global instance in development to prevent exhausting database connections during hot reloads
 if (process.env.NODE_ENV === "production") {
   db = new PrismaClient({
-    log: [{ emit: "event", level: "query" }],
+    adapter: createAdapter(),
   });
 } else {
   if (!global.__db) {
     global.__db = new PrismaClient({
-      log: [{ emit: "event", level: "query" }],
+      adapter: createAdapter(),
     });
   }
   db = global.__db;
@@ -29,15 +36,15 @@ db.$connect()
   });
 
 // Gracefully disconnect on process termination
-process.on('SIGINT', async () => {
+process.on("SIGINT", async () => {
   await db.$disconnect();
-  console.log('Database connection closed.');
+  console.log("Database connection closed.");
   process.exit(0);
 });
 
-process.on('SIGTERM', async () => {
+process.on("SIGTERM", async () => {
   await db.$disconnect();
-  console.log('Database connection closed.');
+  console.log("Database connection closed.");
   process.exit(0);
 });
 

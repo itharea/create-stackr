@@ -97,6 +97,9 @@ export const isValidEmail = (email: string): boolean => {
 /**
  * Format name for display
  */
-export const formatDisplayName = (name: string): string => {
+export const formatDisplayName = (name: string | null | undefined, fallback: string = 'User'): string => {
+  if (!name || !name.trim()) {
+    return fallback;
+  }
   return capitalizeWords(name.trim());
 };

@@ -1,207 +1,151 @@
-import { AuthFastifyRequest, SessionFastifyRequest, AuthOrSessionFastifyRequest, FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
+import type {
+  AuthFastifyRequest,
+  DeviceSessionFastifyRequest,
+  AuthOrDeviceSessionFastifyRequest,
+} from "fastify";
+import { FastifyPluginAsync, FastifyRequest, FastifyReply } from "fastify";
 import fp from "fastify-plugin";
-
-import jwt from "../../../utils/jwt";
-import Ajv from "ajv";
-import { User, UserSchema } from "../../../domain/user/schema";
-import { Session } from "../../../domain/session/schema";
-import { Type } from "@sinclair/typebox";
-import { isUserExistByEmail } from "../../../domain/user/repository";
-import { validateSession, updateSessionActivity } from "../../../domain/session/repository";
+import { auth, Session } from "../../../lib/auth";
+import { validateDeviceSession, updateDeviceSessionActivity } from "../../../domain/device-session/repository";
+import { DeviceSession } from "../../../domain/device-session/schema";
 import { ErrorFactory, normalizeError } from "../../../utils/errors";
 
-// JWT payload schema
-const JWTPayloadSchema = Type.Object({
-  id: Type.String(),
-  email: Type.String(),
-  name: Type.String(),
-  iat: Type.Optional(Type.Number()),
-  exp: Type.Optional(Type.Number()),
-});
-
-const ajv = new Ajv({
-  allErrors: true,
-  removeAdditional: true,
-  useDefaults: true,
-  coerceTypes: true,
-});
+/**
+ * Convert Node.js/Fastify headers to Web API Headers object for BetterAuth
+ */
+function toHeaders(requestHeaders: FastifyRequest["headers"]): Headers {
+  const headers = new Headers();
+  Object.entries(requestHeaders).forEach(([key, value]) => {
+    if (value) headers.set(key, Array.isArray(value) ? value[0] : value);
+  });
+  return headers;
+}
 
 const authPlugin: FastifyPluginAsync = async (server) => {
+  // Authenticated user middleware (using BetterAuth session)
+  // Uses cookie-based authentication for both mobile and web clients
   server.decorate(
     "requireAuth",
     async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       try {
-        // Extract the token from the Authorization header
-        const authHeader = request.headers.authorization;
-        if (!authHeader || !authHeader.startsWith("Bearer ")) {
-          throw ErrorFactory.tokenMissing();
+        // Validate session via BetterAuth (reads cookies from headers)
+        const session = await auth.api.getSession({
+          headers: toHeaders(request.headers),
+        });
+
+        if (!session || !session.user) {
+          throw ErrorFactory.unauthorized();
         }
 
-        const token = authHeader.substring(7, authHeader.length);
-
-        // Verify the token
-        let decoded: any;
-        try {
-          decoded = jwt.verify(token);
-        } catch (jwtError) {
-          throw ErrorFactory.tokenInvalid({
-            reason: jwtError instanceof Error ? jwtError.message : 'Token verification failed'
-          });
-        }
-
-        // Validate the decoded token payload
-        const validate = ajv.compile(JWTPayloadSchema);
-        const valid = validate(decoded);
-
-        if (!valid) {
-          throw ErrorFactory.tokenInvalid({
-            reason: 'Invalid token payload structure',
-            details: validate.errors
-          });
-        }
-
-        const user = decoded as User;
-        
-        // Check if user still exists in database
-        const userExists = await isUserExistByEmail(user.email);
-
-        if (!userExists) {
-          throw ErrorFactory.userNotFound();
-        }
-
-        (request as AuthFastifyRequest).user = user;
-        (request as AuthFastifyRequest).token = token;
-
+        // Attach to request
+        (request as AuthFastifyRequest).user = session.user;
+        (request as AuthFastifyRequest).session = session.session;
       } catch (error) {
-        // Normalize the error and send standardized response
         const appError = normalizeError(error);
-        const response = appError.toApiResponse(
-          request.id,
-          request.url
-        );
-
+        const response = appError.toApiResponse(request.id, request.url);
         return reply.status(appError.statusCode).send(response);
       }
     }
   );
 
-  // Session-only authentication middleware
+  // Anonymous device session middleware (for device-based sessions before auth)
   server.decorate(
-    "requireSession",
+    "requireDeviceSession",
     async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       try {
-        // Extract the session token from the X-Session-Token header
-        const sessionTokenHeader = request.headers['x-session-token'] as string;
+        const sessionTokenHeader = request.headers["x-device-session-token"] as string;
         if (!sessionTokenHeader) {
           throw ErrorFactory.tokenMissing();
         }
 
-        // Validate the session
-        const session = await validateSession(sessionTokenHeader);
-        if (!session) {
+        const deviceSession = await validateDeviceSession(sessionTokenHeader);
+        if (!deviceSession) {
           throw ErrorFactory.sessionNotFound();
         }
 
-        // Update session activity (heartbeat)
-        await updateSessionActivity(sessionTokenHeader);
+        await updateDeviceSessionActivity(sessionTokenHeader);
 
-        (request as SessionFastifyRequest).session = session;
-        (request as SessionFastifyRequest).sessionToken = sessionTokenHeader;
-
+        (request as DeviceSessionFastifyRequest).deviceSession = deviceSession;
+        (request as DeviceSessionFastifyRequest).sessionToken = sessionTokenHeader;
       } catch (error) {
-        // Normalize the error and send standardized response
         const appError = normalizeError(error);
-        const response = appError.toApiResponse(
-          request.id,
-          request.url
-        );
-
+        const response = appError.toApiResponse(request.id, request.url);
         return reply.status(appError.statusCode).send(response);
       }
     }
   );
 
-  // Flexible authentication middleware (accepts either JWT or Session)
+  // Flexible auth: accepts either BetterAuth session or device session
   server.decorate(
-    "requireAuthOrSession",
+    "requireAuthOrDeviceSession",
     async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       try {
-        const authHeader = request.headers.authorization;
-        const sessionTokenHeader = request.headers['x-session-token'] as string;
+        // Try BetterAuth session first (cookie-based)
+        try {
+          const session = await auth.api.getSession({
+            headers: toHeaders(request.headers),
+          });
 
-        // Try JWT first
-        if (authHeader && authHeader.startsWith("Bearer ")) {
-          try {
-            await server.requireAuth(request, reply);
-            // If we get here, JWT auth succeeded
-            (request as AuthOrSessionFastifyRequest).authType = 'user';
+          if (session && session.user) {
+            (request as AuthOrDeviceSessionFastifyRequest).user = session.user;
+            (request as AuthOrDeviceSessionFastifyRequest).session = session.session;
+            (request as AuthOrDeviceSessionFastifyRequest).authType = "user";
             return;
-          } catch (jwtError) {
-            // JWT auth failed, try session auth
           }
+        } catch {
+          // BetterAuth session not found, try device session
         }
 
-        // Try session token
+        // Try device session
+        const sessionTokenHeader = request.headers["x-device-session-token"] as string;
         if (sessionTokenHeader) {
-          try {
-            await server.requireSession(request, reply);
-            // If we get here, session auth succeeded
-            (request as AuthOrSessionFastifyRequest).authType = 'session';
+          const deviceSession = await validateDeviceSession(sessionTokenHeader);
+          if (deviceSession) {
+            await updateDeviceSessionActivity(sessionTokenHeader);
+            (request as AuthOrDeviceSessionFastifyRequest).deviceSession = deviceSession;
+            (request as AuthOrDeviceSessionFastifyRequest).sessionToken = sessionTokenHeader;
+            (request as AuthOrDeviceSessionFastifyRequest).authType = "device";
             return;
-          } catch (sessionError) {
-            // Session auth failed
           }
         }
 
-        // Neither auth method worked
-        throw ErrorFactory.tokenMissing();
-
+        throw ErrorFactory.unauthorized();
       } catch (error) {
-        // Normalize the error and send standardized response
         const appError = normalizeError(error);
-        const response = appError.toApiResponse(
-          request.id,
-          request.url
-        );
-
+        const response = appError.toApiResponse(request.id, request.url);
         return reply.status(appError.statusCode).send(response);
       }
     }
   );
 };
 
+// Extend Fastify module with auth types and middleware decorators
 declare module "fastify" {
+  // For authenticated users (BetterAuth session)
   export interface AuthFastifyRequest extends FastifyRequest {
-    user: User;
-    token: string;
+    user: Session["user"];
+    session: Session["session"];
   }
 
-  export interface SessionFastifyRequest extends FastifyRequest {
-    session: Session;
+  // For device/anonymous sessions (before user authentication)
+  export interface DeviceSessionFastifyRequest extends FastifyRequest {
+    deviceSession: DeviceSession;
     sessionToken: string;
   }
 
-  export interface AuthOrSessionFastifyRequest extends FastifyRequest {
-    user?: User;
-    token?: string;
-    session?: Session;
+  // For endpoints that accept either auth type
+  export interface AuthOrDeviceSessionFastifyRequest extends FastifyRequest {
+    user?: Session["user"];
+    session?: Session["session"];
+    deviceSession?: DeviceSession;
     sessionToken?: string;
-    authType: 'user' | 'session';
+    authType: "user" | "device";
   }
 
-  export interface FastifyInstance {
-    requireAuth: (
-      request: FastifyRequest,
-      reply: FastifyReply
-    ) => Promise<void>;
-    requireSession: (
-      request: FastifyRequest,
-      reply: FastifyReply
-    ) => Promise<void>;
-    requireAuthOrSession: (
-      request: FastifyRequest,
-      reply: FastifyReply
-    ) => Promise<void>;
+  interface FastifyInstance {
+    requireAuth: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    requireDeviceSession: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    requireAuthOrDeviceSession: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   }
 }
 

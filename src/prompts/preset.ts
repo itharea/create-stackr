@@ -4,7 +4,7 @@ import { PRESETS } from '../config/presets.js';
 import type { ProjectConfig } from '../types/index.js';
 
 export async function selectPreset(): Promise<
-  Omit<ProjectConfig, 'projectName' | 'packageManager'> | null
+  Omit<ProjectConfig, 'projectName' | 'packageManager' | 'appScheme'> | null
 > {
   const choices = [
     ...PRESETS.map((preset) => ({
@@ -44,8 +44,8 @@ export async function selectPreset(): Promise<
 }
 
 export async function customizePreset(
-  config: Omit<ProjectConfig, 'projectName' | 'packageManager'>
-): Promise<Omit<ProjectConfig, 'projectName' | 'packageManager'>> {
+  config: Omit<ProjectConfig, 'projectName' | 'packageManager' | 'appScheme'>
+): Promise<Omit<ProjectConfig, 'projectName' | 'packageManager' | 'appScheme'>> {
   const { customize } = await inquirer.prompt([
     {
       type: 'confirm',
@@ -149,7 +149,7 @@ export async function customizePreset(
 }
 
 function displayPresetSummary(
-  config: Omit<ProjectConfig, 'projectName' | 'packageManager'>
+  config: Omit<ProjectConfig, 'projectName' | 'packageManager' | 'appScheme'>
 ): void {
   console.log(chalk.gray('Current configuration:'));
   console.log(

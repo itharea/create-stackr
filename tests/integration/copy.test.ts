@@ -11,9 +11,21 @@ describe('Copy Utils', () => {
   const mockConfig: ProjectConfig = {
     projectName: 'test-app',
     packageManager: 'npm',
+    appScheme: 'testapp',
     features: {
       onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
-      authentication: true,
+      authentication: {
+        enabled: true,
+        providers: {
+          emailPassword: true,
+          google: false,
+          apple: false,
+          github: false,
+        },
+        emailVerification: false,
+        passwordReset: true,
+        twoFactor: false,
+      },
       paywall: false,
       sessionManagement: true,
     },

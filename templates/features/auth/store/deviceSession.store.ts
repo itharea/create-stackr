@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { sessionService, Session, MigrationEligibilityResponse } from '../services/session';
+import { deviceSessionService, DeviceSession, DeviceSessionMigrationEligibilityResponse } from '../services/deviceSession';
 import { logger } from '../utils/logger';
 
 export interface MigrateSessionData {
@@ -25,7 +25,7 @@ export interface SessionMigrationResponse {
 
 interface SessionState {
   // State
-  session: Session | null;
+  session: DeviceSession | null;
   sessionToken: string | null;
   deviceId: string | null;
   isLoading: boolean;
@@ -33,7 +33,7 @@ interface SessionState {
   error: string | null;
 
   // Actions
-  setSession: (session: Session | null) => void;
+  setSession: (session: DeviceSession | null) => void;
   setSessionToken: (token: string | null) => void;
   setDeviceId: (deviceId: string | null) => void;
   setLoading: (loading: boolean) => void;
@@ -46,7 +46,7 @@ interface SessionState {
   initializeSession: () => Promise<void>;
   deleteSession: () => Promise<void>;
   isSessionValid: () => Promise<boolean>;
-  getMigrationEligibility: () => Promise<MigrationEligibilityResponse>;
+  getMigrationEligibility: () => Promise<DeviceSessionMigrationEligibilityResponse>;
   migrateSession: (data: MigrateSessionData) => Promise<SessionMigrationResponse>;
   refreshSession: () => Promise<void>;
 
@@ -88,13 +88,13 @@ export const useSessionStore = create<SessionState>()(
         logger.debug('SessionStore: Initializing session...');
         set({ isLoading: true, error: null });
 
-        const sessionData = await sessionService.initialize();
+        const sessionData = await deviceSessionService.initialize();
         
         if (sessionData) {
           set({
             session: sessionData,
-            sessionToken: await sessionService.getSessionToken(),
-            deviceId: sessionService.getDeviceId(),
+            sessionToken: await deviceSessionService.getSessionToken(),
+            deviceId: deviceSessionService.getDeviceId(),
           });
           logger.info('SessionStore: Session initialized successfully', { 
             sessionId: sessionData.id,
@@ -130,7 +130,7 @@ export const useSessionStore = create<SessionState>()(
           // Don't throw - not critical
         }
 
-        await sessionService.deleteSession();
+        await deviceSessionService.deleteSession();
         set({ session: null, sessionToken: null, deviceId: null });
 
         logger.info('SessionStore: Session deleted successfully');
@@ -159,7 +159,7 @@ export const useSessionStore = create<SessionState>()(
       try {
         logger.debug('SessionStore: Checking session validity...');
         
-        const isValid = await sessionService.isSessionValid();
+        const isValid = await deviceSessionService.isDeviceSessionValid();
         
         if (!isValid && get().session) {
           // Session became invalid, clear it
@@ -180,7 +180,7 @@ export const useSessionStore = create<SessionState>()(
         logger.debug('SessionStore: Checking migration eligibility...');
         set({ error: null });
         
-        const eligibility = await sessionService.getMigrationEligibility();
+        const eligibility = await deviceSessionService.getMigrationEligibility();
         
         logger.debug('SessionStore: Migration eligibility checked', { 
           canMigrate: eligibility.canMigrate
@@ -258,9 +258,9 @@ export const useSessionStore = create<SessionState>()(
         set({ error: null });
         
         // Check if current session is still valid
-        const currentSession = sessionService.getCurrentSession();
+        const currentSession = deviceSessionService.getCurrentDeviceSession();
         if (currentSession) {
-          const isValid = await sessionService.isSessionValid();
+          const isValid = await deviceSessionService.isDeviceSessionValid();
           
           if (isValid) {
             // Session is still valid, just update the local state

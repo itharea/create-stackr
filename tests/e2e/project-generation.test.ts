@@ -32,9 +32,21 @@ describe('E2E: Full Project Generation', () => {
     const config: ProjectConfig & { skipInstall: boolean } = {
       projectName: 'minimal-app',
       packageManager: 'npm',
+      appScheme: 'minimalapp',
       features: {
         onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
-        authentication: true,
+        authentication: {
+          enabled: true,
+          providers: {
+            emailPassword: true,
+            google: false,
+            apple: false,
+            github: false,
+          },
+          emailVerification: false,
+          passwordReset: true,
+          twoFactor: false,
+        },
         paywall: false,
         sessionManagement: true,
       },
@@ -94,9 +106,21 @@ describe('E2E: Full Project Generation', () => {
     const config: ProjectConfig & { skipInstall: boolean } = {
       projectName: 'full-featured-app',
       packageManager: 'npm',
+      appScheme: 'fullfeaturedapp',
       features: {
         onboarding: { enabled: true, pages: 5, skipButton: true, showPaywall: true },
-        authentication: true,
+        authentication: {
+          enabled: true,
+          providers: {
+            emailPassword: true,
+            google: true,
+            apple: true,
+            github: false,
+          },
+          emailVerification: true,
+          passwordReset: true,
+          twoFactor: false,
+        },
         paywall: true,
         sessionManagement: true,
       },
@@ -167,9 +191,21 @@ describe('E2E: Full Project Generation', () => {
     const config: ProjectConfig & { skipInstall: boolean } = {
       projectName: 'json-test-app',
       packageManager: 'npm',
+      appScheme: 'jsontestapp',
       features: {
         onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
-        authentication: true,
+        authentication: {
+          enabled: true,
+          providers: {
+            emailPassword: true,
+            google: false,
+            apple: false,
+            github: false,
+          },
+          emailVerification: false,
+          passwordReset: true,
+          twoFactor: false,
+        },
         paywall: false,
         sessionManagement: true,
       },
@@ -216,9 +252,21 @@ describe('E2E: Full Project Generation', () => {
     const config: ProjectConfig & { skipInstall: boolean } = {
       projectName: 'ts-test-app',
       packageManager: 'npm',
+      appScheme: 'tstestapp',
       features: {
         onboarding: { enabled: true, pages: 3, skipButton: true, showPaywall: false },
-        authentication: true,
+        authentication: {
+          enabled: true,
+          providers: {
+            emailPassword: true,
+            google: false,
+            apple: false,
+            github: false,
+          },
+          emailVerification: false,
+          passwordReset: true,
+          twoFactor: false,
+        },
         paywall: false,
         sessionManagement: true,
       },

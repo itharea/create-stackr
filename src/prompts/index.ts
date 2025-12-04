@@ -6,6 +6,7 @@ import { promptOnboarding } from './onboarding.js';
 import { promptPackageManager } from './packageManager.js';
 import { PRESETS } from '../config/presets.js';
 import type { ProjectConfig, CLIOptions } from '../types/index.js';
+import { deriveAppScheme } from '../types/index.js';
 
 export async function collectConfiguration(
   projectName: string | undefined,
@@ -21,6 +22,7 @@ export async function collectConfiguration(
     return {
       ...config,
       projectName: name,
+      appScheme: deriveAppScheme(name),
       packageManager,
     };
   }
@@ -31,6 +33,7 @@ export async function collectConfiguration(
     return {
       ...config,
       projectName: name,
+      appScheme: deriveAppScheme(name),
       packageManager: 'npm',
     };
   }
@@ -52,12 +55,13 @@ export async function collectConfiguration(
   return {
     ...config,
     projectName: name,
+    appScheme: deriveAppScheme(name),
     packageManager,
   };
 }
 
 async function collectCustomConfiguration(): Promise<
-  Omit<ProjectConfig, 'projectName' | 'packageManager'>
+  Omit<ProjectConfig, 'projectName' | 'packageManager' | 'appScheme'>
 > {
   // Collect features
   const features = await promptFeatures();
@@ -91,7 +95,7 @@ async function collectCustomConfiguration(): Promise<
 
 async function loadPresetByName(
   presetName: string
-): Promise<Omit<ProjectConfig, 'projectName' | 'packageManager'>> {
+): Promise<Omit<ProjectConfig, 'projectName' | 'packageManager' | 'appScheme'>> {
   const preset = PRESETS.find(
     (p) => p.name.toLowerCase() === presetName.toLowerCase()
   );

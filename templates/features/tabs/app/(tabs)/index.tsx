@@ -7,16 +7,17 @@ import {
   ScrollView,
   Modal,
   Pressable,
+  Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import Constants from 'expo-constants';
 import { useAuth } from '../../src/hooks';
-import { useSessionActions } from '../../src/store/session.store';
+import { useSessionActions } from '../../src/store/deviceSession.store';
 import { Button, Input } from '../../src/components/ui';
 import { formatDisplayName } from '../../src/utils/formatters';
 
 export default function HomeScreen() {
-  const { user, logout, deleteAccount, isLoading, isAuthenticated } = useAuth();
+  const { user, signOut, deleteAccount, isLoading, isAuthenticated } = useAuth();
   const { deleteSession, initializeSession } = useSessionActions();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -26,7 +27,10 @@ export default function HomeScreen() {
   const [isDeletingSession, setIsDeletingSession] = useState(false);
 
   const handleLogout = async () => {
-    await logout();
+    const result = await signOut();
+    if (!result.success) {
+      Alert.alert('Error', 'Failed to sign out. Please try again.');
+    }
     // Button visibility updates automatically via isAuthenticated state
     // Navigation handled by _layout.tsx reactively
   };
@@ -40,10 +44,19 @@ export default function HomeScreen() {
     const result = await deleteAccount();
     setIsDeleting(false);
 
-    if (result.success || !result.success) {
-      // Close modal (navigation handled by _layout.tsx)
+    if (result.success) {
+      // Clear BetterAuth session (important for UI to update)
+      await signOut();
+
+      // Close modal
       setShowDeleteModal(false);
       setDeleteConfirmText('');
+
+      // Navigation to login is handled reactively by _layout.tsx
+      // since isAuthenticated becomes false after signOut
+    } else {
+      // Show error to user
+      Alert.alert('Error', result.error || 'Failed to delete account. Please try again.');
     }
   };
 

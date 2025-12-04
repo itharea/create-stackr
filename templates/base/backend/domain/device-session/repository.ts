@@ -1,29 +1,24 @@
 import { db } from "../../utils/db";
 import { ErrorFactory } from "../../utils/errors";
 import {
-  Session,
-  CreateSessionBody,
-  CreateSessionResponse,
-  MigrationEligibilityResponse,
-  MigrateSessionBody,
-  MigrateSessionResponse,
+  DeviceSession,
+  CreateDeviceSessionBody,
+  CreateDeviceSessionResponse,
+  DeviceSessionMigrationEligibilityResponse,
 } from "./schema";
-import { createUser, isUserExistByEmail, isUsernameExist } from "../user/repository";
-import { hash } from "bcrypt";
-import jwt from "../../utils/jwt";
 
 // Generate a UUID v4 for session tokens
 const generateSessionToken = (): string => {
   return crypto.randomUUID();
 };
 
-export const createSession = async (data: CreateSessionBody): Promise<CreateSessionResponse> => {
+export const createDeviceSession = async (data: CreateDeviceSessionBody): Promise<CreateDeviceSessionResponse> => {
   const { deviceId } = data;
-  
+
   try {
     const sessionToken = generateSessionToken();
-    
-    const session = await db.session.create({
+
+    const session = await db.deviceSession.create({
       data: {
         deviceId,
         sessionToken,
@@ -53,16 +48,16 @@ export const createSession = async (data: CreateSessionBody): Promise<CreateSess
     };
   } catch (error) {
     throw ErrorFactory.databaseError({
-      operation: 'createSession',
+      operation: 'createDeviceSession',
       deviceId,
       originalError: error instanceof Error ? error.message : String(error)
     });
   }
 };
 
-export const validateSession = async (sessionToken: string): Promise<Session | null> => {
+export const validateDeviceSession = async (sessionToken: string): Promise<DeviceSession | null> => {
   try {
-    const session = await db.session.findUnique({
+    const session = await db.deviceSession.findUnique({
       where: { sessionToken },
       select: {
         id: true,
@@ -83,10 +78,10 @@ export const validateSession = async (sessionToken: string): Promise<Session | n
     // Check if session is expired (30 days of inactivity)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
+
     if (session.lastActiveAt < thirtyDaysAgo) {
       // Session expired, delete it
-      await deleteSession(sessionToken);
+      await deleteDeviceSession(sessionToken);
       return null;
     }
 
@@ -97,31 +92,31 @@ export const validateSession = async (sessionToken: string): Promise<Session | n
     };
   } catch (error) {
     throw ErrorFactory.databaseError({
-      operation: 'validateSession',
+      operation: 'validateDeviceSession',
       sessionToken,
       originalError: error instanceof Error ? error.message : String(error)
     });
   }
 };
 
-export const updateSessionActivity = async (sessionToken: string): Promise<void> => {
+export const updateDeviceSessionActivity = async (sessionToken: string): Promise<void> => {
   try {
-    await db.session.update({
+    await db.deviceSession.update({
       where: { sessionToken },
       data: { lastActiveAt: new Date() },
     });
   } catch (error) {
     throw ErrorFactory.databaseError({
-      operation: 'updateSessionActivity',
+      operation: 'updateDeviceSessionActivity',
       sessionToken,
       originalError: error instanceof Error ? error.message : String(error)
     });
   }
 };
 
-export const deleteSession = async (sessionToken: string): Promise<void> => {
+export const deleteDeviceSession = async (sessionToken: string): Promise<void> => {
   try {
-    await db.session.delete({
+    await db.deviceSession.delete({
       where: { sessionToken },
     });
   } catch (error) {
@@ -129,31 +124,30 @@ export const deleteSession = async (sessionToken: string): Promise<void> => {
     if (error instanceof Error && error.message.includes('Record to delete does not exist')) {
       return;
     }
-    
+
     throw ErrorFactory.databaseError({
-      operation: 'deleteSession',
+      operation: 'deleteDeviceSession',
       sessionToken,
       originalError: error instanceof Error ? error.message : String(error)
     });
   }
 };
 
-
-export const validateMigrationEligibility = async (sessionToken: string): Promise<MigrationEligibilityResponse> => {
+export const validateDeviceSessionMigrationEligibility = async (sessionToken: string): Promise<DeviceSessionMigrationEligibilityResponse> => {
   try {
-    const session = await validateSession(sessionToken);
-    
+    const session = await validateDeviceSession(sessionToken);
+
     if (!session) {
       return {
         canMigrate: false,
-        reason: 'Session not found or expired',
+        reason: 'Device session not found or expired',
       };
     }
 
     if (session.migrated) {
       return {
         canMigrate: false,
-        reason: 'Session already migrated to user account',
+        reason: 'Device session already migrated to user account',
       };
     }
 
@@ -162,114 +156,43 @@ export const validateMigrationEligibility = async (sessionToken: string): Promis
     };
   } catch (error) {
     throw ErrorFactory.databaseError({
-      operation: 'validateMigrationEligibility',
+      operation: 'validateDeviceSessionMigrationEligibility',
       sessionToken,
       originalError: error instanceof Error ? error.message : String(error)
     });
   }
 };
 
-export const migrateSessionToUser = async (data: MigrateSessionBody): Promise<MigrateSessionResponse> => {
-  const { sessionToken, name, email, password, passwordConfirmation } = data;
-
-  if (password !== passwordConfirmation) {
-    throw ErrorFactory.validationError('Password confirmation does not match');
-  }
-
+/**
+ * Migrate a device session to a user account
+ * This is called after a user signs up through BetterAuth to link their device session
+ */
+export const migrateDeviceSessionToUser = async (sessionToken: string, userId: string): Promise<void> => {
   try {
-    // Validate session exists and is eligible for migration
-    const session = await validateSession(sessionToken);
-    if (!session) {
-      throw ErrorFactory.sessionNotFound();
-    }
-
-    if (session.migrated) {
-      throw ErrorFactory.validationError('Session has already been migrated');
-    }
-
-    // Check if user with email already exists
-    const userExists = await isUserExistByEmail(email);
-    if (userExists) {
-      throw ErrorFactory.userAlreadyExists();
-    }
-
-    // Check if username already exists
-    const usernameExists = await isUsernameExist(name);
-    if (usernameExists) {
-      throw ErrorFactory.usernameAlreadyExists();
-    }
-
-    // Hash password
-    const hashedPassword = await hash(password, 12);
-
-    // Use a transaction to ensure data consistency
-    const result = await db.$transaction(async (prisma) => {
-      // Create new user
-      const newUser = await prisma.user.create({
-        data: {
-          email,
-          password: hashedPassword,
-          name,
-        },
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      });
-
-
-      // Mark session as migrated
-      await prisma.session.update({
-        where: { sessionToken },
-        data: {
-          migrated: true,
-          migratedToUserId: newUser.id,
-        },
-      });
-
-      return {
-        user: newUser,
-      };
-    });
-
-    // Generate JWT token for the new user
-    const token = jwt.sign({
-      id: result.user.id,
-      email: result.user.email,
-      name: result.user.name,
-    });
-
-    return {
-      user: {
-        id: result.user.id,
-        email: result.user.email,
-        name: result.user.name,
-        preferredCurrency: session.preferredCurrency,
-        createdAt: result.user.createdAt.toISOString(),
-        updatedAt: result.user.updatedAt.toISOString(),
+    await db.deviceSession.update({
+      where: { sessionToken },
+      data: {
+        migrated: true,
+        migratedToUserId: userId,
       },
-      token,
-    };
+    });
   } catch (error) {
     throw ErrorFactory.databaseError({
-      operation: 'migrateSessionToUser',
+      operation: 'migrateDeviceSessionToUser',
       sessionToken,
-      email,
+      userId,
       originalError: error instanceof Error ? error.message : String(error)
     });
   }
 };
 
-export const cleanupExpiredSessions = async (): Promise<number> => {
+export const cleanupExpiredDeviceSessions = async (): Promise<number> => {
   try {
     // Delete sessions older than 30 days of inactivity
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const result = await db.session.deleteMany({
+    const result = await db.deviceSession.deleteMany({
       where: {
         lastActiveAt: {
           lt: thirtyDaysAgo,
@@ -280,15 +203,15 @@ export const cleanupExpiredSessions = async (): Promise<number> => {
     return result.count;
   } catch (error) {
     throw ErrorFactory.databaseError({
-      operation: 'cleanupExpiredSessions',
+      operation: 'cleanupExpiredDeviceSessions',
       originalError: error instanceof Error ? error.message : String(error)
     });
   }
 };
 
-export const getSessionById = async (sessionId: string): Promise<Session | null> => {
+export const getDeviceSessionById = async (sessionId: string): Promise<DeviceSession | null> => {
   try {
-    const session = await db.session.findUnique({
+    const session = await db.deviceSession.findUnique({
       where: { id: sessionId },
       select: {
         id: true,
@@ -313,9 +236,13 @@ export const getSessionById = async (sessionId: string): Promise<Session | null>
     };
   } catch (error) {
     throw ErrorFactory.databaseError({
-      operation: 'getSessionById',
+      operation: 'getDeviceSessionById',
       sessionId,
       originalError: error instanceof Error ? error.message : String(error)
     });
   }
+};
+
+export const getDeviceSessionByToken = async (sessionToken: string): Promise<DeviceSession | null> => {
+  return validateDeviceSession(sessionToken);
 };

@@ -3,9 +3,21 @@ import type { ProjectConfig } from '../../../src/types/index.js';
 export const minimalConfig: Readonly<ProjectConfig> = {
   projectName: 'test-minimal',
   packageManager: 'npm',
+  appScheme: 'testminimal',
   features: {
     onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
-    authentication: true,
+    authentication: {
+      enabled: true,
+      providers: {
+        emailPassword: true,
+        google: false,
+        apple: false,
+        github: false,
+      },
+      emailVerification: false,
+      passwordReset: true,
+      twoFactor: false,
+    },
     paywall: false,
     sessionManagement: true,
   },

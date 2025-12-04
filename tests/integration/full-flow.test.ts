@@ -87,7 +87,7 @@ describe('Integration Tests - Prompt Flows', () => {
       expect(config.projectName).toBe('default-app');
       expect(config.packageManager).toBe('npm');
       expect(config.preset).toBe('minimal');
-      expect(config.features.authentication).toBe(true);
+      expect(config.features.authentication.enabled).toBe(true);
       expect(config.features.onboarding.enabled).toBe(false);
       expect(config.features.paywall).toBe(false);
     });
@@ -153,8 +153,13 @@ describe('Integration Tests - Prompt Flows', () => {
       inquirer.prompt
         .mockResolvedValueOnce({ preset: 'custom' }) // Select custom
         .mockResolvedValueOnce({
-          // Feature selection
+          // Feature selection (basic features)
           features: ['onboarding', 'authentication', 'paywall', 'sessionManagement'],
+        })
+        .mockResolvedValueOnce({
+          // Auth details (OAuth providers and features) - new in BetterAuth
+          providers: ['google'],
+          authFeatures: ['passwordReset'],
         })
         .mockResolvedValueOnce({
           // SDK selection
@@ -177,7 +182,8 @@ describe('Integration Tests - Prompt Flows', () => {
       expect(config.features.onboarding.pages).toBe(5);
       expect(config.features.onboarding.skipButton).toBe(true);
       expect(config.features.onboarding.showPaywall).toBe(true);
-      expect(config.features.authentication).toBe(true);
+      expect(config.features.authentication.enabled).toBe(true);
+      expect(config.features.authentication.providers.google).toBe(true);
       expect(config.features.paywall).toBe(true);
       expect(config.integrations.revenueCat.enabled).toBe(true);
       expect(config.integrations.adjust.enabled).toBe(true);
@@ -191,6 +197,11 @@ describe('Integration Tests - Prompt Flows', () => {
         .mockResolvedValueOnce({
           features: ['authentication', 'sessionManagement'],
         })
+        .mockResolvedValueOnce({
+          // Auth details (OAuth providers and features) - new in BetterAuth
+          providers: [],
+          authFeatures: ['passwordReset'],
+        })
         .mockResolvedValueOnce({ sdks: [] })
         .mockResolvedValueOnce({ packageManager: 'npm' });
 
@@ -198,15 +209,20 @@ describe('Integration Tests - Prompt Flows', () => {
       const config = await collectConfiguration('simple-app', options);
 
       expect(config.features.onboarding.enabled).toBe(false);
-      // Should only call prompt 4 times (custom, features, sdks, package manager)
+      // Should only call prompt 5 times (custom, features, auth details, sdks, package manager)
       // Not calling onboarding config prompt
-      expect(inquirer.prompt).toHaveBeenCalledTimes(4);
+      expect(inquirer.prompt).toHaveBeenCalledTimes(5);
     });
 
     it('should auto-enable ATT when Adjust is selected', async () => {
       inquirer.prompt
         .mockResolvedValueOnce({ preset: 'custom' })
         .mockResolvedValueOnce({ features: ['authentication'] })
+        .mockResolvedValueOnce({
+          // Auth details (OAuth providers and features) - new in BetterAuth
+          providers: [],
+          authFeatures: ['passwordReset'],
+        })
         .mockResolvedValueOnce({ sdks: ['adjust', 'scate'] })
         .mockResolvedValueOnce({ packageManager: 'npm' });
 
@@ -241,6 +257,7 @@ describe('Integration Tests - Prompt Flows', () => {
 
   describe('Backend configuration', () => {
     it('should always include backend with custom configuration', async () => {
+      // When features is empty (no 'authentication'), promptFeatures doesn't call the auth details prompt
       inquirer.prompt
         .mockResolvedValueOnce({ preset: 'custom' })
         .mockResolvedValueOnce({ features: [] })

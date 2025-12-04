@@ -6,7 +6,7 @@ import { Platform } from 'react-native';
 import * as Application from 'expo-application';
 import * as SecureStore from 'expo-secure-store';
 
-export interface Session {
+export interface DeviceSession {
   id: string;
   deviceId: string;
   sessionToken: string;
@@ -17,43 +17,43 @@ export interface Session {
   preferredCurrency: string;
 }
 
-export interface CreateSessionResponse {
-  session: Session;
+export interface CreateDeviceSessionResponse {
+  session: DeviceSession;
   sessionToken: string;
 }
 
-export interface SessionValidationResponse {
+export interface DeviceSessionValidationResponse {
   valid: boolean;
-  session?: Session;
+  session?: DeviceSession;
 }
 
-export interface MigrationEligibilityResponse {
+export interface DeviceSessionMigrationEligibilityResponse {
   canMigrate: boolean;
   reason?: string;
 }
 
-class SessionService {
-  private static instance: SessionService;
+class DeviceSessionService {
+  private static instance: DeviceSessionService;
   private sessionToken: string | null = null;
   private deviceId: string | null = null;
-  private session: Session | null = null;
-  
-  private readonly SESSION_TOKEN_KEY = 'session_token';
+  private session: DeviceSession | null = null;
+
+  private readonly SESSION_TOKEN_KEY = 'device_session_token';
   private readonly DEVICE_ID_KEY = 'device_id';
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
 
   private constructor() {
-    logger.debug('SessionService: Initializing...');
+    logger.debug('DeviceSessionService: Initializing...');
   }
 
-  public static getInstance(): SessionService {
-    if (!SessionService.instance) {
-      SessionService.instance = new SessionService();
+  public static getInstance(): DeviceSessionService {
+    if (!DeviceSessionService.instance) {
+      DeviceSessionService.instance = new DeviceSessionService();
     }
-    return SessionService.instance;
+    return DeviceSessionService.instance;
   }
 
-  async initialize(): Promise<Session | null> {
+  async initialize(): Promise<DeviceSession | null> {
     try {
       logger.info('SessionService: Initializing session...');
       
@@ -64,19 +64,19 @@ class SessionService {
       const existingToken = await this.getSessionToken();
       
       if (existingToken) {
-        // Validate existing session
-        const validation = await this.validateSession(existingToken);
+        // Validate existing device session
+        const validation = await this.validateDeviceSession(existingToken);
         if (validation.valid && validation.session) {
           this.session = validation.session;
           this.sessionToken = existingToken;
           this.startHeartbeat();
-          logger.info('SessionService: Restored existing session');
+          logger.info('DeviceSessionService: Restored existing device session');
           return validation.session;
         }
       }
-      
-      // Create new session if no valid existing session
-      const newSession = await this.createSession(deviceId);
+
+      // Create new device session if no valid existing session
+      const newSession = await this.createDeviceSession(deviceId);
       this.session = newSession.session;
       this.sessionToken = newSession.sessionToken;
       await this.setSessionToken(newSession.sessionToken);
@@ -91,13 +91,13 @@ class SessionService {
     }
   }
 
-  async createSession(deviceId: string): Promise<CreateSessionResponse> {
+  async createDeviceSession(deviceId: string): Promise<CreateDeviceSessionResponse> {
     try {
-      logger.info('SessionService: Creating new session for device:', deviceId);
-      
-      const response = await api.post<CreateSessionResponse>('/sessions', { deviceId });
-      
-      logger.info('SessionService: Session created successfully');
+      logger.info('DeviceSessionService: Creating new device session for device:', deviceId);
+
+      const response = await api.post<CreateDeviceSessionResponse>('/device-sessions', { deviceId });
+
+      logger.info('DeviceSessionService: Device session created successfully');
       return response.data;
       
     } catch (error) {
@@ -111,13 +111,13 @@ class SessionService {
     }
   }
 
-  async validateSession(sessionToken: string): Promise<SessionValidationResponse> {
+  async validateDeviceSession(sessionToken: string): Promise<DeviceSessionValidationResponse> {
     try {
-      logger.debug('SessionService: Validating session token...');
-      
-      const response = await api.post<SessionValidationResponse>('/sessions/validate', { sessionToken });
-      
-      logger.debug('SessionService: Session validation complete');
+      logger.debug('DeviceSessionService: Validating device session token...');
+
+      const response = await api.post<DeviceSessionValidationResponse>('/device-sessions/validate', { sessionToken });
+
+      logger.debug('DeviceSessionService: Device session validation complete');
       return response.data;
       
     } catch (error) {
@@ -138,7 +138,7 @@ class SessionService {
 
       logger.debug('SessionService: Updating session activity...');
       
-      await api.put('/sessions/activity', { sessionToken: token });
+      await api.put('/device-sessions/activity', { sessionToken: token });
       
       logger.debug('SessionService: Session activity updated');
       
@@ -149,18 +149,18 @@ class SessionService {
     }
   }
 
-  async getMigrationEligibility(): Promise<MigrationEligibilityResponse> {
+  async getMigrationEligibility(): Promise<DeviceSessionMigrationEligibilityResponse> {
     try {
       const token = await this.getSessionToken();
       if (!token) {
-        throw new Error('No session token available');
+        throw new Error('No device session token available');
       }
 
-      logger.debug('SessionService: Checking migration eligibility...');
-      
-      const response = await api.post<MigrationEligibilityResponse>('/sessions/migration-eligibility', { sessionToken: token });
-      
-      logger.debug('SessionService: Migration eligibility checked');
+      logger.debug('DeviceSessionService: Checking migration eligibility...');
+
+      const response = await api.post<DeviceSessionMigrationEligibilityResponse>('/device-sessions/migration-eligibility', { sessionToken: token });
+
+      logger.debug('DeviceSessionService: Migration eligibility checked');
       return response.data;
       
     } catch (error) {
@@ -185,7 +185,7 @@ class SessionService {
       logger.info('SessionService: Deleting session...');
       
       try {
-        await api.delete('/sessions', { data: { sessionToken: token } });
+        await api.delete('/device-sessions', { data: { sessionToken: token } });
       } catch (error) {
         logger.warn('SessionService: Session deletion API call failed, continuing with local cleanup', { error });
       }
@@ -321,22 +321,22 @@ class SessionService {
     }
   }
 
-  // Session state getters
-  getCurrentSession(): Session | null {
+  // Device session state getters
+  getCurrentDeviceSession(): DeviceSession | null {
     return this.session;
   }
 
-  async isSessionValid(): Promise<boolean> {
+  async isDeviceSessionValid(): Promise<boolean> {
     try {
       const token = await this.getSessionToken();
       if (!token) {
         return false;
       }
-      
-      const validation = await this.validateSession(token);
+
+      const validation = await this.validateDeviceSession(token);
       return validation.valid;
     } catch (error) {
-      logger.error('SessionService: Error checking session validity:', error);
+      logger.error('DeviceSessionService: Error checking device session validity:', error);
       return false;
     }
   }
@@ -367,4 +367,4 @@ class SessionService {
   }
 }
 
-export const sessionService = SessionService.getInstance();
+export const deviceSessionService = DeviceSessionService.getInstance();

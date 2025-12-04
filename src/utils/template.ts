@@ -40,7 +40,26 @@ export function shouldIncludeFile(
     return false;
   }
 
-  if (filePath.includes('features/auth') && !config.features.authentication) {
+  // Auth check updated for new structure
+  if (filePath.includes('features/auth') && !config.features.authentication.enabled) {
+    return false;
+  }
+
+  // Email verification screens
+  if (filePath.includes('verify-email') && !config.features.authentication.emailVerification) {
+    return false;
+  }
+
+  // Password reset screens
+  if (
+    (filePath.includes('forgot-password') || filePath.includes('reset-password')) &&
+    !config.features.authentication.passwordReset
+  ) {
+    return false;
+  }
+
+  // Two-factor screens (future scope)
+  if (filePath.includes('two-factor') && !config.features.authentication.twoFactor) {
     return false;
   }
 
@@ -77,6 +96,13 @@ export function shouldIncludeFile(
 
   // Backend conditional files
   if (filePath.includes('controllers/event-queue') && !config.backend.eventQueue) {
+    return false;
+  }
+
+  // Email service - only include when email verification or password reset is enabled
+  if (filePath.includes('utils/email') &&
+      !config.features.authentication.emailVerification &&
+      !config.features.authentication.passwordReset) {
     return false;
   }
 

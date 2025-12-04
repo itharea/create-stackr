@@ -3,9 +3,21 @@ import type { ProjectConfig } from '../../../src/types/index.js';
 export const analyticsFocusedConfig: Readonly<ProjectConfig> = {
   projectName: 'test-analytics',
   packageManager: 'npm',
+  appScheme: 'testanalytics',
   features: {
     onboarding: { enabled: true, pages: 2, skipButton: false, showPaywall: false },
-    authentication: true,
+    authentication: {
+      enabled: true,
+      providers: {
+        emailPassword: true,
+        google: false,
+        apple: false,
+        github: false,
+      },
+      emailVerification: false,
+      passwordReset: true,
+      twoFactor: false,
+    },
     paywall: false,
     sessionManagement: true,
   },

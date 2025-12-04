@@ -1,0 +1,102 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "./generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// BetterAuth User model
+// Uses BetterAuth default table name: "user"
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  name          String?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // BetterAuth relations
+  sessions      Session[]
+  accounts      Account[]
+
+  // Device session migration relation
+  deviceSessions DeviceSession[]
+
+  @@map("user")
+}
+
+// BetterAuth Session model (authenticated sessions)
+// Uses BetterAuth default table name: "session"
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("session")
+}
+
+// BetterAuth Account model (OAuth connections)
+// Uses BetterAuth default table name: "account"
+model Account {
+  id                    String    @id @default(cuid())
+  userId                String
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  idToken               String?
+  password              String?   // For email/password auth
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@map("account")
+}
+
+// BetterAuth Verification model (email verification, password reset)
+// Uses BetterAuth default table name: "verification"
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("verification")
+}
+
+// Device Session model (anonymous device sessions before authentication)
+// Renamed from Session to avoid conflict with BetterAuth's Session model
+model DeviceSession {
+  id                String    @id @default(cuid())
+  deviceId          String
+  sessionToken      String    @unique @default(uuid())
+  createdAt         DateTime  @default(now())
+  lastActiveAt      DateTime  @default(now())
+  migrated          Boolean   @default(false)
+  migratedToUserId  String?
+  preferredCurrency String    @default("USD")
+
+  migratedToUser User? @relation(fields: [migratedToUserId], references: [id], onDelete: SetNull)
+
+  @@map("device_session")
+}

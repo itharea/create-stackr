@@ -1,181 +1,147 @@
-import { FastifyPluginAsync, AuthFastifyRequest } from "fastify";
+import type { AuthFastifyRequest } from "fastify";
+import { FastifyPluginAsync, FastifyRequest, FastifyReply } from "fastify";
+import { auth } from "../../../lib/auth";
 import { Type } from "@sinclair/typebox";
-import { UserSchema } from "../../../domain/user/schema";
-import { 
-  LoginBody, 
-  LoginResponse, 
-  RegisterBody, 
-  RegisterBodySchema, 
-  RegisterResponse, 
-  RegisterResponseSchema,
-  UpdateProfileBody,
-  UpdateProfileBodySchema,
-  UpdateProfileResponse,
-  UpdateProfileResponseSchema,
-  ChangePasswordBody,
-  ChangePasswordBodySchema,
-  LoginBodySchema,
-  LoginResponseSchema
-} from "../../../domain/auth/schema";
-import { loginUser, registerUser, updateUser, changePassword } from "../../../domain/auth/repository";
+import { db } from "../../../utils/db";
+
+/**
+ * Convert Fastify request to Fetch API Request for BetterAuth
+ * BetterAuth expects a standard Fetch API Request object
+ */
+function toFetchRequest(request: FastifyRequest): Request {
+  // Construct full URL
+  const url = `${request.protocol}://${request.hostname}${request.url}`;
+
+  // Convert Fastify headers to Fetch API Headers
+  const headers = new Headers();
+  Object.entries(request.headers).forEach(([key, value]) => {
+    if (value) {
+      headers.set(key, Array.isArray(value) ? value[0] : value);
+    }
+  });
+
+  // Create Fetch API compatible Request
+  // Note: GET and HEAD requests cannot have a body
+  const hasBody = request.method !== "GET" && request.method !== "HEAD" && request.body;
+
+  return new Request(url, {
+    method: request.method,
+    headers,
+    body: hasBody ? JSON.stringify(request.body) : undefined,
+  });
+}
 
 const authRoutes: FastifyPluginAsync = async (server) => {
+  // Mount BetterAuth handler for all /* routes under this plugin
+  // Since this plugin is registered at /api/auth, BetterAuth handles /api/auth/*
+  // BetterAuth handles: sign-in, sign-up, sign-out, oauth callbacks, etc.
+  server.all("/*", async (request, reply) => {
+    // Convert Fastify request to Fetch API Request for BetterAuth
+    const fetchRequest = toFetchRequest(request);
+    const response = await auth.handler(fetchRequest);
 
-  // Get current user endpoint
+    // Copy response headers
+    response.headers.forEach((value, key) => {
+      reply.header(key, value);
+    });
+
+    // Send response body
+    // Use text() to get the response body as BetterAuth may return JSON or other content
+    const body = await response.text();
+    reply.status(response.status).send(body);
+  });
+
+  // Keep custom endpoints that extend BetterAuth functionality
+
+  // Get current user (uses BetterAuth session)
   server.get(
-    "/me", 
+    "/me",
     {
       onRequest: server.requireAuth,
       schema: {
         response: {
-          200: UserSchema,
-          404: Type.Object({
-            error: Type.String()
+          200: Type.Object({
+            id: Type.String(),
+            email: Type.String(),
+            name: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+            emailVerified: Type.Boolean(),
+            image: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+            createdAt: Type.String(),
+            updatedAt: Type.String(),
           }),
         },
       },
-    }, 
-    async (request, reply) => {
-      const tokenUser = (request as AuthFastifyRequest).user;
-      
-      // Fetch fresh user data from database to get latest info
-      const { getUser } = await import("../../../domain/user/repository");
-      const currentUser = await getUser(tokenUser.id);
-      
-      if (!currentUser) {
-        return reply.status(404).send({ error: "User not found" });
-      }
-      
-      return reply.status(200).send({
-        ...currentUser,
-        createdAt: currentUser.createdAt.toISOString(),
-        updatedAt: currentUser.updatedAt.toISOString(),
-      });
-    }
-  );
-
-  // Register endpoint
-  server.post<{Body: RegisterBody; Reply: RegisterResponse}>(
-    "/register",
-    {
-      schema: {
-        body: RegisterBodySchema,
-        response: {
-          200: RegisterResponseSchema,
-        }
-      }
     },
     async (request, reply) => {
-      const { name, email, password, passwordConfirmation } = request.body;
-
-      const response = await registerUser({
-        name,
-        email, 
-        password,
-        passwordConfirmation
+      // user is attached by requireAuth middleware
+      const { user } = request as AuthFastifyRequest;
+      return reply.send({
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        emailVerified: user.emailVerified,
+        image: user.image,
+        createdAt: user.createdAt.toISOString(),
+        updatedAt: user.updatedAt.toISOString(),
       });
-
-      return reply.code(200).send(response);
     }
   );
 
-  // Login endpoint
-  server.post<{Body: LoginBody; Reply: LoginResponse}>(
-    "/login",
-    {
-      schema: {
-        body: LoginBodySchema,
-        response: {
-          200: LoginResponseSchema,
-        }
-      }
-    },
-    async (request, reply) => {
-      const { email, password } = request.body;
-
-      const response = await loginUser({
-        email,
-        password,
-      });
-
-      return reply.code(200).send(response);
-    }
-  );
-
-  // Update profile endpoint
-  server.put<{Body: UpdateProfileBody}>(
+  // Update profile (custom endpoint, BetterAuth doesn't provide this)
+  server.put(
     "/profile",
     {
       onRequest: server.requireAuth,
       schema: {
-        body: UpdateProfileBodySchema,
-        response: {
-          200: UpdateProfileResponseSchema,
-        }
-      }
+        body: Type.Object({
+          name: Type.Optional(Type.String()),
+        }),
+      },
     },
     async (request, reply) => {
-      const user = (request as AuthFastifyRequest).user;
-      const updateData = request.body;
+      const { user } = request as AuthFastifyRequest;
+      const { name } = request.body as { name?: string };
 
-      const updatedUser = await updateUser(user.id, updateData);
+      const updatedUser = await db.user.update({
+        where: { id: user.id },
+        data: { name },
+      });
 
-      return reply.code(200).send({
-        ...updatedUser,
+      return reply.send({
+        id: updatedUser.id,
+        email: updatedUser.email,
+        name: updatedUser.name,
+        emailVerified: updatedUser.emailVerified,
+        image: updatedUser.image,
         createdAt: updatedUser.createdAt.toISOString(),
         updatedAt: updatedUser.updatedAt.toISOString(),
       });
     }
   );
 
-  // Change password endpoint
-  server.put<{Body: ChangePasswordBody}>(
-    "/password",
-    {
-      onRequest: server.requireAuth,
-      schema: {
-        body: ChangePasswordBodySchema,
-      }
-    },
-    async (request, reply) => {
-      const user = (request as AuthFastifyRequest).user;
-      const { currentPassword, newPassword } = request.body;
-
-      await changePassword(user.id, currentPassword, newPassword);
-
-      return reply.code(200).send({ message: "Password changed successfully" });
-    }
-  );
-
-  // Delete account endpoint
+  // Delete account
   server.delete(
     "/account",
     {
       onRequest: server.requireAuth,
-      schema: {
-        response: {
-          200: Type.Object({
-            message: Type.String()
-          })
-        }
-      }
     },
     async (request, reply) => {
-      const user = (request as AuthFastifyRequest).user;
-      const { deleteUser } = await import("../../../domain/user/repository");
+      const { user } = request as AuthFastifyRequest;
 
-      await deleteUser(user.id);
+      await db.user.delete({
+        where: { id: user.id },
+      });
 
-      return reply.code(200).send({ message: "Account deleted successfully" });
+      return reply.send({ message: "Account deleted successfully" });
     }
   );
 
-  // Health check endpoint
+  // Health check
   server.get("/health", async (request, reply) => {
-    return reply.code(200).send({
+    return reply.send({
       status: "ok",
       timestamp: new Date().toISOString(),
-      service: "auth"
+      service: "auth",
     });
   });
 };

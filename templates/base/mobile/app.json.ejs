@@ -2,6 +2,7 @@
   "expo": {
     "name": "<%= projectName %>",
     "slug": "<%= projectName.toLowerCase().replace(/[^a-z0-9-]/g, '-') %>",
+    "scheme": "<%= appScheme %>",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -39,7 +40,8 @@
     },
     "plugins": [
       "expo-router"<% if (integrations.att.enabled) { %>,
-      "expo-tracking-transparency"<% } %>
+      "expo-tracking-transparency"<% } %><% if (features.authentication.enabled) { %>,
+      "expo-secure-store"<% } %>
     ],
     "experiments": {
       "typedRoutes": true
@@ -51,11 +53,20 @@
       "eas": {
         "projectId": "your-eas-project-id-here"
       },
+      "apiUrl": "http://localhost:8080",
+      "appScheme": "<%= appScheme %>",
       "features": {
         "onboarding": {
           "enabled": <%= features.onboarding.enabled %>
         },
-        "authentication": <%= features.authentication %>,
+        "authentication": {
+          "enabled": <%= features.authentication.enabled %>,
+          "providers": {
+            "google": <%= features.authentication.providers.google %>,
+            "apple": <%= features.authentication.providers.apple %>,
+            "github": <%= features.authentication.providers.github %>
+          }
+        },
         "paywall": <%= features.paywall %>
       }<% if (integrations.revenueCat.enabled) { %>,
       "revenueCat": {
