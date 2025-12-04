@@ -4,7 +4,7 @@ import config from "./plugins/config";
 import auth from "./plugins/auth";
 import errorHandler from "./plugins/error-handler";
 import authRoutes from "./routes/auth";
-import sessionRoutes from "./routes/sessions";
+import deviceSessionRoutes from "./routes/device-sessions";
 
 const server = fastify({
   ajv: {
@@ -37,25 +37,33 @@ await server.register(config);
 // Register error handler early to catch all errors
 await server.register(errorHandler);
 
-// Register CORS
+// Register CORS with credentials support for cookie-based auth
 await server.register(import('@fastify/cors'), {
-  origin: process.env.NODE_ENV === 'production' 
-    ? process.env.ALLOWED_ORIGINS?.split(',') || false
-    : true, // Allow all origins in development
+  // In production, use explicit origins; in development, allow all
+  origin: process.env.NODE_ENV === 'production'
+    ? (process.env.ALLOWED_ORIGINS?.split(',') || [])
+    : true,
+  // Required for cookie-based auth - allows cookies to be sent cross-origin
   credentials: true,
+  // Allowed headers for requests
+  allowedHeaders: ['Content-Type', 'Cookie', 'X-Device-Session-Token'],
+  // Expose Set-Cookie header so clients can receive cookies
+  exposedHeaders: ['set-cookie'],
 });
 
 // Register auth plugin
 await server.register(auth);
 
 // Register routes
-await server.register(authRoutes, { prefix: "/auth" });
-await server.register(sessionRoutes, { prefix: "/sessions" });
+// Auth routes at /api/auth to match BetterAuth basePath
+await server.register(authRoutes, { prefix: "/api/auth" });
+// Device session routes for anonymous sessions
+await server.register(deviceSessionRoutes, { prefix: "/device-sessions" });
 
 // Root health check
 server.get("/", async (request, reply) => {
-  return reply.code(200).send({ 
-    message: "Auth API is running",
+  return reply.code(200).send({
+    message: "API is running",
     timestamp: new Date().toISOString(),
     version: "1.0.0"
   });

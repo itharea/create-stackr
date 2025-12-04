@@ -1,0 +1,218 @@
+import { useCallback, useState } from 'react';
+import { useSession, authClient, getCookies } from '../lib/auth-client';
+import Constants from 'expo-constants';
+
+// Get API URL from Expo config
+const API_URL = Constants.expoConfig?.extra?.apiUrl || 'http://localhost:8080';
+
+/**
+ * Auth hook using BetterAuth's useSession() directly
+ *
+ * This hook provides:
+ * - Reactive auth state from BetterAuth's SecureStore
+ * - Auth actions (signIn, signUp, signOut, etc.)
+ * - Loading and error state for UI feedback
+ */
+export const useAuth = () => {
+  const { data: session, isPending, error: sessionError, refetch } = useSession();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Computed state from BetterAuth session
+  const isAuthenticated = !!(session?.user && session?.session);
+  const user = session?.user ?? null;
+
+  // Sign in with email/password
+  const signIn = useCallback(async (credentials: { email: string; password: string }) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await authClient.signIn.email({
+        email: credentials.email,
+        password: credentials.password,
+      });
+      if (result.error) {
+        throw new Error(result.error.message || 'Sign in failed');
+      }
+      return { success: true };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Sign in failed';
+      setError(message);
+      return { success: false, error: message };
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Sign up with email/password
+  const signUp = useCallback(async (data: { email: string; password: string; name: string }) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await authClient.signUp.email({
+        email: data.email,
+        password: data.password,
+        name: data.name,
+      });
+      if (result.error) {
+        throw new Error(result.error.message || 'Sign up failed');
+      }
+      return { success: true };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Sign up failed';
+      setError(message);
+      return { success: false, error: message };
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Sign out
+  const signOut = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      await authClient.signOut();
+      return { success: true };
+    } catch (err) {
+      // Still considered success - BetterAuth will clear local state
+      return { success: true };
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+<% if (features.authentication.providers.google || features.authentication.providers.apple || features.authentication.providers.github) { %>
+
+  /**
+   * OAuth Sign In using BetterAuth's Expo plugin
+   *
+   * The plugin automatically:
+   * 1. Opens the system browser for OAuth
+   * 2. Converts callbackURL to deep link (e.g., "/(tabs)" -> "<%= appScheme %>://(tabs)")
+   * 3. Handles the callback and stores the session securely
+   * 4. Redirects to the callbackURL after success
+   */
+  const signInWithOAuth = useCallback(async (
+    provider: "google" | "apple" | "github",
+    callbackURL: string = "/(tabs)",
+    errorCallbackURL: string = "/(auth)/login"
+  ) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await authClient.signIn.social({
+        provider,
+        callbackURL,
+        errorCallbackURL,
+      });
+      if (result.error) {
+        throw new Error(result.error.message || `${provider} sign in failed`);
+      }
+      // Note: On success, the expo plugin redirects via deep link
+      return { success: true };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : `${provider} sign in failed`;
+      setError(message);
+      return { success: false, error: message };
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+<% } %>
+
+  // Update profile (custom endpoint)
+  const updateProfile = useCallback(async (data: { name?: string }) => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/api/auth/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cookie': getCookies() || '',
+        },
+        credentials: 'omit',
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        throw new Error('Update failed');
+      }
+      // Refetch session to get updated user data
+      await refetch();
+      return { success: true };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Update failed';
+      return { success: false, error: message };
+    } finally {
+      setIsLoading(false);
+    }
+  }, [refetch]);
+
+  // Change password
+  const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {
+    setIsLoading(true);
+    try {
+      const result = await authClient.changePassword({
+        currentPassword,
+        newPassword,
+      });
+      if (result.error) {
+        throw new Error(result.error.message || 'Password change failed');
+      }
+      return { success: true };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Password change failed';
+      return { success: false, error: message };
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Delete account (custom endpoint)
+  const deleteAccount = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/api/auth/account`, {
+        method: 'DELETE',
+        headers: {
+          'Cookie': getCookies() || '',
+        },
+        credentials: 'omit',
+      });
+      if (!response.ok) {
+        throw new Error('Delete account failed');
+      }
+      return { success: true };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Delete account failed';
+      return { success: false, error: message };
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const clearError = useCallback(() => setError(null), []);
+
+  return {
+    // State (from BetterAuth's useSession)
+    user,
+    session: session?.session ?? null,
+    isAuthenticated,
+    isPending,
+
+    // Local state for UI feedback
+    isLoading,
+    error,
+
+    // Actions
+    signIn,
+    signUp,
+    signOut,
+<% if (features.authentication.providers.google || features.authentication.providers.apple || features.authentication.providers.github) { %>
+    signInWithOAuth,
+<% } %>
+    updateProfile,
+    changePassword,
+    deleteAccount,
+    clearError,
+    refetch,
+  };
+};

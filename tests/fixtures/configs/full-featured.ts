@@ -3,9 +3,21 @@ import type { ProjectConfig } from '../../../src/types/index.js';
 export const fullFeaturedConfig: Readonly<ProjectConfig> = {
   projectName: 'test-full',
   packageManager: 'npm',
+  appScheme: 'testfull',
   features: {
     onboarding: { enabled: true, pages: 3, skipButton: true, showPaywall: true },
-    authentication: true,
+    authentication: {
+      enabled: true,
+      providers: {
+        emailPassword: true,
+        google: true,
+        apple: true,
+        github: false,
+      },
+      emailVerification: true,
+      passwordReset: true,
+      twoFactor: false,
+    },
     paywall: true,
     sessionManagement: true,
   },

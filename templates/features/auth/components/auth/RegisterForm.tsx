@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { Button, Input } from '../ui';
 import { useAuth } from '../../hooks';
@@ -42,7 +43,12 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
   });
   const [errors, setErrors] = useState<FormErrors>({});
 
-  const { register, isLoading } = useAuth();
+  const { signUp, isLoading, clearError } = useAuth();
+
+  // Clear auth error on unmount
+  useEffect(() => {
+    return () => clearError();
+  }, [clearError]);
 
   const updateField = (field: keyof FormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -91,15 +97,17 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
   const handleSubmit = async () => {
     if (!validateForm()) return;
 
-    const result = await register({
+    const result = await signUp({
       name: formData.name.trim(),
       email: formData.email.trim().toLowerCase(),
       password: formData.password,
-      passwordConfirmation: formData.passwordConfirmation,
     });
 
     if (result.success) {
       onSuccess?.();
+    } else {
+      // Show server error via Alert
+      Alert.alert('Registration Failed', result.error || 'Please try again.');
     }
   };
 

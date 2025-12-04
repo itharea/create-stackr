@@ -3,6 +3,9 @@ export interface ProjectConfig {
   projectName: string;
   packageManager: 'npm' | 'yarn' | 'bun';
 
+  // Deep link scheme for OAuth callbacks (derived from projectName)
+  appScheme: string;
+
   // Feature flags
   features: {
     onboarding: {
@@ -11,7 +14,18 @@ export interface ProjectConfig {
       skipButton: boolean;
       showPaywall: boolean;
     };
-    authentication: boolean;
+    authentication: {
+      enabled: boolean;
+      providers: {
+        emailPassword: boolean; // Always true when auth enabled
+        google: boolean;
+        apple: boolean;
+        github: boolean;
+      };
+      emailVerification: boolean;
+      passwordReset: boolean;
+      twoFactor: boolean;
+    };
     paywall: boolean;
     sessionManagement: boolean;
   };
@@ -53,7 +67,36 @@ export interface PresetDefinition {
   name: string;
   description: string;
   icon: string;
-  config: Omit<ProjectConfig, 'projectName' | 'packageManager'>;
+  config: Omit<ProjectConfig, 'projectName' | 'packageManager' | 'appScheme'>;
+}
+
+/**
+ * Derives a valid URL scheme from the project name
+ * - Converts to lowercase
+ * - Removes all non-alphanumeric characters
+ * - Ensures it starts with a letter (required by iOS/Android)
+ * - Falls back to "app" if result is empty
+ */
+export function deriveAppScheme(projectName: string): string {
+  // Handle undefined or empty project name
+  if (!projectName) {
+    return 'app';
+  }
+
+  // Remove non-alphanumeric characters and convert to lowercase
+  let scheme = projectName.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  // URL schemes must start with a letter
+  if (scheme && !/^[a-z]/.test(scheme)) {
+    scheme = 'app' + scheme;
+  }
+
+  // Fallback if empty
+  if (!scheme) {
+    scheme = 'app';
+  }
+
+  return scheme;
 }
 
 export interface CLIOptions {

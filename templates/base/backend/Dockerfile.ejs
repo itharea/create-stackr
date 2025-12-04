@@ -17,12 +17,11 @@ WORKDIR /app
 COPY package*.json ./
 <% if (packageManager === 'bun') { %>COPY bun.lockb ./<% } else if (packageManager === 'npm') { %>COPY package-lock.json ./<% } else { %>COPY yarn.lock ./<% } %>
 COPY prisma/schema.prisma ./prisma/
+COPY prisma.config.ts ./
+COPY .env ./
 
 # Install dependencies and generate Prisma client
-<% if (packageManager === 'bun') { %>RUN bun install \
-    && bun prisma generate<% } else if (packageManager === 'npm') { %>RUN npm ci \
-    && npm run db:generate<% } else { %>RUN yarn install --frozen-lockfile \
-    && yarn db:generate<% } %>
+<% if (packageManager === 'bun') { %>RUN bun install && bun prisma generate<% } else if (packageManager === 'npm') { %>RUN npm ci && npm run db:generate<% } else { %>RUN yarn install --frozen-lockfile && yarn db:generate<% } %>
 
 # Copy source code
 COPY . .
@@ -59,8 +58,10 @@ COPY package*.json ./
 # Install production dependencies only (clean install)
 <% if (packageManager === 'bun') { %>RUN bun install --production<% } else if (packageManager === 'npm') { %>RUN npm ci --production<% } else { %>RUN yarn install --production --frozen-lockfile<% } %>
 
-# Copy Prisma schema and generate client
+# Copy Prisma schema, config, and generate client
 COPY prisma/schema.prisma ./prisma/
+COPY prisma.config.ts ./
+COPY .env ./
 <% if (packageManager === 'bun') { %>RUN bun prisma generate<% } else if (packageManager === 'npm') { %>RUN npm run db:generate<% } else { %>RUN yarn db:generate<% } %>
 
 # Copy source code
@@ -104,8 +105,10 @@ COPY package*.json ./
 # Install production dependencies only (clean install)
 <% if (packageManager === 'bun') { %>RUN bun install --production<% } else if (packageManager === 'npm') { %>RUN npm ci --production<% } else { %>RUN yarn install --production --frozen-lockfile<% } %>
 
-# Copy Prisma schema and generate client
+# Copy Prisma schema, config, and generate client
 COPY prisma/schema.prisma ./prisma/
+COPY prisma.config.ts ./
+COPY .env ./
 <% if (packageManager === 'bun') { %>RUN bun prisma generate<% } else if (packageManager === 'npm') { %>RUN npm run db:generate<% } else { %>RUN yarn db:generate<% } %>
 
 # Copy source code

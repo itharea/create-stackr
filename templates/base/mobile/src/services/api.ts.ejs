@@ -1,20 +1,15 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
-import { Platform } from 'react-native';
+<% if (features.authentication.enabled) { %>
+import { authClient } from '../lib/auth-client';
+<% } %>
+
+// Storage key for device sessions (anonymous users)
+const DEVICE_SESSION_TOKEN_KEY = 'device_session_token';
 
 // API Configuration
-const getApiUrl = () => {
-  // Replace with your backend URL
-  const API_URL = 'http://localhost:8080'; // Change this to your backend URL
-
-  // For physical devices, use your computer's IP instead of localhost
-  // const API_URL = 'http://192.168.1.100:8080'; // Replace with your IP
-
-  return API_URL;
-};
-
-const API_URL = Constants.expoConfig?.extra?.apiUrl || getApiUrl();
+const API_URL = Constants.expoConfig?.extra?.apiUrl || 'http://localhost:8080';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -24,25 +19,22 @@ const api = axios.create({
   },
 });
 
-// Request interceptor to add auth token and session token
+// Request interceptor to add auth cookies and device session token
 api.interceptors.request.use(
   async (config) => {
     try {
-      // Add JWT auth token if available
-      const authStorage = await AsyncStorage.getItem('auth-storage');
-      if (authStorage) {
-        const parsedAuthStorage = JSON.parse(authStorage);
-        const authToken = parsedAuthStorage?.state?.token;
-
-        if (authToken) {
-          config.headers.Authorization = `Bearer ${authToken}`;
-        }
+<% if (features.authentication.enabled) { %>
+      // Add BetterAuth session cookies for authenticated requests
+      const cookies = authClient.getCookie();
+      if (cookies) {
+        config.headers.Cookie = cookies;
       }
+<% } %>
 
-      // Add session token if available
-      const sessionToken = await AsyncStorage.getItem('session_token');
-      if (sessionToken) {
-        config.headers['X-Session-Token'] = sessionToken;
+      // Add device session token if available (for anonymous sessions)
+      const deviceSessionToken = await AsyncStorage.getItem(DEVICE_SESSION_TOKEN_KEY);
+      if (deviceSessionToken) {
+        config.headers['X-Device-Session-Token'] = deviceSessionToken;
       }
 
       return config;
@@ -59,16 +51,19 @@ api.interceptors.request.use(
 
 // Response interceptor for handling common responses and errors
 api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+  (response) => response,
   async (error) => {
-    // Handle 401 errors by clearing auth
+    // Handle 401 errors - session expired or invalid
     if (error.response?.status === 401) {
-      await AsyncStorage.removeItem('auth-storage');
-      // You might want to redirect to login or trigger a global auth state reset
+<% if (features.authentication.enabled) { %>
+      // Sign out to clear BetterAuth session
+      try {
+        await authClient.signOut();
+      } catch {
+        // Ignore sign out errors
+      }
+<% } %>
     }
-
     return Promise.reject(error);
   }
 );

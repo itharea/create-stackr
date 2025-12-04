@@ -1,9 +1,8 @@
 // UI Store (always included)
 export * from './ui.store';
 
-<% if (features.authentication) { %>// Auth Stores
-export * from './auth.store';
-export * from './session.store';
+<% if (features.sessionManagement) { %>// Device Session Store
+export * from './deviceSession.store';
 <% } %>
 <% if (integrations.revenueCat.enabled) { %>// RevenueCat Store
 export * from './revenuecat.store';

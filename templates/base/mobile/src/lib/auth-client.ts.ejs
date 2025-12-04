@@ -1,0 +1,51 @@
+import { createAuthClient } from "better-auth/react";
+import { expoClient } from "@better-auth/expo/client";
+import * as SecureStore from "expo-secure-store";
+import Constants from "expo-constants";
+
+// Get API URL from Expo config or default
+const API_URL = Constants.expoConfig?.extra?.apiUrl || "http://localhost:8080";
+
+// Get app scheme from Expo config
+const APP_SCHEME = Constants.expoConfig?.extra?.appScheme || "<%= appScheme %>";
+
+/**
+ * BetterAuth client configured for Expo/React Native
+ *
+ * Features:
+ * - Automatic OAuth deep link handling (callbackURL paths become deep links)
+ * - Secure session storage via expo-secure-store
+ * - Session caching to avoid loading spinners on app reload
+ */
+export const authClient = createAuthClient({
+  baseURL: API_URL,
+  plugins: [
+    expoClient({
+      scheme: APP_SCHEME,           // Must match app.json scheme
+      storagePrefix: APP_SCHEME,    // Prefix for secure storage keys
+      storage: SecureStore,         // Use secure storage (not AsyncStorage!)
+    }),
+  ],
+});
+
+// Export commonly used methods and hooks
+export const {
+  signIn,
+  signUp,
+  signOut,
+  useSession,
+  getSession,
+} = authClient;
+
+/**
+ * Get cookies for authenticated API requests
+ * Use this when making custom API calls that need authentication
+ *
+ * @example
+ * const cookies = getCookies();
+ * const response = await fetch(url, {
+ *   headers: { "Cookie": cookies || "" },
+ *   credentials: "omit"
+ * });
+ */
+export const getCookies = () => authClient.getCookie();

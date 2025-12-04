@@ -45,7 +45,8 @@ export const DEPENDENCY_VERSIONS = {
   backend: {
     core: {
       '@fastify/cors': '^11.0.1',
-      '@prisma/client': '^6.12.0',
+      '@prisma/adapter-pg': '^7.0.0',
+      '@prisma/client': '^7.0.0',
       '@sinclair/typebox': '^0.34.33',
       ajv: '^8.17.1',
       bcrypt: '^6.0.0',
@@ -73,7 +74,7 @@ export const DEPENDENCY_VERSIONS = {
       '@types/bcrypt': '^6.0.0',
       '@types/jsonwebtoken': '^9.0.7',
       '@types/node': '^24.0.0',
-      prisma: '^6.12.0',
+      prisma: '^7.0.0',
       tsx: '^4.20.1',
       typescript: '^5.8.3',
     },

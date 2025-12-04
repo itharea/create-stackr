@@ -3,6 +3,7 @@ import { FastifyError } from 'fastify';
 // Error codes enum for consistent error identification
 export enum ErrorCode {
   // Authentication & Authorization
+  AUTH_UNAUTHORIZED = 'AUTH_UNAUTHORIZED',
   AUTH_TOKEN_MISSING = 'AUTH_TOKEN_MISSING',
   AUTH_TOKEN_INVALID = 'AUTH_TOKEN_INVALID',
   AUTH_TOKEN_EXPIRED = 'AUTH_TOKEN_EXPIRED',
@@ -109,6 +110,15 @@ export class AppError extends Error {
 // Factory functions for common errors
 export class ErrorFactory {
   // Authentication errors
+  static unauthorized(message: string = 'Authentication required'): AppError {
+    return new AppError(
+      ErrorCode.AUTH_UNAUTHORIZED,
+      message,
+      401,
+      ErrorSeverity.MEDIUM
+    );
+  }
+
   static tokenMissing(): AppError {
     return new AppError(
       ErrorCode.AUTH_TOKEN_MISSING,

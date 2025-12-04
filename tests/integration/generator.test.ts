@@ -17,6 +17,20 @@ vi.mock('inquirer', () => ({
   },
 }));
 
+// Helper for auth configuration
+const createAuthConfig = (enabled: boolean) => ({
+  enabled,
+  providers: {
+    emailPassword: true,
+    google: false,
+    apple: false,
+    github: false,
+  },
+  emailVerification: false,
+  passwordReset: true,
+  twoFactor: false,
+});
+
 describe('ProjectGenerator', () => {
   let tempDir: string;
 
@@ -32,9 +46,10 @@ describe('ProjectGenerator', () => {
     const config: ProjectConfig & { skipInstall: boolean } = {
       projectName: 'test-minimal',
       packageManager: 'npm',
+      appScheme: 'testminimal',
       features: {
         onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
-        authentication: true,
+        authentication: createAuthConfig(true),
         paywall: false,
         sessionManagement: true,
       },
@@ -79,9 +94,10 @@ describe('ProjectGenerator', () => {
     const config: ProjectConfig & { skipInstall: boolean } = {
       projectName: 'test-onboarding',
       packageManager: 'npm',
+      appScheme: 'testonboarding',
       features: {
         onboarding: { enabled: true, pages: 3, skipButton: true, showPaywall: false },
-        authentication: true,
+        authentication: createAuthConfig(true),
         paywall: false,
         sessionManagement: true,
       },
@@ -120,9 +136,10 @@ describe('ProjectGenerator', () => {
     const config: ProjectConfig & { skipInstall: boolean } = {
       projectName: 'test-integrations',
       packageManager: 'npm',
+      appScheme: 'testintegrations',
       features: {
         onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
-        authentication: true,
+        authentication: createAuthConfig(true),
         paywall: true,
         sessionManagement: true,
       },
@@ -165,9 +182,10 @@ describe('ProjectGenerator', () => {
     const config: ProjectConfig & { skipInstall: boolean } = {
       projectName: 'test-exists',
       packageManager: 'npm',
+      appScheme: 'testexists',
       features: {
         onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
-        authentication: true,
+        authentication: createAuthConfig(true),
         paywall: false,
         sessionManagement: true,
       },

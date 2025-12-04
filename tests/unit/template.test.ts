@@ -6,9 +6,21 @@ describe('Template Utils', () => {
   const mockConfig: ProjectConfig = {
     projectName: 'test-app',
     packageManager: 'npm',
+    appScheme: 'testapp',
     features: {
       onboarding: { enabled: true, pages: 3, skipButton: true, showPaywall: false },
-      authentication: true,
+      authentication: {
+        enabled: true,
+        providers: {
+          emailPassword: true,
+          google: false,
+          apple: false,
+          github: false,
+        },
+        emailVerification: false,
+        passwordReset: true,
+        twoFactor: false,
+      },
       paywall: false,
       sessionManagement: true,
     },
@@ -194,7 +206,7 @@ describe('Template Utils', () => {
         const parsed = JSON.parse(rendered);
         expect(parsed.expo.extra.features).toBeDefined();
         expect(parsed.expo.extra.features.onboarding.enabled).toBe(true);
-        expect(parsed.expo.extra.features.authentication).toBe(true);
+        expect(parsed.expo.extra.features.authentication.enabled).toBe(true);
         expect(parsed.expo.extra.features.paywall).toBe(false);
       });
 

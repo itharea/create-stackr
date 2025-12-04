@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { Button, Input } from '../ui';
 import { useAuth } from '../../hooks';
@@ -24,7 +25,12 @@ export const LoginForm: React.FC<LoginFormProps> = ({
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
 
-  const { login, isLoading } = useAuth();
+  const { signIn, isLoading, clearError } = useAuth();
+
+  // Clear auth error on unmount
+  useEffect(() => {
+    return () => clearError();
+  }, [clearError]);
 
   const validateForm = (): boolean => {
     const newErrors: { email?: string; password?: string } = {};
@@ -48,13 +54,16 @@ export const LoginForm: React.FC<LoginFormProps> = ({
   const handleSubmit = async () => {
     if (!validateForm()) return;
 
-    const result = await login({
+    const result = await signIn({
       email: email.trim().toLowerCase(),
       password,
     });
 
     if (result.success) {
       onSuccess?.();
+    } else {
+      // Show server error via Alert
+      Alert.alert('Sign In Failed', result.error || 'Please check your credentials and try again.');
     }
   };
 
