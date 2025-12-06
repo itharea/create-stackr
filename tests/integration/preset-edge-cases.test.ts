@@ -36,10 +36,21 @@ describe('Preset Edge Cases', () => {
   });
 
   describe('customizePreset validation', () => {
-    const mockConfig: Omit<ProjectConfig, 'projectName' | 'packageManager'> = {
+    const mockConfig: Omit<ProjectConfig, 'projectName' | 'packageManager' | 'appScheme'> = {
       features: {
         onboarding: { enabled: true, pages: 3, skipButton: true, showPaywall: false },
-        authentication: true,
+        authentication: {
+          enabled: true,
+          providers: {
+            emailPassword: true,
+            google: false,
+            apple: false,
+            github: false,
+          },
+          emailVerification: false,
+          passwordReset: true,
+          twoFactor: false,
+        },
         paywall: false,
         sessionManagement: true,
       },
@@ -68,6 +79,7 @@ describe('Preset Edge Cases', () => {
           paywall: false,
           adjust: false,
           scate: false,
+          oauthProviders: [],
         });
 
       // Get the validation function by calling customizePreset
@@ -101,6 +113,7 @@ describe('Preset Edge Cases', () => {
           paywall: false,
           adjust: false,
           scate: false,
+          oauthProviders: [],
         });
 
       const promise = customizePreset(mockConfig);
@@ -130,6 +143,7 @@ describe('Preset Edge Cases', () => {
           paywall: false,
           adjust: false,
           scate: false,
+          oauthProviders: [],
         });
 
       const promise = customizePreset(mockConfig);

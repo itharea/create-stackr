@@ -103,5 +103,4 @@ export interface CLIOptions {
   template?: string;
   defaults?: boolean;
   verbose?: boolean;
-  skipInstall?: boolean;
 }

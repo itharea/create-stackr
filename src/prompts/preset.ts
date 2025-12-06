@@ -110,6 +110,16 @@ export async function customizePreset(
       message: 'Include Scate (engagement)?',
       default: config.integrations.scate.enabled,
     },
+    {
+      type: 'checkbox',
+      name: 'oauthProviders',
+      message: 'Select OAuth providers to enable:',
+      choices: [
+        { name: 'Google', value: 'google', checked: config.features.authentication.providers.google },
+        { name: 'Apple', value: 'apple', checked: config.features.authentication.providers.apple },
+        { name: 'GitHub', value: 'github', checked: config.features.authentication.providers.github },
+      ],
+    },
   ]);
 
   // Update config with answers
@@ -122,6 +132,15 @@ export async function customizePreset(
         pages: answers.onboardingPages || 3,
         skipButton: config.features.onboarding.skipButton,
         showPaywall: answers.paywall && answers.revenueCat,
+      },
+      authentication: {
+        ...config.features.authentication,
+        providers: {
+          emailPassword: true,
+          google: answers.oauthProviders?.includes('google') ?? config.features.authentication.providers.google,
+          apple: answers.oauthProviders?.includes('apple') ?? config.features.authentication.providers.apple,
+          github: answers.oauthProviders?.includes('github') ?? config.features.authentication.providers.github,
+        },
       },
       paywall: answers.paywall,
     },
@@ -168,6 +187,15 @@ function displayPresetSummary(
   );
   console.log(
     chalk.gray(`  • Scate: ${config.integrations.scate.enabled ? 'Yes' : 'No'}`)
+  );
+  console.log(
+    chalk.gray(`  • Google OAuth: ${config.features.authentication.providers.google ? 'Yes' : 'No'}`)
+  );
+  console.log(
+    chalk.gray(`  • Apple OAuth: ${config.features.authentication.providers.apple ? 'Yes' : 'No'}`)
+  );
+  console.log(
+    chalk.gray(`  • GitHub OAuth: ${config.features.authentication.providers.github ? 'Yes' : 'No'}`)
   );
   console.log();
 }

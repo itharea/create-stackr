@@ -29,7 +29,7 @@ describe('E2E: Full Project Generation', () => {
   });
 
   it('should generate complete minimal project', async () => {
-    const config: ProjectConfig & { skipInstall: boolean } = {
+    const config: ProjectConfig = {
       projectName: 'minimal-app',
       packageManager: 'npm',
       appScheme: 'minimalapp',
@@ -63,7 +63,6 @@ describe('E2E: Full Project Generation', () => {
       },
       preset: 'minimal',
       customized: false,
-      skipInstall: true,
     };
 
     const generator = new ProjectGenerator(config);
@@ -103,7 +102,7 @@ describe('E2E: Full Project Generation', () => {
   });
 
   it('should generate complete full-featured project', async () => {
-    const config: ProjectConfig & { skipInstall: boolean } = {
+    const config: ProjectConfig = {
       projectName: 'full-featured-app',
       packageManager: 'npm',
       appScheme: 'fullfeaturedapp',
@@ -137,7 +136,6 @@ describe('E2E: Full Project Generation', () => {
       },
       preset: 'full-featured',
       customized: false,
-      skipInstall: true,
     };
 
     const generator = new ProjectGenerator(config);
@@ -188,7 +186,7 @@ describe('E2E: Full Project Generation', () => {
   });
 
   it('should generate valid JSON configuration files', async () => {
-    const config: ProjectConfig & { skipInstall: boolean } = {
+    const config: ProjectConfig = {
       projectName: 'json-test-app',
       packageManager: 'npm',
       appScheme: 'jsontestapp',
@@ -222,7 +220,6 @@ describe('E2E: Full Project Generation', () => {
       },
       preset: 'minimal',
       customized: false,
-      skipInstall: true,
     };
 
     const generator = new ProjectGenerator(config);
@@ -249,7 +246,7 @@ describe('E2E: Full Project Generation', () => {
   });
 
   it('should generate valid TypeScript files that can be type-checked', async () => {
-    const config: ProjectConfig & { skipInstall: boolean } = {
+    const config: ProjectConfig = {
       projectName: 'ts-test-app',
       packageManager: 'npm',
       appScheme: 'tstestapp',
@@ -283,7 +280,6 @@ describe('E2E: Full Project Generation', () => {
       },
       preset: 'custom',
       customized: false,
-      skipInstall: true,
     };
 
     const generator = new ProjectGenerator(config);

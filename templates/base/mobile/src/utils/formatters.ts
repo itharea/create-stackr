@@ -101,5 +101,5 @@ export const formatDisplayName = (name: string | null | undefined, fallback: str
   if (!name || !name.trim()) {
     return fallback;
   }
-  return capitalizeWords(name.trim());
+  return name.trim();
 };

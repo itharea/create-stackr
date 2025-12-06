@@ -51,18 +51,22 @@ export async function runCLI(
 
   // Step 8: Generate project
   console.log(chalk.cyan('\n📦 Creating your project...\n'));
-  const generator = new ProjectGenerator({ ...config, skipInstall: options.skipInstall, verbose: options.verbose });
+  const generator = new ProjectGenerator({ ...config, verbose: options.verbose });
   await generator.generate(targetDir);
 
-  // Step 9: Show success message
+  // Step 9: Show success message with setup instructions
   displaySuccess('Project created successfully!', [
     `📂 Location: ${targetDir}`,
-    `📦 Package Manager: ${config.packageManager}`,
     '',
-    `Next steps:`,
-    `  1. cd ${config.projectName}`,
-    `  2. Read the README.md for setup instructions`,
-    `  3. Start building! 🚀`,
+    chalk.bold('Next steps:'),
+    '',
+    `  ${chalk.cyan('1.')} cd ${config.projectName}`,
+    `  ${chalk.cyan('2.')} ./scripts/setup.sh`,
+    '',
+    chalk.gray('The setup script will:'),
+    chalk.gray('  • Create .env files with secure credentials'),
+    chalk.gray('  • Install dependencies'),
+    chalk.gray('  • Set up the database'),
   ]);
 }
 

@@ -4,13 +4,11 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { copyTemplateFiles } from '../utils/copy.js';
 import { generateOnboardingPages } from './onboarding.js';
-import { installDependencies } from '../utils/install.js';
 import { initializeGit } from '../utils/git.js';
 import { cleanup } from '../utils/cleanup.js';
 import type { ProjectConfig } from '../types/index.js';
 
 interface GeneratorConfig extends ProjectConfig {
-  skipInstall?: boolean;
   verbose?: boolean;
 }
 
@@ -44,16 +42,11 @@ export class ProjectGenerator {
       // Step 4: Generate dynamic files (onboarding pages 4-5 if needed)
       await this.generateDynamicFiles();
 
-      // Step 5: Install dependencies (optional, can be slow)
-      if (!this.config.skipInstall) {
-        await this.installDependencies();
-      }
+      // Step 5: Make setup script executable
+      await this.makeSetupScriptExecutable();
 
       // Step 6: Initialize git repository
       await this.initializeGit();
-
-      // Success!
-      console.log(chalk.green('\n✨ Project generated successfully!\n'));
     } catch (error) {
       // Handle error and cleanup
       await this.handleError(error);
@@ -110,25 +103,19 @@ export class ProjectGenerator {
   }
 
   /**
-   * Install dependencies
+   * Make setup script executable
    */
-  private async installDependencies(): Promise<void> {
-    const spinner = ora('Installing dependencies (this may take a few minutes)...').start();
+  private async makeSetupScriptExecutable(): Promise<void> {
+    const setupScriptPath = path.join(this.targetDir, 'scripts', 'setup.sh');
 
     try {
-      await installDependencies(
-        this.config.packageManager,
-        this.targetDir,
-        (message: string) => {
-          spinner.text = message;
-        }
-      );
-      spinner.succeed('Dependencies installed');
+      if (await fs.pathExists(setupScriptPath)) {
+        await fs.chmod(setupScriptPath, 0o755);
+      }
     } catch {
-      spinner.fail('Failed to install dependencies');
-      // Don't throw - project is still usable, user can install manually
+      // Non-critical, user can chmod manually
       console.log(
-        chalk.yellow('\n⚠️  Dependency installation failed. You can install them manually later.')
+        chalk.yellow('\n⚠️  Could not make setup.sh executable. Run: chmod +x ./scripts/setup.sh')
       );
     }
   }

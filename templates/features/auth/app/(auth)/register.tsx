@@ -1,13 +1,23 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, StyleSheet, SafeAreaView, TouchableOpacity } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { RegisterForm } from '../../src/components/auth';
 import { IconSymbol } from '../../src/components/ui/IconSymbol';
 import { Theme } from '@/constants/Theme';
+import { useAuth } from '../../src/hooks';
 
 export default function RegisterScreen() {
+  const { isAuthenticated } = useAuth();
+
+  // Watch for auth state changes (handles both native and browser OAuth)
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.replace('/(tabs)');
+    }
+  }, [isAuthenticated]);
+
   const handleRegisterSuccess = () => {
-    // Navigate to the main app
+    // Navigate to the main app (for email/password registration)
     router.replace('/(tabs)');
   };
 

@@ -201,13 +201,19 @@ describe('Template Utils', () => {
     });
 
     describe('app.json extra configuration', () => {
-      it('should always include features in extra section', async () => {
+      it('should include apiUrl in extra section', async () => {
         const rendered = await renderTemplate('base/mobile/app.json.ejs', mockConfig);
         const parsed = JSON.parse(rendered);
-        expect(parsed.expo.extra.features).toBeDefined();
-        expect(parsed.expo.extra.features.onboarding.enabled).toBe(true);
-        expect(parsed.expo.extra.features.authentication.enabled).toBe(true);
-        expect(parsed.expo.extra.features.paywall).toBe(false);
+        expect(parsed.expo.extra.apiUrl).toBeDefined();
+        expect(parsed.expo.extra.apiUrl).toBe('http://localhost:8080');
+      });
+
+      it('should not include redundant scaffolding metadata in extra', async () => {
+        const rendered = await renderTemplate('base/mobile/app.json.ejs', mockConfig);
+        const parsed = JSON.parse(rendered);
+        // features and appScheme are scaffolding config, not runtime config
+        expect(parsed.expo.extra.features).toBeUndefined();
+        expect(parsed.expo.extra.appScheme).toBeUndefined();
       });
 
       it('should include revenueCat config in extra when enabled', async () => {

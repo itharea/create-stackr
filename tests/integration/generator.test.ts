@@ -43,7 +43,7 @@ describe('ProjectGenerator', () => {
   });
 
   it('should generate minimal project structure', async () => {
-    const config: ProjectConfig & { skipInstall: boolean } = {
+    const config: ProjectConfig = {
       projectName: 'test-minimal',
       packageManager: 'npm',
       appScheme: 'testminimal',
@@ -66,7 +66,6 @@ describe('ProjectGenerator', () => {
       },
       preset: 'minimal',
       customized: false,
-      skipInstall: true, // Skip install for tests
     };
 
     const generator = new ProjectGenerator(config);
@@ -91,7 +90,7 @@ describe('ProjectGenerator', () => {
   });
 
   it('should generate project with onboarding pages', async () => {
-    const config: ProjectConfig & { skipInstall: boolean } = {
+    const config: ProjectConfig = {
       projectName: 'test-onboarding',
       packageManager: 'npm',
       appScheme: 'testonboarding',
@@ -114,7 +113,6 @@ describe('ProjectGenerator', () => {
       },
       preset: 'custom',
       customized: false,
-      skipInstall: true,
     };
 
     const generator = new ProjectGenerator(config);
@@ -133,7 +131,7 @@ describe('ProjectGenerator', () => {
   });
 
   it('should include integrations when enabled', async () => {
-    const config: ProjectConfig & { skipInstall: boolean } = {
+    const config: ProjectConfig = {
       projectName: 'test-integrations',
       packageManager: 'npm',
       appScheme: 'testintegrations',
@@ -156,7 +154,6 @@ describe('ProjectGenerator', () => {
       },
       preset: 'full-featured',
       customized: false,
-      skipInstall: true,
     };
 
     const generator = new ProjectGenerator(config);
@@ -179,7 +176,7 @@ describe('ProjectGenerator', () => {
   });
 
   it('should throw error if directory already exists', async () => {
-    const config: ProjectConfig & { skipInstall: boolean } = {
+    const config: ProjectConfig = {
       projectName: 'test-exists',
       packageManager: 'npm',
       appScheme: 'testexists',
@@ -202,7 +199,6 @@ describe('ProjectGenerator', () => {
       },
       preset: 'minimal',
       customized: false,
-      skipInstall: true,
     };
 
     const projectDir = path.join(tempDir, 'test-exists');
