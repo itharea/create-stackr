@@ -51,14 +51,15 @@ export const auth = betterAuth({
   socialProviders: {
 <% if (features.authentication.providers.google) { %>
     google: {
-      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientId: process.env.GOOGLE_WEB_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     },
 <% } %>
 <% if (features.authentication.providers.apple) { %>
     apple: {
-      clientId: process.env.APPLE_CLIENT_ID!,
+      clientId: process.env.APPLE_SERVICE_ID!,
       clientSecret: process.env.APPLE_CLIENT_SECRET!,
+      appBundleIdentifier: process.env.APPLE_BUNDLE_ID!,
     },
 <% } %>
 <% if (features.authentication.providers.github) { %>
@@ -86,6 +87,10 @@ export const auth = betterAuth({
     "<%= appScheme %>://",
     // Expo development URLs (development only)
     ...(process.env.NODE_ENV === "development" ? ["exp://*/*", "exp://192.168.*.*:*/*"] : []),
+<% if (features.authentication.providers.apple) { %>
+    // Apple Sign In origin (required for native iOS sign-in)
+    "https://appleid.apple.com",
+<% } %>
   ],
 });
 

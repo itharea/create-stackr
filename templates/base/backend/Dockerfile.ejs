@@ -15,7 +15,7 @@ WORKDIR /app
 
 # Copy package files and lock file for dependency installation
 COPY package*.json ./
-<% if (packageManager === 'bun') { %>COPY bun.lockb ./<% } else if (packageManager === 'npm') { %>COPY package-lock.json ./<% } else { %>COPY yarn.lock ./<% } %>
+<% if (packageManager === 'bun') { %>COPY bun.lock* ./<% } else if (packageManager === 'npm') { %>COPY package-lock.json ./<% } else { %>COPY yarn.lock ./<% } %>
 COPY prisma/schema.prisma ./prisma/
 COPY prisma.config.ts ./
 COPY .env ./
@@ -53,7 +53,7 @@ WORKDIR /app
 
 # Copy package files and lock file first (for better layer caching)
 COPY package*.json ./
-<% if (packageManager === 'bun') { %>COPY bun.lockb ./<% } else if (packageManager === 'npm') { %>COPY package-lock.json ./<% } else { %>COPY yarn.lock ./<% } %>
+<% if (packageManager === 'bun') { %>COPY bun.lock* ./<% } else if (packageManager === 'npm') { %>COPY package-lock.json ./<% } else { %>COPY yarn.lock ./<% } %>
 
 # Install production dependencies only (clean install)
 <% if (packageManager === 'bun') { %>RUN bun install --production<% } else if (packageManager === 'npm') { %>RUN npm ci --production<% } else { %>RUN yarn install --production --frozen-lockfile<% } %>
@@ -100,7 +100,7 @@ WORKDIR /app
 
 # Copy package files and lock file first (for better layer caching)
 COPY package*.json ./
-<% if (packageManager === 'bun') { %>COPY bun.lockb ./<% } else if (packageManager === 'npm') { %>COPY package-lock.json ./<% } else { %>COPY yarn.lock ./<% } %>
+<% if (packageManager === 'bun') { %>COPY bun.lock* ./<% } else if (packageManager === 'npm') { %>COPY package-lock.json ./<% } else { %>COPY yarn.lock ./<% } %>
 
 # Install production dependencies only (clean install)
 <% if (packageManager === 'bun') { %>RUN bun install --production<% } else if (packageManager === 'npm') { %>RUN npm ci --production<% } else { %>RUN yarn install --production --frozen-lockfile<% } %>

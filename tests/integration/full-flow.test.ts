@@ -129,6 +129,7 @@ describe('Integration Tests - Prompt Flows', () => {
           revenueCat: true,
           adjust: true,
           scate: false,
+          oauthProviders: ['google', 'apple'], // OAuth provider selection
         })
         .mockResolvedValueOnce({ packageManager: 'npm' }); // Package manager
 
@@ -140,6 +141,9 @@ describe('Integration Tests - Prompt Flows', () => {
       expect(config.features.onboarding.enabled).toBe(true);
       expect(config.features.onboarding.pages).toBe(4);
       expect(config.features.paywall).toBe(true);
+      expect(config.features.authentication.providers.google).toBe(true); // OAuth customized
+      expect(config.features.authentication.providers.apple).toBe(true); // OAuth customized
+      expect(config.features.authentication.providers.github).toBe(false); // Not selected
       expect(config.integrations.revenueCat.enabled).toBe(true);
       expect(config.integrations.adjust.enabled).toBe(true);
       expect(config.integrations.scate.enabled).toBe(false);

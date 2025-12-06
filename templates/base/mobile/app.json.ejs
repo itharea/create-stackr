@@ -17,7 +17,8 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.yourcompany.<%= projectName.toLowerCase().replace(/[^a-z0-9]/g, '') %>"<% if (integrations.att.enabled) { %>,
+      "bundleIdentifier": "com.yourcompany.<%= projectName.toLowerCase().replace(/[^a-z0-9]/g, '') %>"<% if (features.authentication.providers.apple) { %>,
+      "usesAppleSignIn": true<% } %><% if (integrations.att.enabled) { %>,
       "infoPlist": {
         "NSUserTrackingUsageDescription": "This identifier will be used to deliver personalized ads to you."
       }<% } %>
@@ -41,7 +42,14 @@
     "plugins": [
       "expo-router"<% if (integrations.att.enabled) { %>,
       "expo-tracking-transparency"<% } %><% if (features.authentication.enabled) { %>,
-      "expo-secure-store"<% } %>
+      "expo-secure-store"<% } %><% if (features.authentication.providers.google) { %>,
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.YOUR_IOS_CLIENT_ID"
+        }
+      ]<% } %><% if (features.authentication.providers.apple) { %>,
+      "expo-apple-authentication"<% } %>
     ],
     "experiments": {
       "typedRoutes": true
@@ -53,22 +61,12 @@
       "eas": {
         "projectId": "your-eas-project-id-here"
       },
-      "apiUrl": "http://localhost:8080",
-      "appScheme": "<%= appScheme %>",
-      "features": {
-        "onboarding": {
-          "enabled": <%= features.onboarding.enabled %>
-        },
-        "authentication": {
-          "enabled": <%= features.authentication.enabled %>,
-          "providers": {
-            "google": <%= features.authentication.providers.google %>,
-            "apple": <%= features.authentication.providers.apple %>,
-            "github": <%= features.authentication.providers.github %>
-          }
-        },
-        "paywall": <%= features.paywall %>
-      }<% if (integrations.revenueCat.enabled) { %>,
+      "apiUrl": "http://localhost:8080"<% if (features.authentication.providers.google) { %>,
+      "googleOAuth": {
+        "webClientId": "YOUR_GOOGLE_WEB_CLIENT_ID",
+        "iosClientId": "YOUR_GOOGLE_IOS_CLIENT_ID",
+        "androidClientId": "YOUR_GOOGLE_ANDROID_CLIENT_ID"
+      }<% } %><% if (integrations.revenueCat.enabled) { %>,
       "revenueCat": {
         "iosKey": "<%= integrations.revenueCat.iosKey || 'YOUR_IOS_API_KEY_HERE' %>",
         "androidKey": "<%= integrations.revenueCat.androidKey || 'YOUR_ANDROID_API_KEY_HERE' %>"

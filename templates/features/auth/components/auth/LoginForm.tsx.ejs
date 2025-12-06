@@ -1,3 +1,4 @@
+<% const hasOAuth = features.authentication.providers.google || features.authentication.providers.apple || features.authentication.providers.github; %>
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -7,6 +8,9 @@ import {
   Platform,
   ScrollView,
   Alert,
+<% if (hasOAuth) { %>
+  TouchableOpacity,
+<% } %>
 } from 'react-native';
 import { Button, Input } from '../ui';
 import { useAuth } from '../../hooks';
@@ -25,7 +29,20 @@ export const LoginForm: React.FC<LoginFormProps> = ({
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
 
-  const { signIn, isLoading, clearError } = useAuth();
+  const {
+    signIn,
+    isLoading,
+    clearError,
+<% if (features.authentication.providers.google) { %>
+    signInWithGoogle,
+<% } %>
+<% if (features.authentication.providers.apple) { %>
+    signInWithApple,
+<% } %>
+<% if (features.authentication.providers.github) { %>
+    signInWithGitHub,
+<% } %>
+  } = useAuth();
 
   // Clear auth error on unmount
   useEffect(() => {
@@ -66,6 +83,38 @@ export const LoginForm: React.FC<LoginFormProps> = ({
       Alert.alert('Sign In Failed', result.error || 'Please check your credentials and try again.');
     }
   };
+<% if (features.authentication.providers.google) { %>
+
+  const handleGoogleSignIn = async () => {
+    const result = await signInWithGoogle();
+    // Don't call onSuccess here - browser OAuth completes asynchronously
+    // via deep link callback. The parent screen watches isAuthenticated
+    // state and will navigate when the session is established.
+    if (result.error && result.error !== 'Sign in cancelled') {
+      Alert.alert('Sign In Failed', result.error);
+    }
+  };
+<% } %>
+<% if (features.authentication.providers.apple) { %>
+
+  const handleAppleSignIn = async () => {
+    const result = await signInWithApple();
+    // Don't call onSuccess here - browser OAuth completes asynchronously
+    if (result.error && result.error !== 'Sign in cancelled') {
+      Alert.alert('Sign In Failed', result.error);
+    }
+  };
+<% } %>
+<% if (features.authentication.providers.github) { %>
+
+  const handleGitHubSignIn = async () => {
+    const result = await signInWithGitHub();
+    // Don't call onSuccess here - browser OAuth completes asynchronously
+    if (result.error && result.error !== 'Sign in cancelled') {
+      Alert.alert('Sign In Failed', result.error);
+    }
+  };
+<% } %>
 
   return (
     <KeyboardAvoidingView
@@ -121,6 +170,51 @@ export const LoginForm: React.FC<LoginFormProps> = ({
             disabled={isLoading}
             style={styles.submitButton}
           />
+<% if (hasOAuth) { %>
+
+          {/* OAuth Divider */}
+          <View style={styles.dividerContainer}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or continue with</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {/* OAuth Buttons */}
+          <View style={styles.oauthContainer}>
+<% if (features.authentication.providers.google) { %>
+            <TouchableOpacity
+              style={[styles.oauthButton, styles.googleButton]}
+              onPress={handleGoogleSignIn}
+              disabled={isLoading}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.googleButtonText}>
+                <Text style={styles.googleIcon}>G</Text>{'  '}Google
+              </Text>
+            </TouchableOpacity>
+<% } %>
+<% if (features.authentication.providers.apple) { %>
+            <TouchableOpacity
+              style={[styles.oauthButton, styles.appleButton]}
+              onPress={handleAppleSignIn}
+              disabled={isLoading}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.appleButtonText}>Apple</Text>
+            </TouchableOpacity>
+<% } %>
+<% if (features.authentication.providers.github) { %>
+            <TouchableOpacity
+              style={[styles.oauthButton, styles.githubButton]}
+              onPress={handleGitHubSignIn}
+              disabled={isLoading}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.githubButtonText}>GitHub</Text>
+            </TouchableOpacity>
+<% } %>
+          </View>
+<% } %>
 
           {onSwitchToRegister && (
             <View style={styles.switchContainer}>
@@ -182,6 +276,83 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 24,
   },
+<% if (hasOAuth) { %>
+
+  // Divider
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E5E5EA',
+  },
+  dividerText: {
+    marginHorizontal: 16,
+    fontSize: 14,
+    color: '#8E8E93',
+  },
+
+  // OAuth buttons
+  oauthContainer: {
+    gap: 12,
+    marginBottom: 24,
+  },
+  oauthButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+<% if (features.authentication.providers.google) { %>
+
+  // Google
+  googleButton: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#DADCE0',
+  },
+  googleButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F1F1F',
+  },
+  googleIcon: {
+    color: '#4285F4',
+    fontWeight: '700',
+    fontSize: 18,
+  },
+<% } %>
+<% if (features.authentication.providers.apple) { %>
+
+  // Apple
+  appleButton: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+  },
+  appleButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+<% } %>
+<% if (features.authentication.providers.github) { %>
+
+  // GitHub
+  githubButton: {
+    backgroundColor: '#24292F',
+    borderColor: '#24292F',
+  },
+  githubButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+<% } %>
+<% } %>
 
   switchContainer: {
     flexDirection: 'row',

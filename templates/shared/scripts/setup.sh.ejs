@@ -115,6 +115,9 @@ collect_configuration() {
     local default_redis_password=$(generate_password 16)
 <% } %>
     local default_jwt_secret=$(generate_jwt_secret)
+<% if (features.authentication.enabled) { %>
+    local default_auth_secret=$(generate_jwt_secret)
+<% } %>
 
     # Database configuration
     echo "🗄️  Database Configuration:"
@@ -141,10 +144,17 @@ collect_configuration() {
     echo ""
     echo "🔐 Security Configuration:"
     JWT_CONFIG_SECRET=$(prompt_with_default "JWT secret (leave empty for secure auto-generated)" "$default_jwt_secret")
+<% if (features.authentication.enabled) { %>
+    AUTH_CONFIG_SECRET=$(prompt_with_default "BetterAuth secret (leave empty for secure auto-generated)" "$default_auth_secret")
+<% } %>
 
     # Global variables for use in other functions
-<% if (backend.eventQueue) { %>
+<% if (backend.eventQueue && features.authentication.enabled) { %>
+    export DB_CONFIG_USER DB_CONFIG_PASSWORD DB_CONFIG_NAME REDIS_CONFIG_PASSWORD JWT_CONFIG_SECRET AUTH_CONFIG_SECRET
+<% } else if (backend.eventQueue) { %>
     export DB_CONFIG_USER DB_CONFIG_PASSWORD DB_CONFIG_NAME REDIS_CONFIG_PASSWORD JWT_CONFIG_SECRET
+<% } else if (features.authentication.enabled) { %>
+    export DB_CONFIG_USER DB_CONFIG_PASSWORD DB_CONFIG_NAME JWT_CONFIG_SECRET AUTH_CONFIG_SECRET
 <% } else { %>
     export DB_CONFIG_USER DB_CONFIG_PASSWORD DB_CONFIG_NAME JWT_CONFIG_SECRET
 <% } %>
@@ -399,16 +409,68 @@ DATABASE_URL="${database_url}"
 
 # JWT Configuration
 JWT_SECRET=${JWT_CONFIG_SECRET}
-<% if (backend.eventQueue) { %>
+<% if (features.authentication.enabled) { %>
+# =============================================================================
+# BetterAuth Configuration
+# =============================================================================
+# IMPORTANT: Change this in production! Use a secure random string.
+BETTER_AUTH_SECRET=${AUTH_CONFIG_SECRET}
+BETTER_AUTH_URL=http://localhost:8080
 
-# Redis Configuration for BullMQ
+# Trusted Origins for BetterAuth (includes mobile deep link scheme)
+TRUSTED_ORIGINS=http://localhost:3000,http://localhost:8081,<%= appScheme %>://
+<% if (features.authentication.providers.google) { %>
+# =============================================================================
+# Google OAuth Configuration
+# =============================================================================
+# Get credentials at: https://console.cloud.google.com/
+GOOGLE_WEB_CLIENT_ID=YOUR_GOOGLE_WEB_CLIENT_ID
+GOOGLE_CLIENT_SECRET=YOUR_GOOGLE_CLIENT_SECRET
+<% } %>
+<% if (features.authentication.providers.apple) { %>
+# =============================================================================
+# Apple Sign In Configuration
+# =============================================================================
+# Get credentials at: https://developer.apple.com/
+APPLE_SERVICE_ID=YOUR_APPLE_SERVICE_ID
+APPLE_BUNDLE_ID=com.yourcompany.yourapp
+APPLE_CLIENT_SECRET=YOUR_APPLE_CLIENT_SECRET
+<% } %>
+<% if (features.authentication.providers.github) { %>
+# =============================================================================
+# GitHub OAuth Configuration
+# =============================================================================
+# Get credentials at: https://github.com/settings/developers
+GITHUB_CLIENT_ID=YOUR_GITHUB_CLIENT_ID
+GITHUB_CLIENT_SECRET=YOUR_GITHUB_CLIENT_SECRET
+<% } %>
+<% } %>
+# Redis Configuration
 REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_PASSWORD=${REDIS_CONFIG_PASSWORD}
+<% if (backend.eventQueue) { %>
+# BullMQ Configuration (Event Queue)
+BULLMQ_QUEUE_NAME=<%= projectName.toLowerCase().replace(/[^a-z0-9]/g, '_') %>_queue
+BULLMQ_MAX_RETRIES=3
+BULLMQ_BACKOFF_DELAY=5000
 <% } %>
+# CORS Configuration
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8081,https://yourdomain.com
 
-# CORS Configuration (production only)
-ALLOWED_ORIGINS=http://localhost:3000,https://yourdomain.com
+# Rate Limiting
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX_REQUESTS=100
+<% if (features.authentication.emailVerification || features.authentication.passwordReset) { %>
+# =============================================================================
+# Email Configuration (Required for email verification/password reset)
+# =============================================================================
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-app-password
+EMAIL_FROM=noreply@<%= projectName.toLowerCase().replace(/[^a-z0-9]/g, '') %>.com
+<% } %>
 EOF
     print_status "Created backend/.env with configured values"
 

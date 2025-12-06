@@ -53,7 +53,6 @@ program
   )
   .option('--defaults', 'Use default configuration without prompts')
   .option('--verbose', 'Show detailed output')
-  .option('--skip-install', 'Skip dependency installation')
   .action(async (projectName: string | undefined, options: any) => {
     try {
       displayWelcome();

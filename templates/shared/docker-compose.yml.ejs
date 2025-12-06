@@ -64,6 +64,7 @@ services:
       API_HOST: 0.0.0.0
       API_PORT: 8080
       LOG_LEVEL: debug
+      # Note: BetterAuth and OAuth config loaded from env_file: ./backend/.env
     ports:
       - "8080:8080"
     volumes:
