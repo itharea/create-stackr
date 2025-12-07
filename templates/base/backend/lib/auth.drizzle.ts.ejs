@@ -1,0 +1,104 @@
+import { betterAuth } from "better-auth";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { expo } from "@better-auth/expo";
+<% if (features.authentication.twoFactor) { %>
+import { twoFactor } from "better-auth/plugins";
+<% } %>
+import { db } from "../utils/db";
+import * as schema from "../drizzle/schema";
+<% if (features.authentication.emailVerification || features.authentication.passwordReset) { %>
+import { sendEmail } from "../utils/email";
+<% } %>
+
+export const auth = betterAuth({
+  database: drizzleAdapter(db, {
+    provider: "pg",
+    schema: {
+      user: schema.user,
+      session: schema.session,
+      account: schema.account,
+      verification: schema.verification,
+    },
+  }),
+  basePath: "/api/auth", // BetterAuth endpoints will be at /api/auth/*
+  emailAndPassword: {
+    enabled: true,
+    requireEmailVerification: <%= features.authentication.emailVerification %>,
+<% if (features.authentication.passwordReset) { %>
+    sendResetPassword: async ({ user, url }) => {
+      await sendEmail({
+        to: user.email,
+        subject: "Reset your password",
+        html: `
+          <h1>Reset your password</h1>
+          <p>Click the link below to reset your password:</p>
+          <a href="${url}">Reset Password</a>
+          <p>If you didn't request this, you can safely ignore this email.</p>
+        `,
+      });
+    },
+<% } %>
+  },
+<% if (features.authentication.emailVerification) { %>
+  emailVerification: {
+    sendVerificationEmail: async ({ user, url }) => {
+      await sendEmail({
+        to: user.email,
+        subject: "Verify your email address",
+        html: `
+          <h1>Verify your email</h1>
+          <p>Click the link below to verify your email address:</p>
+          <a href="${url}">Verify Email</a>
+        `,
+      });
+    },
+  },
+<% } %>
+<% if (features.authentication.providers.google || features.authentication.providers.apple || features.authentication.providers.github) { %>
+  socialProviders: {
+<% if (features.authentication.providers.google) { %>
+    google: {
+      clientId: process.env.GOOGLE_WEB_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    },
+<% } %>
+<% if (features.authentication.providers.apple) { %>
+    apple: {
+      clientId: process.env.APPLE_SERVICE_ID!,
+      clientSecret: process.env.APPLE_CLIENT_SECRET!,
+      appBundleIdentifier: process.env.APPLE_BUNDLE_ID!,
+    },
+<% } %>
+<% if (features.authentication.providers.github) { %>
+    github: {
+      clientId: process.env.GITHUB_CLIENT_ID!,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+    },
+<% } %>
+  },
+<% } %>
+  plugins: [
+    expo(), // Required for React Native/Expo OAuth deep link handling
+<% if (features.authentication.twoFactor) { %>
+    twoFactor(),
+<% } %>
+  ],
+  session: {
+    expiresIn: 60 * 60 * 24 * 7, // 7 days
+    updateAge: 60 * 60 * 24, // 1 day
+  },
+  trustedOrigins: [
+    // Web origins
+    ...(process.env.TRUSTED_ORIGINS?.split(",") || ["http://localhost:3000"]),
+    // Mobile deep link scheme (required for OAuth callbacks)
+    "<%= appScheme %>://",
+    // Expo development URLs (development only)
+    ...(process.env.NODE_ENV === "development" ? ["exp://*/*", "exp://192.168.*.*:*/*"] : []),
+<% if (features.authentication.providers.apple) { %>
+    // Apple Sign In origin (required for native iOS sign-in)
+    "https://appleid.apple.com",
+<% } %>
+  ],
+});
+
+export type Session = typeof auth.$Infer.Session;

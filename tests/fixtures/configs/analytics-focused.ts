@@ -29,6 +29,7 @@ export const analyticsFocusedConfig: Readonly<ProjectConfig> = {
   },
   backend: {
     database: 'postgresql',
+    orm: 'prisma',
     eventQueue: true,
     docker: true,
   },

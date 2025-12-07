@@ -49,6 +49,7 @@ export const PRESETS: PresetDefinition[] = [
       },
       backend: {
         database: 'postgresql',
+        orm: 'prisma',
         eventQueue: false,
         docker: true,
       },
@@ -104,6 +105,7 @@ export const PRESETS: PresetDefinition[] = [
       },
       backend: {
         database: 'postgresql',
+        orm: 'prisma',
         eventQueue: true,
         docker: true,
       },
@@ -159,6 +161,7 @@ export const PRESETS: PresetDefinition[] = [
       },
       backend: {
         database: 'postgresql',
+        orm: 'prisma',
         eventQueue: true,
         docker: true,
       },

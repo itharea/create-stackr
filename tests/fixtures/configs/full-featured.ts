@@ -29,6 +29,7 @@ export const fullFeaturedConfig: Readonly<ProjectConfig> = {
   },
   backend: {
     database: 'postgresql',
+    orm: 'prisma',
     eventQueue: true,
     docker: true,
   },

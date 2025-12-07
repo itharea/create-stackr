@@ -1,11 +1,13 @@
 import type { ProjectConfig } from '../../../src/types/index.js';
 
-export const minimalConfig: Readonly<ProjectConfig> = {
-  projectName: 'test-minimal',
-  packageManager: 'npm',
-  appScheme: 'testminimal',
+export const drizzleConfig: Omit<ProjectConfig, 'projectName' | 'packageManager' | 'appScheme'> = {
   features: {
-    onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
+    onboarding: {
+      enabled: true,
+      pages: 3,
+      skipButton: true,
+      showPaywall: false,
+    },
     authentication: {
       enabled: true,
       providers: {
@@ -29,10 +31,10 @@ export const minimalConfig: Readonly<ProjectConfig> = {
   },
   backend: {
     database: 'postgresql',
-    orm: 'prisma',
-    eventQueue: false,
+    orm: 'drizzle',
+    eventQueue: true,
     docker: true,
   },
-  preset: 'minimal',
+  preset: 'custom',
   customized: false,
-} as const;
+};

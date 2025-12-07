@@ -106,6 +106,33 @@ export function shouldIncludeFile(
     return false;
   }
 
+  // ORM-specific file filtering
+  const orm = config.backend.orm;
+
+  // Prisma-specific: filter entire prisma/ directory and .prisma.ts suffix files
+  if (orm !== 'prisma') {
+    // Matches: prisma/schema.prisma.ejs, prisma/generated/*, prisma/migrations/*, etc.
+    if (filePath.includes('/prisma/')) {
+      return false;
+    }
+    // Matches: db.prisma.ts, auth.prisma.ts.ejs, prisma.config.prisma.ts, etc.
+    if (filePath.includes('.prisma.ts')) {
+      return false;
+    }
+  }
+
+  // Drizzle-specific: filter entire drizzle/ directory and .drizzle.ts suffix files
+  if (orm !== 'drizzle') {
+    // Matches: drizzle/schema.drizzle.ts, drizzle/migrations/*, etc.
+    if (filePath.includes('/drizzle/')) {
+      return false;
+    }
+    // Matches: db.drizzle.ts, auth.drizzle.ts.ejs, drizzle.config.drizzle.ts, etc.
+    if (filePath.includes('.drizzle.ts')) {
+      return false;
+    }
+  }
+
   return true;
 }
 
@@ -158,6 +185,17 @@ export function getDestinationPath(
   else if (relativePath.startsWith('shared/')) {
     relativePath = relativePath.substring('shared/'.length);
   }
+
+  // Remove ORM suffix from file names (.prisma.ts → .ts, .drizzle.ts → .ts)
+  // This handles:
+  //   - db.prisma.ts → db.ts
+  //   - db.drizzle.ts → db.ts
+  //   - auth.prisma.ts.ejs → auth.ts.ejs (then .ejs removed later)
+  //   - prisma.config.prisma.ts → prisma.config.ts
+  //   - drizzle.config.drizzle.ts → drizzle.config.ts
+  //   - drizzle/schema.drizzle.ts → drizzle/schema.ts
+  relativePath = relativePath.replace(/\.prisma\.ts/, '.ts');
+  relativePath = relativePath.replace(/\.drizzle\.ts/, '.ts');
 
   // Remove .ejs extension
   if (relativePath.endsWith('.ejs')) {
