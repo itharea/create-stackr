@@ -1,0 +1,111 @@
+/**
+ * Drizzle ORM Schema for BetterAuth + Application
+ *
+ * IMPORTANT: The user, session, account, and verification tables MUST match
+ * BetterAuth's expected schema structure. Do not modify column names or types
+ * in these tables without verifying compatibility with BetterAuth.
+ *
+ * @see https://www.better-auth.com/docs/adapters/drizzle
+ * @see https://www.better-auth.com/docs/concepts/database
+ */
+
+import { pgTable, text, boolean, timestamp, varchar, uniqueIndex } from 'drizzle-orm/pg-core';
+import { relations } from 'drizzle-orm';
+
+// ==================== BetterAuth Tables ====================
+// WARNING: These tables are managed by BetterAuth. Modify with caution.
+
+// BetterAuth User model
+export const user = pgTable('user', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  email: varchar('email', { length: 255 }).notNull().unique(),
+  emailVerified: boolean('email_verified').default(false).notNull(),
+  name: text('name'),
+  image: text('image'),
+  createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull().$onUpdate(() => new Date()),
+});
+
+// BetterAuth Session model
+export const session = pgTable('session', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  token: text('token').notNull().unique(),
+  expiresAt: timestamp('expires_at', { mode: 'date' }).notNull(),
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
+  createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull().$onUpdate(() => new Date()),
+});
+
+// BetterAuth Account model (OAuth connections)
+export const account = pgTable('account', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  accountId: text('account_id').notNull(),
+  providerId: text('provider_id').notNull(),
+  accessToken: text('access_token'),
+  refreshToken: text('refresh_token'),
+  accessTokenExpiresAt: timestamp('access_token_expires_at', { mode: 'date' }),
+  refreshTokenExpiresAt: timestamp('refresh_token_expires_at', { mode: 'date' }),
+  scope: text('scope'),
+  idToken: text('id_token'),
+  password: text('password'),
+  createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => ({
+  providerAccountIdx: uniqueIndex('provider_account_idx').on(table.providerId, table.accountId),
+}));
+
+// BetterAuth Verification model
+export const verification = pgTable('verification', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  identifier: text('identifier').notNull(),
+  value: text('value').notNull(),
+  expiresAt: timestamp('expires_at', { mode: 'date' }).notNull(),
+  createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull().$onUpdate(() => new Date()),
+});
+
+// ==================== App-Specific Tables ====================
+
+// Device Session model (anonymous sessions before authentication)
+export const deviceSession = pgTable('device_session', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  deviceId: text('device_id').notNull(),
+  sessionToken: text('session_token').notNull().unique().$defaultFn(() => crypto.randomUUID()),
+  createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
+  lastActiveAt: timestamp('last_active_at', { mode: 'date' }).defaultNow().notNull(),
+  migrated: boolean('migrated').default(false).notNull(),
+  migratedToUserId: text('migrated_to_user_id').references(() => user.id, { onDelete: 'set null' }),
+  preferredCurrency: varchar('preferred_currency', { length: 3 }).default('USD').notNull(),
+});
+
+// ==================== Relations ====================
+
+export const userRelations = relations(user, ({ many }) => ({
+  sessions: many(session),
+  accounts: many(account),
+  deviceSessions: many(deviceSession),
+}));
+
+export const sessionRelations = relations(session, ({ one }) => ({
+  user: one(user, {
+    fields: [session.userId],
+    references: [user.id],
+  }),
+}));
+
+export const accountRelations = relations(account, ({ one }) => ({
+  user: one(user, {
+    fields: [account.userId],
+    references: [user.id],
+  }),
+}));
+
+export const deviceSessionRelations = relations(deviceSession, ({ one }) => ({
+  migratedToUser: one(user, {
+    fields: [deviceSession.migratedToUserId],
+    references: [user.id],
+  }),
+}));

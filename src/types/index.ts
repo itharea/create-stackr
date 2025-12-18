@@ -1,3 +1,6 @@
+// ORM choices available for the backend
+export type ORMChoice = 'prisma' | 'drizzle';
+
 export interface ProjectConfig {
   // Project metadata
   projectName: string;
@@ -54,6 +57,7 @@ export interface ProjectConfig {
   // Backend configuration
   backend: {
     database: 'postgresql';
+    orm: ORMChoice;
     eventQueue: boolean;
     docker: boolean;
   };

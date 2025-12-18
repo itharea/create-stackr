@@ -71,7 +71,9 @@ services:
       # Hot reload for development
       - ./backend:/app:cached
       - /app/node_modules
+<% if (backend.orm === 'prisma') { %>
       - /app/prisma/generated
+<% } %>
     depends_on:
       database:
         condition: service_healthy
@@ -102,7 +104,9 @@ services:
       # Hot reload for development
       - ./backend:/app:cached
       - /app/node_modules
+<% if (backend.orm === 'prisma') { %>
       - /app/prisma/generated
+<% } %>
     depends_on:
       database:
         condition: service_healthy

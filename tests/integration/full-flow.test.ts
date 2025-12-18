@@ -156,6 +156,7 @@ describe('Integration Tests - Prompt Flows', () => {
       // Mock custom selection
       inquirer.prompt
         .mockResolvedValueOnce({ preset: 'custom' }) // Select custom
+        .mockResolvedValueOnce({ orm: 'prisma' }) // ORM selection
         .mockResolvedValueOnce({
           // Feature selection (basic features)
           features: ['onboarding', 'authentication', 'paywall', 'sessionManagement'],
@@ -193,11 +194,13 @@ describe('Integration Tests - Prompt Flows', () => {
       expect(config.integrations.adjust.enabled).toBe(true);
       expect(config.integrations.scate.enabled).toBe(false);
       expect(config.integrations.att.enabled).toBe(true); // Auto-enabled with Adjust
+      expect(config.backend.orm).toBe('prisma');
     });
 
     it('should skip onboarding config when onboarding not selected', async () => {
       inquirer.prompt
         .mockResolvedValueOnce({ preset: 'custom' })
+        .mockResolvedValueOnce({ orm: 'drizzle' }) // ORM selection
         .mockResolvedValueOnce({
           features: ['authentication', 'sessionManagement'],
         })
@@ -213,14 +216,16 @@ describe('Integration Tests - Prompt Flows', () => {
       const config = await collectConfiguration('simple-app', options);
 
       expect(config.features.onboarding.enabled).toBe(false);
-      // Should only call prompt 5 times (custom, features, auth details, sdks, package manager)
+      expect(config.backend.orm).toBe('drizzle');
+      // Should only call prompt 6 times (custom, orm, features, auth details, sdks, package manager)
       // Not calling onboarding config prompt
-      expect(inquirer.prompt).toHaveBeenCalledTimes(5);
+      expect(inquirer.prompt).toHaveBeenCalledTimes(6);
     });
 
     it('should auto-enable ATT when Adjust is selected', async () => {
       inquirer.prompt
         .mockResolvedValueOnce({ preset: 'custom' })
+        .mockResolvedValueOnce({ orm: 'prisma' }) // ORM selection
         .mockResolvedValueOnce({ features: ['authentication'] })
         .mockResolvedValueOnce({
           // Auth details (OAuth providers and features) - new in BetterAuth
@@ -264,6 +269,7 @@ describe('Integration Tests - Prompt Flows', () => {
       // When features is empty (no 'authentication'), promptFeatures doesn't call the auth details prompt
       inquirer.prompt
         .mockResolvedValueOnce({ preset: 'custom' })
+        .mockResolvedValueOnce({ orm: 'prisma' }) // ORM selection
         .mockResolvedValueOnce({ features: [] })
         .mockResolvedValueOnce({ sdks: [] })
         .mockResolvedValueOnce({ packageManager: 'npm' });
@@ -272,8 +278,24 @@ describe('Integration Tests - Prompt Flows', () => {
       const config = await collectConfiguration('backend-app', options);
 
       expect(config.backend.database).toBe('postgresql');
+      expect(config.backend.orm).toBe('prisma');
       expect(config.backend.eventQueue).toBe(true);
       expect(config.backend.docker).toBe(true);
+    });
+
+    it('should include drizzle when selected', async () => {
+      inquirer.prompt
+        .mockResolvedValueOnce({ preset: 'custom' })
+        .mockResolvedValueOnce({ orm: 'drizzle' }) // ORM selection
+        .mockResolvedValueOnce({ features: [] })
+        .mockResolvedValueOnce({ sdks: [] })
+        .mockResolvedValueOnce({ packageManager: 'npm' });
+
+      const options: CLIOptions = {};
+      const config = await collectConfiguration('drizzle-app', options);
+
+      expect(config.backend.database).toBe('postgresql');
+      expect(config.backend.orm).toBe('drizzle');
     });
   });
 });

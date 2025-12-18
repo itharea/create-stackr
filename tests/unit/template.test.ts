@@ -32,6 +32,7 @@ describe('Template Utils', () => {
     },
     backend: {
       database: 'postgresql',
+      orm: 'prisma',
       eventQueue: false,
       docker: true,
     },
@@ -315,6 +316,155 @@ describe('Template Utils', () => {
         const parsed = JSON.parse(rendered);
         expect(parsed.expo.plugins).not.toContain('expo-tracking-transparency');
       });
+    });
+  });
+
+  // Helper to create test config with overrides
+  const createTestConfig = (overrides: { backend?: Partial<typeof mockConfig.backend> }): typeof mockConfig => ({
+    ...mockConfig,
+    backend: {
+      ...mockConfig.backend,
+      ...overrides.backend,
+    },
+  });
+
+  describe('shouldIncludeFile - ORM selection', () => {
+    it('should include Prisma files when orm is prisma', () => {
+      const config = createTestConfig({ backend: { orm: 'prisma' } });
+      // .prisma.ts suffix files
+      expect(shouldIncludeFile('base/backend/utils/db.prisma.ts', config)).toBe(true);
+      expect(shouldIncludeFile('base/backend/lib/auth.prisma.ts.ejs', config)).toBe(true);
+      expect(shouldIncludeFile('base/backend/prisma.config.prisma.ts', config)).toBe(true);
+      // Files in prisma/ directory
+      expect(shouldIncludeFile('base/backend/prisma/schema.prisma.ejs', config)).toBe(true);
+    });
+
+    it('should exclude Drizzle files when orm is prisma', () => {
+      const config = createTestConfig({ backend: { orm: 'prisma' } });
+      // .drizzle.ts suffix files
+      expect(shouldIncludeFile('base/backend/utils/db.drizzle.ts', config)).toBe(false);
+      expect(shouldIncludeFile('base/backend/lib/auth.drizzle.ts.ejs', config)).toBe(false);
+      expect(shouldIncludeFile('base/backend/drizzle.config.drizzle.ts', config)).toBe(false);
+      // Files in drizzle/ directory
+      expect(shouldIncludeFile('base/backend/drizzle/schema.drizzle.ts', config)).toBe(false);
+      expect(shouldIncludeFile('base/backend/drizzle/migrations/0001_init.sql', config)).toBe(false);
+    });
+
+    it('should include Drizzle files when orm is drizzle', () => {
+      const config = createTestConfig({ backend: { orm: 'drizzle' } });
+      // .drizzle.ts suffix files
+      expect(shouldIncludeFile('base/backend/utils/db.drizzle.ts', config)).toBe(true);
+      expect(shouldIncludeFile('base/backend/lib/auth.drizzle.ts.ejs', config)).toBe(true);
+      expect(shouldIncludeFile('base/backend/drizzle.config.drizzle.ts', config)).toBe(true);
+      // Files in drizzle/ directory
+      expect(shouldIncludeFile('base/backend/drizzle/schema.drizzle.ts', config)).toBe(true);
+    });
+
+    it('should exclude Prisma files when orm is drizzle', () => {
+      const config = createTestConfig({ backend: { orm: 'drizzle' } });
+      // .prisma.ts suffix files
+      expect(shouldIncludeFile('base/backend/utils/db.prisma.ts', config)).toBe(false);
+      expect(shouldIncludeFile('base/backend/lib/auth.prisma.ts.ejs', config)).toBe(false);
+      expect(shouldIncludeFile('base/backend/prisma.config.prisma.ts', config)).toBe(false);
+      // Files in prisma/ directory
+      expect(shouldIncludeFile('base/backend/prisma/schema.prisma.ejs', config)).toBe(false);
+      expect(shouldIncludeFile('base/backend/prisma/generated/client.ts', config)).toBe(false);
+    });
+  });
+
+  describe('getDestinationPath - ORM file naming', () => {
+    it('should strip .prisma suffix from file paths', () => {
+      const result = getDestinationPath('base/backend/utils/db.prisma.ts', '/target');
+      expect(result).toBe('/target/backend/utils/db.ts');
+    });
+
+    it('should strip .drizzle suffix from file paths', () => {
+      const result = getDestinationPath('base/backend/utils/db.drizzle.ts', '/target');
+      expect(result).toBe('/target/backend/utils/db.ts');
+    });
+
+    it('should handle .prisma.ts.ejs files correctly', () => {
+      const result = getDestinationPath('base/backend/lib/auth.prisma.ts.ejs', '/target');
+      expect(result).toBe('/target/backend/lib/auth.ts');
+    });
+
+    it('should handle .drizzle.ts.ejs files correctly', () => {
+      const result = getDestinationPath('base/backend/lib/auth.drizzle.ts.ejs', '/target');
+      expect(result).toBe('/target/backend/lib/auth.ts');
+    });
+
+    it('should handle drizzle schema path correctly', () => {
+      const result = getDestinationPath('base/backend/drizzle/schema.drizzle.ts', '/target');
+      expect(result).toBe('/target/backend/drizzle/schema.ts');
+    });
+
+    it('should handle config file naming correctly', () => {
+      expect(getDestinationPath('base/backend/prisma.config.prisma.ts', '/target'))
+        .toBe('/target/backend/prisma.config.ts');
+      expect(getDestinationPath('base/backend/drizzle.config.drizzle.ts', '/target'))
+        .toBe('/target/backend/drizzle.config.ts');
+    });
+  });
+
+  describe('shouldIncludeFile - Email utility', () => {
+    it('should include email utility when emailVerification is enabled', () => {
+      const config: typeof mockConfig = {
+        ...mockConfig,
+        features: {
+          ...mockConfig.features,
+          authentication: {
+            ...mockConfig.features.authentication,
+            emailVerification: true,
+            passwordReset: false,
+          },
+        },
+      };
+      expect(shouldIncludeFile('base/backend/utils/email.ts.ejs', config)).toBe(true);
+    });
+
+    it('should include email utility when passwordReset is enabled', () => {
+      const config: typeof mockConfig = {
+        ...mockConfig,
+        features: {
+          ...mockConfig.features,
+          authentication: {
+            ...mockConfig.features.authentication,
+            emailVerification: false,
+            passwordReset: true,
+          },
+        },
+      };
+      expect(shouldIncludeFile('base/backend/utils/email.ts.ejs', config)).toBe(true);
+    });
+
+    it('should include email utility when both email features are enabled', () => {
+      const config: typeof mockConfig = {
+        ...mockConfig,
+        features: {
+          ...mockConfig.features,
+          authentication: {
+            ...mockConfig.features.authentication,
+            emailVerification: true,
+            passwordReset: true,
+          },
+        },
+      };
+      expect(shouldIncludeFile('base/backend/utils/email.ts.ejs', config)).toBe(true);
+    });
+
+    it('should exclude email utility when neither email feature is enabled', () => {
+      const config: typeof mockConfig = {
+        ...mockConfig,
+        features: {
+          ...mockConfig.features,
+          authentication: {
+            ...mockConfig.features.authentication,
+            emailVerification: false,
+            passwordReset: false,
+          },
+        },
+      };
+      expect(shouldIncludeFile('base/backend/utils/email.ts.ejs', config)).toBe(false);
     });
   });
 });

@@ -58,6 +58,7 @@ describe('E2E: Full Project Generation', () => {
       },
       backend: {
         database: 'postgresql',
+        orm: 'prisma',
         eventQueue: false,
         docker: true,
       },
@@ -131,6 +132,7 @@ describe('E2E: Full Project Generation', () => {
       },
       backend: {
         database: 'postgresql',
+        orm: 'prisma',
         eventQueue: true,
         docker: true,
       },
@@ -215,6 +217,7 @@ describe('E2E: Full Project Generation', () => {
       },
       backend: {
         database: 'postgresql',
+        orm: 'prisma',
         eventQueue: false,
         docker: true,
       },
@@ -275,6 +278,7 @@ describe('E2E: Full Project Generation', () => {
       },
       backend: {
         database: 'postgresql',
+        orm: 'prisma',
         eventQueue: false,
         docker: true,
       },
@@ -307,5 +311,131 @@ describe('E2E: Full Project Generation', () => {
       expect(content).not.toContain('<%'); // No unprocessed EJS
       expect(content).not.toContain('%>'); // No unprocessed EJS
     }
+  });
+
+  describe('Drizzle ORM generation', () => {
+    it('should generate project with Drizzle ORM', async () => {
+      const config: ProjectConfig = {
+        projectName: 'drizzle-test-project',
+        packageManager: 'npm',
+        appScheme: 'drizzletestproject',
+        features: {
+          onboarding: { enabled: true, pages: 3, skipButton: true, showPaywall: false },
+          authentication: {
+            enabled: true,
+            providers: {
+              emailPassword: true,
+              google: false,
+              apple: false,
+              github: false,
+            },
+            emailVerification: false,
+            passwordReset: true,
+            twoFactor: false,
+          },
+          paywall: false,
+          sessionManagement: true,
+        },
+        integrations: {
+          revenueCat: { enabled: false, iosKey: '', androidKey: '' },
+          adjust: { enabled: false, appToken: '', environment: 'sandbox' },
+          scate: { enabled: false, apiKey: '' },
+          att: { enabled: false },
+        },
+        backend: {
+          database: 'postgresql',
+          orm: 'drizzle',
+          eventQueue: true,
+          docker: true,
+        },
+        preset: 'custom',
+        customized: false,
+      };
+
+      const generator = new ProjectGenerator(config);
+      const projectDir = path.join(tempDir, 'drizzle-test-project');
+      await generator.generate(projectDir);
+
+      // Verify Drizzle-specific files exist
+      expect(await fs.pathExists(path.join(projectDir, 'backend/drizzle/schema.ts'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'backend/drizzle.config.ts'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'backend/utils/db.ts'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'backend/lib/auth.ts'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'backend/domain/user/repository.ts'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'backend/domain/device-session/repository.ts'))).toBe(true);
+
+      // Verify Prisma files do NOT exist
+      expect(await fs.pathExists(path.join(projectDir, 'backend/prisma/schema.prisma'))).toBe(false);
+      expect(await fs.pathExists(path.join(projectDir, 'backend/prisma.config.ts'))).toBe(false);
+
+      // Verify package.json has Drizzle dependencies
+      const packageJson = await fs.readJSON(path.join(projectDir, 'backend/package.json'));
+      expect(packageJson.dependencies['drizzle-orm']).toBeDefined();
+      expect(packageJson.devDependencies['drizzle-kit']).toBeDefined();
+      expect(packageJson.dependencies['@prisma/client']).toBeUndefined();
+      expect(packageJson.devDependencies['prisma']).toBeUndefined();
+
+      // Verify Drizzle-specific scripts
+      expect(packageJson.scripts['db:generate']).toBe('drizzle-kit generate');
+      expect(packageJson.scripts['db:push']).toBe('drizzle-kit push');
+    });
+
+    it('should generate project with Prisma ORM (verifies ORM is correctly applied)', async () => {
+      const config: ProjectConfig = {
+        projectName: 'prisma-test-project',
+        packageManager: 'npm',
+        appScheme: 'prismatestproject',
+        features: {
+          onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
+          authentication: {
+            enabled: true,
+            providers: {
+              emailPassword: true,
+              google: false,
+              apple: false,
+              github: false,
+            },
+            emailVerification: false,
+            passwordReset: true,
+            twoFactor: false,
+          },
+          paywall: false,
+          sessionManagement: true,
+        },
+        integrations: {
+          revenueCat: { enabled: false, iosKey: '', androidKey: '' },
+          adjust: { enabled: false, appToken: '', environment: 'sandbox' },
+          scate: { enabled: false, apiKey: '' },
+          att: { enabled: false },
+        },
+        backend: {
+          database: 'postgresql',
+          orm: 'prisma',
+          eventQueue: false,
+          docker: true,
+        },
+        preset: 'minimal',
+        customized: false,
+      };
+
+      const generator = new ProjectGenerator(config);
+      const projectDir = path.join(tempDir, 'prisma-test-project');
+      await generator.generate(projectDir);
+
+      // Verify Prisma-specific files exist
+      expect(await fs.pathExists(path.join(projectDir, 'backend/prisma/schema.prisma'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'backend/prisma.config.ts'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'backend/utils/db.ts'))).toBe(true);
+
+      // Verify Drizzle files do NOT exist
+      expect(await fs.pathExists(path.join(projectDir, 'backend/drizzle/schema.ts'))).toBe(false);
+      expect(await fs.pathExists(path.join(projectDir, 'backend/drizzle.config.ts'))).toBe(false);
+
+      // Verify package.json has Prisma dependencies
+      const packageJson = await fs.readJSON(path.join(projectDir, 'backend/package.json'));
+      expect(packageJson.dependencies['@prisma/client']).toBeDefined();
+      expect(packageJson.devDependencies['prisma']).toBeDefined();
+      expect(packageJson.dependencies['drizzle-orm']).toBeUndefined();
+    });
   });
 });

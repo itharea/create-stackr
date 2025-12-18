@@ -571,11 +571,19 @@ setup_database() {
         print_info "Running database migrations..."
         cd backend
 
+<% if (backend.orm === 'prisma') { %>
         # Generate Prisma client
         bun prisma generate
 
         # Push schema to database
         bun prisma db push
+<% } else if (backend.orm === 'drizzle') { %>
+        # Generate Drizzle migrations
+        bun run db:generate
+
+        # Push schema to database
+        bun run db:push
+<% } %>
 
         print_status "Database<% if (backend.eventQueue) { %> and Redis<% } %> setup complete"
         cd ..
