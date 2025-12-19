@@ -156,6 +156,7 @@ describe('Integration Tests - Prompt Flows', () => {
       // Mock custom selection
       inquirer.prompt
         .mockResolvedValueOnce({ preset: 'custom' }) // Select custom
+        .mockResolvedValueOnce({ platforms: ['mobile', 'web'] }) // Platforms selection
         .mockResolvedValueOnce({ orm: 'prisma' }) // ORM selection
         .mockResolvedValueOnce({
           // Feature selection (basic features)
@@ -200,6 +201,7 @@ describe('Integration Tests - Prompt Flows', () => {
     it('should skip onboarding config when onboarding not selected', async () => {
       inquirer.prompt
         .mockResolvedValueOnce({ preset: 'custom' })
+        .mockResolvedValueOnce({ platforms: ['mobile', 'web'] }) // Platforms selection
         .mockResolvedValueOnce({ orm: 'drizzle' }) // ORM selection
         .mockResolvedValueOnce({
           features: ['authentication', 'sessionManagement'],
@@ -218,13 +220,14 @@ describe('Integration Tests - Prompt Flows', () => {
       expect(config.features.onboarding.enabled).toBe(false);
       expect(config.backend.orm).toBe('drizzle');
       // Should only call prompt 6 times (custom, orm, features, auth details, sdks, package manager)
-      // Not calling onboarding config prompt
-      expect(inquirer.prompt).toHaveBeenCalledTimes(6);
+      // Not calling onboarding config prompt (6 prompts + 1 for platforms = 7)
+      expect(inquirer.prompt).toHaveBeenCalledTimes(7);
     });
 
     it('should auto-enable ATT when Adjust is selected', async () => {
       inquirer.prompt
         .mockResolvedValueOnce({ preset: 'custom' })
+        .mockResolvedValueOnce({ platforms: ['mobile', 'web'] }) // Platforms selection
         .mockResolvedValueOnce({ orm: 'prisma' }) // ORM selection
         .mockResolvedValueOnce({ features: ['authentication'] })
         .mockResolvedValueOnce({
@@ -269,6 +272,7 @@ describe('Integration Tests - Prompt Flows', () => {
       // When features is empty (no 'authentication'), promptFeatures doesn't call the auth details prompt
       inquirer.prompt
         .mockResolvedValueOnce({ preset: 'custom' })
+        .mockResolvedValueOnce({ platforms: ['mobile', 'web'] }) // Platforms selection
         .mockResolvedValueOnce({ orm: 'prisma' }) // ORM selection
         .mockResolvedValueOnce({ features: [] })
         .mockResolvedValueOnce({ sdks: [] })
@@ -286,6 +290,7 @@ describe('Integration Tests - Prompt Flows', () => {
     it('should include drizzle when selected', async () => {
       inquirer.prompt
         .mockResolvedValueOnce({ preset: 'custom' })
+        .mockResolvedValueOnce({ platforms: ['mobile', 'web'] }) // Platforms selection
         .mockResolvedValueOnce({ orm: 'drizzle' }) // ORM selection
         .mockResolvedValueOnce({ features: [] })
         .mockResolvedValueOnce({ sdks: [] })

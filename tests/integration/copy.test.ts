@@ -12,6 +12,7 @@ describe('Copy Utils', () => {
     projectName: 'test-app',
     packageManager: 'npm',
     appScheme: 'testapp',
+    platforms: ['mobile', 'web'],
     features: {
       onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
       authentication: {
@@ -37,6 +38,7 @@ describe('Copy Utils', () => {
     },
     backend: {
       database: 'postgresql',
+      orm: 'prisma',
       eventQueue: false,
       docker: true,
     },

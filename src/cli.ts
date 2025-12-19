@@ -55,7 +55,7 @@ export async function runCLI(
   await generator.generate(targetDir);
 
   // Step 9: Show success message with setup instructions
-  displaySuccess('Project created successfully!', [
+  const nextSteps = [
     `📂 Location: ${targetDir}`,
     '',
     chalk.bold('Next steps:'),
@@ -67,7 +67,22 @@ export async function runCLI(
     chalk.gray('  • Create .env files with secure credentials'),
     chalk.gray('  • Install dependencies'),
     chalk.gray('  • Set up the database'),
-  ]);
+  ];
+
+  // Add platform-specific next steps
+  if (config.platforms.includes('mobile') || config.platforms.includes('web')) {
+    nextSteps.push('');
+    nextSteps.push(chalk.bold('Start development:'));
+  }
+  if (config.platforms.includes('mobile')) {
+    nextSteps.push(chalk.gray(`  • Mobile: cd mobile && ${config.packageManager} start`));
+  }
+  if (config.platforms.includes('web')) {
+    nextSteps.push(chalk.gray(`  • Web: cd web && ${config.packageManager} run dev`));
+  }
+  nextSteps.push(chalk.gray(`  • Backend: cd backend && ${config.packageManager} run dev:rest-api`));
+
+  displaySuccess('Project created successfully!', nextSteps);
 }
 
 async function confirmGeneration(): Promise<boolean> {
@@ -85,6 +100,16 @@ async function confirmGeneration(): Promise<boolean> {
 function displayConfigSummary(config: ProjectConfig): void {
   console.log(chalk.cyan('\n📋 Project Configuration:\n'));
   console.log(`  ${chalk.bold('Project:')} ${config.projectName}`);
+
+  // Display platforms
+  const platformLabels = {
+    mobile: 'Mobile (Expo)',
+    web: 'Web (Next.js)',
+  };
+  const platformsDisplay = config.platforms
+    .map(p => platformLabels[p])
+    .join(', ');
+  console.log(`  ${chalk.bold('Platforms:')} ${platformsDisplay}`);
 
   const features = Object.entries(config.features)
     .filter(([_, value]) => {

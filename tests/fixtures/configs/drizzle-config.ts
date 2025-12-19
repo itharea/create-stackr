@@ -1,6 +1,7 @@
 import type { ProjectConfig } from '../../../src/types/index.js';
 
 export const drizzleConfig: Omit<ProjectConfig, 'projectName' | 'packageManager' | 'appScheme'> = {
+  platforms: ['mobile', 'web'],
   features: {
     onboarding: {
       enabled: true,

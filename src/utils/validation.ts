@@ -53,6 +53,24 @@ export function validateConfiguration(config: ProjectConfig): ValidationResult {
     return nameValidation;
   }
 
+  // Validate platforms
+  if (!config.platforms || config.platforms.length === 0) {
+    return {
+      valid: false,
+      error: 'At least one platform must be selected',
+    };
+  }
+
+  const validPlatforms = ['mobile', 'web'];
+  for (const platform of config.platforms) {
+    if (!validPlatforms.includes(platform)) {
+      return {
+        valid: false,
+        error: `Invalid platform: ${platform}. Must be one of: ${validPlatforms.join(', ')}`,
+      };
+    }
+  }
+
   // Validate package manager
   const validPackageManagers = ['npm', 'yarn', 'bun'];
   if (!validPackageManagers.includes(config.packageManager)) {

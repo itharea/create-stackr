@@ -5,11 +5,17 @@ import type { ProjectConfig } from '../types/index.js';
 /**
  * Generate dynamic onboarding pages based on configuration
  * Note: Templates already have pages 1-3, so we only generate pages 4-5 if needed
+ * Onboarding is a mobile-only feature
  */
 export async function generateOnboardingPages(
   config: ProjectConfig,
   targetDir: string
 ): Promise<void> {
+  // Onboarding is mobile-only - skip if mobile platform not selected
+  if (!config.platforms.includes('mobile')) {
+    return;
+  }
+
   if (!config.features.onboarding.enabled) {
     return;
   }

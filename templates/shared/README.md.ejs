@@ -27,6 +27,7 @@ cp backend/.env.example backend/.env
 ./scripts/setup.sh
 ```
 
+<% if (platforms.includes('mobile')) { %>
 ### 3. Start Mobile App
 
 ```bash
@@ -34,8 +35,20 @@ cd mobile
 <%= packageManager %> install
 <%= packageManager %> start
 ```
+<% } %>
+<% if (platforms.includes('web')) { %>
+### <%= platforms.includes('mobile') ? '4' : '3' %>. Start Web App
 
-### 4. Start Backend
+```bash
+cd web
+<%= packageManager %> install
+<%= packageManager %> run dev
+```
+
+The web app will be available at `http://localhost:3000`.
+<% } %>
+
+### <%= platforms.includes('mobile') && platforms.includes('web') ? '5' : platforms.includes('mobile') || platforms.includes('web') ? '4' : '3' %>. Start Backend
 
 ```bash
 cd backend
@@ -79,21 +92,42 @@ eas build --platform android
 ```
 
 For more information, see the [EAS Build documentation](https://docs.expo.dev/build/introduction/).
+<% if (platforms.includes('web')) { %>
+
+## Web App
+
+The web application is built with:
+- **Next.js 15** - React framework with App Router
+- **TypeScript** - Type safety
+- **Tailwind CSS** - Utility-first styling
+- **shadcn/ui** - UI component library
+
+### Development
+
+```bash
+cd web
+<%= packageManager %> run dev
+```
+
+The web app will be available at `http://localhost:3000`.
+<% } %>
 
 ## Project Structure
 
 ```
 <%= projectName %>/
-├── mobile/          # React Native (Expo) mobile app
-├── backend/         # Node.js backend API
+<% if (platforms.includes('mobile')) { %>├── mobile/          # React Native (Expo) mobile app
+<% } %><% if (platforms.includes('web')) { %>├── web/             # Next.js web app
+<% } %>├── backend/         # Node.js backend API
 ├── scripts/         # Setup and utility scripts
 └── docker-compose.yml
 ```
 
 ## Documentation
 
-- [Mobile App Documentation](./mobile/README.md)
-- [Backend API Documentation](./backend/README.md)
+<% if (platforms.includes('mobile')) { %>- [Mobile App Documentation](./mobile/README.md)
+<% } %><% if (platforms.includes('web')) { %>- [Web App Documentation](./web/README.md)
+<% } %>- [Backend API Documentation](./backend/README.md)
 
 ## License
 

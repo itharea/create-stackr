@@ -6,6 +6,7 @@ export const PRESETS: PresetDefinition[] = [
     description: 'Basic mobile app + backend',
     icon: '📱',
     config: {
+      platforms: ['mobile', 'web'],
       features: {
         onboarding: {
           enabled: false,
@@ -62,6 +63,7 @@ export const PRESETS: PresetDefinition[] = [
     description: 'All integrations included',
     icon: '🚀',
     config: {
+      platforms: ['mobile', 'web'],
       features: {
         onboarding: {
           enabled: true,
@@ -118,6 +120,7 @@ export const PRESETS: PresetDefinition[] = [
     description: 'Adjust + Scate + basic features',
     icon: '📊',
     config: {
+      platforms: ['mobile', 'web'],
       features: {
         onboarding: {
           enabled: true,
