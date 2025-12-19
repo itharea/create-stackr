@@ -203,9 +203,7 @@ export function getDestinationPath(
   // features/mobile/*/app/* → mobile/app/*
   else if (relativePath.startsWith('features/mobile/')) {
     const featurePath = relativePath.substring('features/mobile/'.length);
-    const parts = featurePath.split('/');
-    const featureName = parts[0];
-    const restOfPath = parts.slice(1).join('/');
+    const restOfPath = featurePath.substring(featurePath.indexOf('/') + 1);
 
     if (restOfPath.startsWith('app/') || restOfPath === 'app') {
       relativePath = `mobile/${restOfPath}`;
@@ -219,9 +217,7 @@ export function getDestinationPath(
   // integrations/mobile/*/services/* → mobile/src/services/*
   else if (relativePath.startsWith('integrations/mobile/')) {
     const integrationPath = relativePath.substring('integrations/mobile/'.length);
-    const parts = integrationPath.split('/');
-    const integrationName = parts[0];
-    const restOfPath = parts.slice(1).join('/');
+    const restOfPath = integrationPath.substring(integrationPath.indexOf('/') + 1);
 
     if (restOfPath.startsWith('services/') || restOfPath.startsWith('store/')) {
       relativePath = `mobile/src/${restOfPath}`;
@@ -236,9 +232,7 @@ export function getDestinationPath(
   // features/web/*/app/* → web/src/app/*
   else if (relativePath.startsWith('features/web/')) {
     const featurePath = relativePath.substring('features/web/'.length);
-    const parts = featurePath.split('/');
-    const featureName = parts[0];
-    const restOfPath = parts.slice(1).join('/');
+    const restOfPath = featurePath.substring(featurePath.indexOf('/') + 1);
 
     // Map to web directory structure (Next.js App Router)
     if (restOfPath.startsWith('app/') || restOfPath === 'app') {
@@ -253,9 +247,7 @@ export function getDestinationPath(
   // integrations/web/* → web/src/*
   else if (relativePath.startsWith('integrations/web/')) {
     const integrationPath = relativePath.substring('integrations/web/'.length);
-    const parts = integrationPath.split('/');
-    const integrationName = parts[0];
-    const restOfPath = parts.slice(1).join('/');
+    const restOfPath = integrationPath.substring(integrationPath.indexOf('/') + 1);
 
     relativePath = `web/src/${restOfPath}`;
   }
