@@ -515,6 +515,7 @@ install_backend_deps() {
     fi
 }
 
+<% if (platforms.includes('mobile')) { %>
 # Install mobile dependencies
 install_mobile_deps() {
     if [ -d "mobile" ]; then
@@ -533,6 +534,27 @@ install_mobile_deps() {
         print_warning "Mobile directory not found"
     fi
 }
+<% } %>
+<% if (platforms.includes('web')) { %>
+# Install web dependencies
+install_web_deps() {
+    if [ -d "web" ]; then
+        print_info "Installing web dependencies..."
+        cd web
+
+        if [ -f "package.json" ]; then
+            <%= packageManager %> install
+            print_status "Web dependencies installed"
+        else
+            print_warning "No package.json found in web directory"
+        fi
+
+        cd ..
+    else
+        print_warning "Web directory not found"
+    fi
+}
+<% } %>
 
 # Setup database<% if (backend.eventQueue) { %> and Redis<% } %>
 setup_database() {
@@ -615,9 +637,16 @@ print_next_steps() {
     echo "   Redis:      localhost:6379"
 <% } %>
     echo ""
+<% if (platforms.includes('mobile')) { %>
     echo "📱 For mobile development:"
-    echo "   cd mobile && bun start"
+    echo "   cd mobile && <%= packageManager %> start"
     echo ""
+<% } %>
+<% if (platforms.includes('web')) { %>
+    echo "🌐 For web development:"
+    echo "   cd web && <%= packageManager %> run dev"
+    echo ""
+<% } %>
     echo "🐳 Docker commands:"
     echo "   docker-compose logs -f backend  # View backend logs"
     echo "   docker-compose down            # Stop all services"
@@ -891,7 +920,12 @@ main() {
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         install_backend_deps
+<% if (platforms.includes('mobile')) { %>
         install_mobile_deps
+<% } %>
+<% if (platforms.includes('web')) { %>
+        install_web_deps
+<% } %>
     fi
 
     # Ask if user wants to setup database<% if (backend.eventQueue) { %> and Redis<% } %>

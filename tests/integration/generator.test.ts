@@ -47,6 +47,7 @@ describe('ProjectGenerator', () => {
       projectName: 'test-minimal',
       packageManager: 'npm',
       appScheme: 'testminimal',
+      platforms: ['mobile', 'web'],
       features: {
         onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
         authentication: createAuthConfig(true),
@@ -61,6 +62,7 @@ describe('ProjectGenerator', () => {
       },
       backend: {
         database: 'postgresql',
+        orm: 'prisma',
         eventQueue: false,
         docker: true,
       },
@@ -94,6 +96,7 @@ describe('ProjectGenerator', () => {
       projectName: 'test-onboarding',
       packageManager: 'npm',
       appScheme: 'testonboarding',
+      platforms: ['mobile', 'web'],
       features: {
         onboarding: { enabled: true, pages: 3, skipButton: true, showPaywall: false },
         authentication: createAuthConfig(true),
@@ -108,6 +111,7 @@ describe('ProjectGenerator', () => {
       },
       backend: {
         database: 'postgresql',
+        orm: 'prisma',
         eventQueue: false,
         docker: true,
       },
@@ -135,6 +139,7 @@ describe('ProjectGenerator', () => {
       projectName: 'test-integrations',
       packageManager: 'npm',
       appScheme: 'testintegrations',
+      platforms: ['mobile', 'web'],
       features: {
         onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
         authentication: createAuthConfig(true),
@@ -149,6 +154,7 @@ describe('ProjectGenerator', () => {
       },
       backend: {
         database: 'postgresql',
+        orm: 'prisma',
         eventQueue: false,
         docker: true,
       },
@@ -180,6 +186,7 @@ describe('ProjectGenerator', () => {
       projectName: 'test-exists',
       packageManager: 'npm',
       appScheme: 'testexists',
+      platforms: ['mobile', 'web'],
       features: {
         onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
         authentication: createAuthConfig(true),
@@ -194,6 +201,7 @@ describe('ProjectGenerator', () => {
       },
       backend: {
         database: 'postgresql',
+        orm: 'prisma',
         eventQueue: false,
         docker: true,
       },

@@ -4,6 +4,7 @@ export const minimalConfig: Readonly<ProjectConfig> = {
   projectName: 'test-minimal',
   packageManager: 'npm',
   appScheme: 'testminimal',
+  platforms: ['mobile', 'web'],
   features: {
     onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
     authentication: {

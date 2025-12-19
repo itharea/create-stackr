@@ -4,6 +4,7 @@ export const fullFeaturedConfig: Readonly<ProjectConfig> = {
   projectName: 'test-full',
   packageManager: 'npm',
   appScheme: 'testfull',
+  platforms: ['mobile', 'web'],
   features: {
     onboarding: { enabled: true, pages: 3, skipButton: true, showPaywall: true },
     authentication: {

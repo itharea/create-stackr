@@ -33,6 +33,7 @@ describe('E2E: Full Project Generation', () => {
       projectName: 'minimal-app',
       packageManager: 'npm',
       appScheme: 'minimalapp',
+      platforms: ['mobile', 'web'],
       features: {
         onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
         authentication: {
@@ -107,6 +108,7 @@ describe('E2E: Full Project Generation', () => {
       projectName: 'full-featured-app',
       packageManager: 'npm',
       appScheme: 'fullfeaturedapp',
+      platforms: ['mobile', 'web'],
       features: {
         onboarding: { enabled: true, pages: 5, skipButton: true, showPaywall: true },
         authentication: {
@@ -192,6 +194,7 @@ describe('E2E: Full Project Generation', () => {
       projectName: 'json-test-app',
       packageManager: 'npm',
       appScheme: 'jsontestapp',
+      platforms: ['mobile', 'web'],
       features: {
         onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
         authentication: {
@@ -253,6 +256,7 @@ describe('E2E: Full Project Generation', () => {
       projectName: 'ts-test-app',
       packageManager: 'npm',
       appScheme: 'tstestapp',
+      platforms: ['mobile', 'web'],
       features: {
         onboarding: { enabled: true, pages: 3, skipButton: true, showPaywall: false },
         authentication: {
@@ -319,6 +323,7 @@ describe('E2E: Full Project Generation', () => {
         projectName: 'drizzle-test-project',
         packageManager: 'npm',
         appScheme: 'drizzletestproject',
+        platforms: ['mobile', 'web'],
         features: {
           onboarding: { enabled: true, pages: 3, skipButton: true, showPaywall: false },
           authentication: {
@@ -385,6 +390,7 @@ describe('E2E: Full Project Generation', () => {
         projectName: 'prisma-test-project',
         packageManager: 'npm',
         appScheme: 'prismatestproject',
+        platforms: ['mobile', 'web'],
         features: {
           onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
           authentication: {

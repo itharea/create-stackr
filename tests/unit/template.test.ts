@@ -7,6 +7,7 @@ describe('Template Utils', () => {
     projectName: 'test-app',
     packageManager: 'npm',
     appScheme: 'testapp',
+    platforms: ['mobile', 'web'],
     features: {
       onboarding: { enabled: true, pages: 3, skipButton: true, showPaywall: false },
       authentication: {
@@ -42,7 +43,7 @@ describe('Template Utils', () => {
 
   describe('shouldIncludeFile', () => {
     it('should include onboarding files when enabled', () => {
-      expect(shouldIncludeFile('features/onboarding/app/page.tsx', mockConfig)).toBe(true);
+      expect(shouldIncludeFile('features/mobile/onboarding/app/page.tsx', mockConfig)).toBe(true);
     });
 
     it('should exclude onboarding files when disabled', () => {
@@ -53,11 +54,11 @@ describe('Template Utils', () => {
           onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false }
         }
       };
-      expect(shouldIncludeFile('features/onboarding/app/page.tsx', config)).toBe(false);
+      expect(shouldIncludeFile('features/mobile/onboarding/app/page.tsx', config)).toBe(false);
     });
 
     it('should exclude RevenueCat files when disabled', () => {
-      expect(shouldIncludeFile('integrations/revenuecat/services/revenuecatService.ts', mockConfig)).toBe(false);
+      expect(shouldIncludeFile('integrations/mobile/revenuecat/services/revenuecatService.ts', mockConfig)).toBe(false);
     });
 
     it('should include RevenueCat files when enabled', () => {
@@ -68,7 +69,7 @@ describe('Template Utils', () => {
           revenueCat: { enabled: true, iosKey: 'test', androidKey: 'test' }
         }
       };
-      expect(shouldIncludeFile('integrations/revenuecat/services/revenuecatService.ts', config)).toBe(true);
+      expect(shouldIncludeFile('integrations/mobile/revenuecat/services/revenuecatService.ts', config)).toBe(true);
     });
 
     it('should include base files always', () => {
@@ -124,17 +125,17 @@ describe('Template Utils', () => {
     });
 
     it('should map features to mobile/app', () => {
-      const result = getDestinationPath('features/onboarding/app/page.tsx', '/target');
+      const result = getDestinationPath('features/mobile/onboarding/app/page.tsx', '/target');
       expect(result).toBe('/target/mobile/app/page.tsx');
     });
 
     it('should map features services to mobile/src/services', () => {
-      const result = getDestinationPath('features/auth/services/auth.ts', '/target');
+      const result = getDestinationPath('features/mobile/auth/services/auth.ts', '/target');
       expect(result).toBe('/target/mobile/src/services/auth.ts');
     });
 
     it('should map integrations to mobile/src', () => {
-      const result = getDestinationPath('integrations/revenuecat/services/revenuecatService.ts', '/target');
+      const result = getDestinationPath('integrations/mobile/revenuecat/services/revenuecatService.ts', '/target');
       expect(result).toBe('/target/mobile/src/services/revenuecatService.ts');
     });
 

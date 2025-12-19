@@ -1,6 +1,9 @@
 // ORM choices available for the backend
 export type ORMChoice = 'prisma' | 'drizzle';
 
+// Platform choices (mobile = Expo, web = Next.js)
+export type Platform = 'mobile' | 'web';
+
 export interface ProjectConfig {
   // Project metadata
   projectName: string;
@@ -8,6 +11,9 @@ export interface ProjectConfig {
 
   // Deep link scheme for OAuth callbacks (derived from projectName)
   appScheme: string;
+
+  // Platforms to generate (mobile = Expo, web = Next.js)
+  platforms: Platform[];
 
   // Feature flags
   features: {

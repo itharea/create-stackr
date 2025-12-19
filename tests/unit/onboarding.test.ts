@@ -20,9 +20,17 @@ describe('Onboarding Generator', () => {
     const config: ProjectConfig = {
       projectName: 'test-app',
       packageManager: 'npm',
+      appScheme: 'testapp',
+      platforms: ['mobile'],
       features: {
         onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
-        authentication: true,
+        authentication: {
+          enabled: true,
+          providers: { emailPassword: true, google: false, apple: false, github: false },
+          emailVerification: false,
+          passwordReset: true,
+          twoFactor: false,
+        },
         paywall: false,
         sessionManagement: true,
       },
@@ -34,6 +42,7 @@ describe('Onboarding Generator', () => {
       },
       backend: {
         database: 'postgresql',
+        orm: 'prisma',
         eventQueue: false,
         docker: true,
       },
@@ -51,9 +60,17 @@ describe('Onboarding Generator', () => {
     const config: ProjectConfig = {
       projectName: 'test-app',
       packageManager: 'npm',
+      appScheme: 'testapp',
+      platforms: ['mobile'],
       features: {
         onboarding: { enabled: true, pages: 3, skipButton: true, showPaywall: false },
-        authentication: true,
+        authentication: {
+          enabled: true,
+          providers: { emailPassword: true, google: false, apple: false, github: false },
+          emailVerification: false,
+          passwordReset: true,
+          twoFactor: false,
+        },
         paywall: false,
         sessionManagement: true,
       },
@@ -65,6 +82,7 @@ describe('Onboarding Generator', () => {
       },
       backend: {
         database: 'postgresql',
+        orm: 'prisma',
         eventQueue: false,
         docker: true,
       },
@@ -83,9 +101,17 @@ describe('Onboarding Generator', () => {
     const config: ProjectConfig = {
       projectName: 'test-app',
       packageManager: 'npm',
+      appScheme: 'testapp',
+      platforms: ['mobile'],
       features: {
         onboarding: { enabled: true, pages: 5, skipButton: true, showPaywall: false },
-        authentication: true,
+        authentication: {
+          enabled: true,
+          providers: { emailPassword: true, google: false, apple: false, github: false },
+          emailVerification: false,
+          passwordReset: true,
+          twoFactor: false,
+        },
         paywall: false,
         sessionManagement: true,
       },
@@ -97,6 +123,7 @@ describe('Onboarding Generator', () => {
       },
       backend: {
         database: 'postgresql',
+        orm: 'prisma',
         eventQueue: false,
         docker: true,
       },
@@ -129,9 +156,17 @@ describe('Onboarding Generator', () => {
     const config: ProjectConfig = {
       projectName: 'test-app',
       packageManager: 'npm',
+      appScheme: 'testapp',
+      platforms: ['mobile'],
       features: {
         onboarding: { enabled: true, pages: 4, skipButton: true, showPaywall: false },
-        authentication: true,
+        authentication: {
+          enabled: true,
+          providers: { emailPassword: true, google: false, apple: false, github: false },
+          emailVerification: false,
+          passwordReset: true,
+          twoFactor: false,
+        },
         paywall: false,
         sessionManagement: true,
       },
@@ -143,6 +178,7 @@ describe('Onboarding Generator', () => {
       },
       backend: {
         database: 'postgresql',
+        orm: 'prisma',
         eventQueue: false,
         docker: true,
       },
@@ -165,9 +201,17 @@ describe('Onboarding Generator', () => {
     const config: ProjectConfig = {
       projectName: 'test-app',
       packageManager: 'npm',
+      appScheme: 'testapp',
+      platforms: ['mobile'],
       features: {
         onboarding: { enabled: true, pages: 4, skipButton: false, showPaywall: true },
-        authentication: true,
+        authentication: {
+          enabled: true,
+          providers: { emailPassword: true, google: false, apple: false, github: false },
+          emailVerification: false,
+          passwordReset: true,
+          twoFactor: false,
+        },
         paywall: true,
         sessionManagement: true,
       },
@@ -179,6 +223,7 @@ describe('Onboarding Generator', () => {
       },
       backend: {
         database: 'postgresql',
+        orm: 'prisma',
         eventQueue: false,
         docker: true,
       },
@@ -200,9 +245,17 @@ describe('Onboarding Generator', () => {
     const config: ProjectConfig = {
       projectName: 'test-app',
       packageManager: 'npm',
+      appScheme: 'testapp',
+      platforms: ['mobile'],
       features: {
         onboarding: { enabled: true, pages: 4, skipButton: false, showPaywall: false },
-        authentication: true,
+        authentication: {
+          enabled: true,
+          providers: { emailPassword: true, google: false, apple: false, github: false },
+          emailVerification: false,
+          passwordReset: true,
+          twoFactor: false,
+        },
         paywall: false,
         sessionManagement: true,
       },
@@ -214,6 +267,7 @@ describe('Onboarding Generator', () => {
       },
       backend: {
         database: 'postgresql',
+        orm: 'prisma',
         eventQueue: false,
         docker: true,
       },

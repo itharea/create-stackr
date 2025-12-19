@@ -35,13 +35,36 @@ export function shouldIncludeFile(
   filePath: string,
   config: ProjectConfig
 ): boolean {
+  // Skip .gitkeep files - they are only for version control
+  if (filePath.endsWith('.gitkeep')) {
+    return false;
+  }
+
+  // ==========================================================================
+  // Platform-based filtering (consistent architecture)
+  // ==========================================================================
+  // All platform-specific content lives under /mobile/ or /web/ subdirectories:
+  // - base/mobile/, features/mobile/, integrations/mobile/ → mobile platform
+  // - base/web/, features/web/, integrations/web/ → web platform
+  // - base/backend/, shared/ → always included (platform-agnostic)
+
+  // Exclude mobile-specific content when mobile platform not selected
+  if (filePath.includes('/mobile/') && !config.platforms.includes('mobile')) {
+    return false;
+  }
+
+  // Exclude web-specific content when web platform not selected
+  if (filePath.includes('/web/') && !config.platforms.includes('web')) {
+    return false;
+  }
+
   // Check if file is in a conditional directory
-  if (filePath.includes('features/onboarding') && !config.features.onboarding.enabled) {
+  if (filePath.includes('features/mobile/onboarding') && !config.features.onboarding.enabled) {
     return false;
   }
 
   // Auth check updated for new structure
-  if (filePath.includes('features/auth') && !config.features.authentication.enabled) {
+  if (filePath.includes('features/mobile/auth') && !config.features.authentication.enabled) {
     return false;
   }
 
@@ -63,25 +86,25 @@ export function shouldIncludeFile(
     return false;
   }
 
-  if (filePath.includes('features/paywall') && !config.features.paywall) {
+  if (filePath.includes('features/mobile/paywall') && !config.features.paywall) {
     return false;
   }
 
   // Note: Tabs templates are always included (not conditional)
 
-  if (filePath.includes('integrations/revenuecat') && !config.integrations.revenueCat.enabled) {
+  if (filePath.includes('integrations/mobile/revenuecat') && !config.integrations.revenueCat.enabled) {
     return false;
   }
 
-  if (filePath.includes('integrations/adjust') && !config.integrations.adjust.enabled) {
+  if (filePath.includes('integrations/mobile/adjust') && !config.integrations.adjust.enabled) {
     return false;
   }
 
-  if (filePath.includes('integrations/scate') && !config.integrations.scate.enabled) {
+  if (filePath.includes('integrations/mobile/scate') && !config.integrations.scate.enabled) {
     return false;
   }
 
-  if (filePath.includes('integrations/att') && !config.integrations.att.enabled) {
+  if (filePath.includes('integrations/mobile/att') && !config.integrations.att.enabled) {
     return false;
   }
 
@@ -158,7 +181,9 @@ export function getDestinationPath(
     relativePath = relativePath.substring('templates/'.length);
   }
 
-  // Map template structure to project structure
+  // ==========================================================================
+  // Platform base paths
+  // ==========================================================================
   // base/mobile/* → mobile/*
   if (relativePath.startsWith('base/mobile/')) {
     relativePath = relativePath.substring('base/'.length);
@@ -167,20 +192,77 @@ export function getDestinationPath(
   else if (relativePath.startsWith('base/backend/')) {
     relativePath = relativePath.substring('base/'.length);
   }
-  // features/*/app/* → mobile/app/*
-  else if (relativePath.startsWith('features/')) {
-    const parts = relativePath.split('/');
-    if (parts[2] === 'app') {
-      relativePath = 'mobile/' + parts.slice(2).join('/');
-    } else if (parts[2] === 'services' || parts[2] === 'store' || parts[2] === 'hooks' || parts[2] === 'components') {
-      relativePath = 'mobile/src/' + parts.slice(2).join('/');
+  // base/web/* → web/*
+  else if (relativePath.startsWith('base/web/')) {
+    relativePath = relativePath.substring('base/'.length);
+  }
+
+  // ==========================================================================
+  // Mobile features and integrations (now under /mobile/ subdirectory)
+  // ==========================================================================
+  // features/mobile/*/app/* → mobile/app/*
+  else if (relativePath.startsWith('features/mobile/')) {
+    const featurePath = relativePath.substring('features/mobile/'.length);
+    const parts = featurePath.split('/');
+    const featureName = parts[0];
+    const restOfPath = parts.slice(1).join('/');
+
+    if (restOfPath.startsWith('app/') || restOfPath === 'app') {
+      relativePath = `mobile/${restOfPath}`;
+    } else if (['services', 'store', 'hooks', 'components'].some(dir => restOfPath.startsWith(dir + '/') || restOfPath === dir)) {
+      relativePath = `mobile/src/${restOfPath}`;
+    } else {
+      relativePath = `mobile/${restOfPath}`;
     }
   }
-  // integrations/*/services/* → mobile/src/services/*
-  else if (relativePath.startsWith('integrations/')) {
-    const parts = relativePath.split('/');
-    relativePath = 'mobile/src/' + parts.slice(2).join('/');
+
+  // integrations/mobile/*/services/* → mobile/src/services/*
+  else if (relativePath.startsWith('integrations/mobile/')) {
+    const integrationPath = relativePath.substring('integrations/mobile/'.length);
+    const parts = integrationPath.split('/');
+    const integrationName = parts[0];
+    const restOfPath = parts.slice(1).join('/');
+
+    if (restOfPath.startsWith('services/') || restOfPath.startsWith('store/')) {
+      relativePath = `mobile/src/${restOfPath}`;
+    } else {
+      relativePath = `mobile/${restOfPath}`;
+    }
   }
+
+  // ==========================================================================
+  // Web features and integrations (future - placeholder for consistency)
+  // ==========================================================================
+  // features/web/*/app/* → web/src/app/*
+  else if (relativePath.startsWith('features/web/')) {
+    const featurePath = relativePath.substring('features/web/'.length);
+    const parts = featurePath.split('/');
+    const featureName = parts[0];
+    const restOfPath = parts.slice(1).join('/');
+
+    // Map to web directory structure (Next.js App Router)
+    if (restOfPath.startsWith('app/') || restOfPath === 'app') {
+      relativePath = `web/src/${restOfPath}`;
+    } else if (['components', 'lib', 'hooks'].some(dir => restOfPath.startsWith(dir + '/') || restOfPath === dir)) {
+      relativePath = `web/src/${restOfPath}`;
+    } else {
+      relativePath = `web/${restOfPath}`;
+    }
+  }
+
+  // integrations/web/* → web/src/*
+  else if (relativePath.startsWith('integrations/web/')) {
+    const integrationPath = relativePath.substring('integrations/web/'.length);
+    const parts = integrationPath.split('/');
+    const integrationName = parts[0];
+    const restOfPath = parts.slice(1).join('/');
+
+    relativePath = `web/src/${restOfPath}`;
+  }
+
+  // ==========================================================================
+  // Shared templates (platform-agnostic)
+  // ==========================================================================
   // shared/* → *
   else if (relativePath.startsWith('shared/')) {
     relativePath = relativePath.substring('shared/'.length);

@@ -43,6 +43,8 @@ describe('validateConfiguration', () => {
   const createValidConfig = (): ProjectConfig => ({
     projectName: 'test-app',
     packageManager: 'npm',
+    appScheme: 'testapp',
+    platforms: ['mobile', 'web'],
     features: {
       onboarding: {
         enabled: false,
@@ -50,7 +52,18 @@ describe('validateConfiguration', () => {
         skipButton: false,
         showPaywall: false,
       },
-      authentication: true,
+      authentication: {
+        enabled: true,
+        providers: {
+          emailPassword: true,
+          google: false,
+          apple: false,
+          github: false,
+        },
+        emailVerification: false,
+        passwordReset: true,
+        twoFactor: false,
+      },
       paywall: false,
       sessionManagement: true,
     },
@@ -75,6 +88,7 @@ describe('validateConfiguration', () => {
     },
     backend: {
       database: 'postgresql',
+      orm: 'prisma',
       eventQueue: false,
       docker: true,
     },

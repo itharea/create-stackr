@@ -5,6 +5,7 @@ import { promptSDKs } from './sdks.js';
 import { promptOnboarding } from './onboarding.js';
 import { promptPackageManager } from './packageManager.js';
 import { promptORM } from './orm.js';
+import { promptPlatforms } from './platform.js';
 import { PRESETS } from '../config/presets.js';
 import type { ProjectConfig, CLIOptions } from '../types/index.js';
 import { deriveAppScheme } from '../types/index.js';
@@ -64,7 +65,10 @@ export async function collectConfiguration(
 async function collectCustomConfiguration(): Promise<
   Omit<ProjectConfig, 'projectName' | 'packageManager' | 'appScheme'>
 > {
-  // ORM selection FIRST (foundational choice)
+  // Platform selection FIRST (foundational choice)
+  const platforms = await promptPlatforms();
+
+  // ORM selection (foundational choice)
   const orm = await promptORM();
 
   // Collect features
@@ -85,6 +89,7 @@ async function collectCustomConfiguration(): Promise<
   }
 
   return {
+    platforms,
     features,
     integrations,
     backend: {

@@ -88,7 +88,7 @@ export const auth = betterAuth({
     updateAge: 60 * 60 * 24, // 1 day
   },
   trustedOrigins: [
-    // Web origins
+    // Web origins (includes development and production URLs)
     ...(process.env.TRUSTED_ORIGINS?.split(",") || ["http://localhost:3000"]),
     // Mobile deep link scheme (required for OAuth callbacks)
     "<%= appScheme %>://",
