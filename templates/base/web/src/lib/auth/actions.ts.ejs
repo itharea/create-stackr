@@ -1,0 +1,334 @@
+'use server';
+
+import {
+  setSessionCookie,
+  getSessionToken,
+  clearSessionCookie,
+  getDeviceSessionToken,
+} from './cookies';
+import { AUTH_CONFIG, BETTER_AUTH_COOKIE_NAME } from './config';
+
+// Types
+export interface User {
+  id: string;
+  email: string;
+  name: string | null;
+  emailVerified: boolean;
+  image: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Session {
+  id: string;
+  userId: string;
+  token: string;
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+export interface AuthSession {
+  user: User;
+  session: Session;
+}
+
+interface SignInResult {
+  success: boolean;
+  error?: string;
+  session?: AuthSession;
+}
+
+interface SignUpResult {
+  success: boolean;
+  error?: string;
+<% if (features.authentication.emailVerification) { %>
+  needsEmailVerification?: boolean;
+<% } %>
+}
+
+/**
+ * Build headers for Fastify requests
+ * Includes session token in Better Auth cookie format and Origin for CSRF protection.
+ * Exported for reuse by other modules (e.g., sessions.ts).
+ */
+export async function buildAuthHeaders(): Promise<HeadersInit> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    // Origin header required for Better Auth CSRF protection
+    // Server Actions run in Node.js and don't automatically include Origin
+    'Origin': AUTH_CONFIG.appUrl,
+  };
+
+  const sessionToken = await getSessionToken();
+  if (sessionToken) {
+    headers['Cookie'] = `${BETTER_AUTH_COOKIE_NAME}=${sessionToken}`;
+  }
+
+  const deviceToken = await getDeviceSessionToken();
+  if (deviceToken) {
+    headers['X-Device-Session-Token'] = deviceToken;
+  }
+
+  return headers;
+}
+
+/**
+ * Sign in with email and password
+ */
+export async function signIn(email: string, password: string): Promise<SignInResult> {
+  try {
+    const response = await fetch(`${AUTH_CONFIG.backendUrl}/api/auth/sign-in/email`, {
+      method: 'POST',
+      headers: await buildAuthHeaders(),
+      body: JSON.stringify({ email, password }),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      return {
+        success: false,
+        error: error.message || 'Invalid email or password',
+      };
+    }
+
+    // Extract session token from Set-Cookie header
+    const sessionToken = extractSessionToken(response);
+
+    if (!sessionToken) {
+      return { success: false, error: 'No session token received' };
+    }
+
+    // Set session cookie
+    await setSessionCookie(sessionToken);
+
+    // Get session data
+    const session = await getSession();
+
+    return { success: true, session: session || undefined };
+  } catch (error) {
+    console.error('Sign in error:', error);
+    return { success: false, error: 'An error occurred during sign in' };
+  }
+}
+
+/**
+ * Sign up with email and password
+ */
+export async function signUp(
+  email: string,
+  password: string,
+  name?: string
+): Promise<SignUpResult> {
+  try {
+    const response = await fetch(`${AUTH_CONFIG.backendUrl}/api/auth/sign-up/email`, {
+      method: 'POST',
+      headers: await buildAuthHeaders(),
+      body: JSON.stringify({ email, password, name }),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      return {
+        success: false,
+        error: error.message || 'Failed to create account',
+      };
+    }
+
+<% if (features.authentication.emailVerification) { %>
+    const data = await response.json();
+
+    // Check if email verification is required
+    if (data.emailVerificationRequired) {
+      return { success: true, needsEmailVerification: true };
+    }
+<% } %>
+
+    // Extract and set session token
+    const sessionToken = extractSessionToken(response);
+
+    if (sessionToken) {
+      await setSessionCookie(sessionToken);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Sign up error:', error);
+    return { success: false, error: 'An error occurred during sign up' };
+  }
+}
+
+/**
+ * Sign out current session
+ */
+export async function signOut(): Promise<{ success: boolean }> {
+  try {
+    await fetch(`${AUTH_CONFIG.backendUrl}/api/auth/sign-out`, {
+      method: 'POST',
+      headers: await buildAuthHeaders(),
+      body: JSON.stringify({}),
+      cache: 'no-store',
+    });
+  } catch (error) {
+    console.error('Sign out error:', error);
+  }
+
+  // Always clear local cookie
+  await clearSessionCookie();
+
+  return { success: true };
+}
+
+/**
+ * Get current session (validates with backend)
+ *
+ * Note: For client-side caching, use the AuthProvider which
+ * maintains a cache to avoid hitting the backend on every render.
+ */
+export async function getSession(): Promise<AuthSession | null> {
+  const sessionToken = await getSessionToken();
+
+  if (!sessionToken) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${AUTH_CONFIG.backendUrl}/api/auth/get-session`, {
+      method: 'GET',
+      headers: await buildAuthHeaders(),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      // Session invalid, clear cookie
+      await clearSessionCookie();
+      return null;
+    }
+
+    const data = await response.json();
+    return data as AuthSession;
+  } catch (error) {
+    console.error('Get session error:', error);
+    return null;
+  }
+}
+
+/**
+ * Request password reset email
+ */
+export async function requestPasswordReset(
+  email: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const response = await fetch(`${AUTH_CONFIG.backendUrl}/api/auth/forget-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        redirectTo: `${AUTH_CONFIG.appUrl}/reset-password`,
+      }),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      return { success: false, error: error.message || 'Failed to send reset email' };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Password reset request error:', error);
+    return { success: false, error: 'An error occurred' };
+  }
+}
+
+/**
+ * Reset password with token
+ */
+export async function resetPassword(
+  token: string,
+  newPassword: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const response = await fetch(`${AUTH_CONFIG.backendUrl}/api/auth/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, newPassword }),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      return { success: false, error: error.message || 'Failed to reset password' };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Password reset error:', error);
+    return { success: false, error: 'An error occurred' };
+  }
+}
+
+<% if (features.authentication.emailVerification) { %>
+/**
+ * Verify email with token
+ */
+export async function verifyEmail(token: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const response = await fetch(`${AUTH_CONFIG.backendUrl}/api/auth/verify-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      return { success: false, error: error.message || 'Failed to verify email' };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Email verification error:', error);
+    return { success: false, error: 'An error occurred' };
+  }
+}
+<% } %>
+
+/**
+ * Extract session token from Set-Cookie header
+ *
+ * IMPORTANT: In Node.js 20+, use headers.getSetCookie() to get an array of cookies.
+ * The headers.get("set-cookie") method joins cookies with commas, which breaks
+ * parsing because cookie attributes like Expires contain commas (e.g., "Thu, 01 Jan 2025").
+ */
+function extractSessionToken(response: Response): string | null {
+  // Use getSetCookie() for proper cookie array handling (Node.js 20+)
+  // This returns an array of individual Set-Cookie header values
+  const setCookies = response.headers.getSetCookie?.() ?? [];
+
+  // Fallback for older Node.js versions or environments without getSetCookie
+  if (setCookies.length === 0) {
+    const setCookieHeader = response.headers.get('set-cookie');
+    if (!setCookieHeader) return null;
+
+    // Manual parsing fallback - split on ", " followed by a cookie name pattern
+    // This handles most cases but getSetCookie() is preferred
+    const cookiePattern = new RegExp(`${BETTER_AUTH_COOKIE_NAME}=([^;]+)`);
+    const match = setCookieHeader.match(cookiePattern);
+    return match ? match[1] : null;
+  }
+
+  for (const cookie of setCookies) {
+    const match = cookie.match(new RegExp(`${BETTER_AUTH_COOKIE_NAME}=([^;]+)`));
+    if (match) {
+      return match[1];
+    }
+  }
+
+  return null;
+}

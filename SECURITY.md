@@ -8,7 +8,7 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in create-core-stack, please report it by opening a private security advisory on GitHub.
+If you discover a security vulnerability in create-stackr, please report it by opening a private security advisory on GitHub.
 
 **Please do not report security vulnerabilities through public GitHub issues.**
 
@@ -32,4 +32,4 @@ If you discover a security vulnerability in create-core-stack, please report it 
 - We will work with you to understand and resolve the issue
 - We will credit you in the fix announcement (unless you prefer to remain anonymous)
 
-Thank you for helping keep create-core-stack and its users safe!
+Thank you for helping keep create-stackr and its users safe!

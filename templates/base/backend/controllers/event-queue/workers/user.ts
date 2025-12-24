@@ -1,7 +1,13 @@
 import { Worker, Job } from "bullmq";
 import { Redis, Cluster as RedisCluster } from "ioredis";
-import { createUser } from "@/domain/user/repository";
 
+/**
+ * User Worker
+ *
+ * Note: User creation/authentication is handled by Better Auth.
+ * This worker handles async user-related tasks like sending welcome emails,
+ * syncing with external services, etc.
+ */
 export const createUserWorker = (
   connection: Redis | RedisCluster,
   options: {
@@ -12,8 +18,17 @@ export const createUserWorker = (
   return new Worker(
     "user",
     async (job: Job) => {
-      if (job.name === "create_user") {
-        await createUser(job.data.email, job.data.password, job.data.name);
+      switch (job.name) {
+        case "send_welcome_email":
+          // TODO: Implement welcome email sending
+          console.log(`Sending welcome email to user: ${job.data.userId}`);
+          break;
+        case "sync_user_profile":
+          // TODO: Sync user profile with external services
+          console.log(`Syncing profile for user: ${job.data.userId}`);
+          break;
+        default:
+          console.log(`Unknown job: ${job.name}`);
       }
     },
     {

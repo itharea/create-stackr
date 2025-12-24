@@ -1,8 +1,8 @@
-# create-core-stack
+# create-stackr
 
-[![npm version](https://badge.fury.io/js/create-core-stack.svg)](https://www.npmjs.com/package/create-core-stack)
+[![npm version](https://badge.fury.io/js/create-stackr.svg)](https://www.npmjs.com/package/create-stackr)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node.js Version](https://img.shields.io/node/v/create-core-stack)](https://nodejs.org)
+[![Node.js Version](https://img.shields.io/node/v/create-stackr)](https://nodejs.org)
 
 > **v0.2.0**: Now with OAuth, Drizzle ORM support, and Next.js for web. Feedback welcome!
 
@@ -12,13 +12,13 @@ Create production-ready fullstack apps with Expo (mobile), Next.js (web), and No
 
 ```bash
 # npm
-npx create-core-stack@latest my-app
+npx create-stackr@latest my-app
 
 # yarn
-yarn create core-stack my-app
+yarn create stackr my-app
 
 # bun
-bunx create-core-stack my-app
+bunx create-stackr my-app
 ```
 
 ## Features
@@ -86,21 +86,21 @@ Analytics SDKs with basic features:
 
 ```bash
 # Interactive mode
-npx create-core-stack my-app
+npx create-stackr my-app
 
 # With preset template
-npx create-core-stack my-app --template minimal
-npx create-core-stack my-app --template full-featured
-npx create-core-stack my-app --template analytics-focused
+npx create-stackr my-app --template minimal
+npx create-stackr my-app --template full-featured
+npx create-stackr my-app --template analytics-focused
 
 # With defaults (minimal preset, no prompts)
-npx create-core-stack my-app --defaults
+npx create-stackr my-app --defaults
 
 # Show help
-npx create-core-stack --help
+npx create-stackr --help
 
 # Verbose output
-npx create-core-stack my-app --verbose
+npx create-stackr my-app --verbose
 ```
 
 ## What You Get
@@ -248,7 +248,7 @@ npm run typecheck
 
 ## Troubleshooting
 
-### "Command not found: create-core-stack"
+### "Command not found: create-stackr"
 
 Make sure npx is working:
 ```bash
@@ -257,7 +257,7 @@ npx --version
 
 Try with explicit version:
 ```bash
-npx create-core-stack@latest my-app
+npx create-stackr@latest my-app
 ```
 
 ### "EACCES: permission denied"
@@ -387,6 +387,6 @@ MIT © itharea
 
 ## Support
 
-- [Documentation](https://github.com/itharea/create-core-stack)
-- [Discussions](https://github.com/itharea/create-core-stack/discussions)
-- [Issues](https://github.com/itharea/create-core-stack/issues)
+- [Documentation](https://github.com/itharea/create-stackr)
+- [Discussions](https://github.com/itharea/create-stackr/discussions)
+- [Issues](https://github.com/itharea/create-stackr/issues)

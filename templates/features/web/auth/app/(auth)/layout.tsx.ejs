@@ -1,0 +1,30 @@
+import Link from "next/link";
+
+export default function AuthLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4">
+      <div className="w-full max-w-md space-y-8">
+        {/* Logo/Brand */}
+        <div className="text-center">
+          <Link href="/" className="inline-block">
+            <h1 className="text-2xl font-bold"><%= projectName %></h1>
+          </Link>
+        </div>
+
+        {/* Auth Content */}
+        <div className="bg-card border rounded-lg p-6 shadow-sm">
+          {children}
+        </div>
+
+        {/* Footer */}
+        <p className="text-center text-sm text-muted-foreground">
+          &copy; {new Date().getFullYear()} <%= projectName %>. All rights reserved.
+        </p>
+      </div>
+    </div>
+  );
+}

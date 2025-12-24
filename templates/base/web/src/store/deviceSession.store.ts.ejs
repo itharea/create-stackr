@@ -1,0 +1,141 @@
+"use client";
+
+import { create } from "zustand";
+import { useShallow } from "zustand/react/shallow";
+import { getOrCreateDeviceId, getDeviceId } from "@/lib/device/id";
+import {
+  createDeviceSession,
+  validateDeviceSession,
+  updateDeviceActivity,
+  type DeviceSession,
+} from "@/lib/device/actions";
+
+interface DeviceSessionState {
+  // State
+  deviceSession: DeviceSession | null;
+  deviceId: string | null;
+  isLoading: boolean;
+  isInitialized: boolean;
+  error: string | null;
+
+  // Actions
+  initializeSession: () => Promise<void>;
+  refreshSession: () => Promise<void>;
+  sendHeartbeat: () => Promise<void>;
+  setDeviceSession: (session: DeviceSession | null) => void;
+  clearError: () => void;
+}
+
+export const useDeviceSessionStore = create<DeviceSessionState>((set, get) => ({
+  deviceSession: null,
+  deviceId: null,
+  isLoading: true,
+  isInitialized: false,
+  error: null,
+
+  // Initialize device session (called once on mount)
+  initializeSession: async () => {
+    if (get().isInitialized) return;
+
+    try {
+      set({ isLoading: true, error: null });
+
+      // Get or create device ID from localStorage
+      const id = getOrCreateDeviceId();
+      set({ deviceId: id });
+
+      // Skip initialization with temp IDs (server-side rendering)
+      if (id.startsWith("temp-")) {
+        set({ isLoading: false, isInitialized: true });
+        return;
+      }
+
+      // Try to validate existing session
+      const { valid, session } = await validateDeviceSession();
+
+      if (valid && session) {
+        set({ deviceSession: session });
+      } else {
+        // Create new device session
+        const result = await createDeviceSession(id);
+        if (result.success && result.session) {
+          set({ deviceSession: result.session });
+        } else if (result.error) {
+          set({ error: result.error });
+        }
+      }
+    } catch (error) {
+      console.error("Device session initialization error:", error);
+      set({ error: error instanceof Error ? error.message : "Initialization failed" });
+    } finally {
+      set({ isLoading: false, isInitialized: true });
+    }
+  },
+
+  // Refresh session (re-validate or create new)
+  refreshSession: async () => {
+    const deviceId = get().deviceId || getDeviceId();
+    if (!deviceId || deviceId.startsWith("temp-")) return;
+
+    try {
+      set({ error: null });
+      const { valid, session } = await validateDeviceSession();
+
+      if (valid && session) {
+        set({ deviceSession: session });
+      } else {
+        const result = await createDeviceSession(deviceId);
+        if (result.success && result.session) {
+          set({ deviceSession: result.session });
+        }
+      }
+    } catch (error) {
+      console.error("Device session refresh error:", error);
+    }
+  },
+
+  // Heartbeat - fire and forget
+  sendHeartbeat: async () => {
+    if (!get().deviceSession) return;
+    try {
+      await updateDeviceActivity();
+    } catch (error) {
+      // Silently fail - heartbeat is non-critical
+      console.error("Device activity update error:", error);
+    }
+  },
+
+  setDeviceSession: (deviceSession) => set({ deviceSession }),
+  clearError: () => set({ error: null }),
+}));
+
+// ============================================================================
+// Selector Hooks (using useShallow for React 19 compatibility)
+// ============================================================================
+
+/**
+ * Device session data and status
+ */
+export const useDeviceSession = () =>
+  useDeviceSessionStore(
+    useShallow((s) => ({
+      deviceSession: s.deviceSession,
+      deviceId: s.deviceId,
+      isLoading: s.isLoading,
+      hasSession: !!s.deviceSession,
+      error: s.error,
+    }))
+  );
+
+/**
+ * Device session actions
+ */
+export const useDeviceSessionActions = () =>
+  useDeviceSessionStore(
+    useShallow((s) => ({
+      initializeSession: s.initializeSession,
+      refreshSession: s.refreshSession,
+      sendHeartbeat: s.sendHeartbeat,
+      clearError: s.clearError,
+    }))
+  );

@@ -1,0 +1,152 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { AUTH_CONFIG, COOKIE_NAMES } from '@/lib/auth/config';
+
+/**
+ * OAuth Callback Route Handler
+ *
+ * This route handler processes the redirect from Fastify after OAuth authentication.
+ * It receives the exchange_token and state as query parameters.
+ *
+ * Using a Route Handler instead of a page component because we need to:
+ * 1. Read cookies from the request
+ * 2. Set/delete cookies on the response
+ * 3. Redirect to the appropriate page
+ *
+ * In Next.js 15+, cookies can only be modified in Server Actions or Route Handlers,
+ * not in React Server Components.
+ */
+export async function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams;
+  const exchangeToken = searchParams.get('exchange_token');
+  const state = searchParams.get('state');
+  const error = searchParams.get('error');
+
+  const baseUrl = AUTH_CONFIG.appUrl;
+
+  // Handle errors from OAuth provider or Fastify
+  if (error) {
+    const errorMessage = getErrorMessage(error);
+    return NextResponse.redirect(
+      new URL(`/login?error=${encodeURIComponent(errorMessage)}`, baseUrl)
+    );
+  }
+
+  // Validate required parameters
+  if (!exchangeToken || !state) {
+    return NextResponse.redirect(
+      new URL('/login?error=missing_params', baseUrl)
+    );
+  }
+
+  // Read PKCE cookies from request
+  const storedState = request.cookies.get(COOKIE_NAMES.OAUTH_STATE)?.value;
+  const verifier = request.cookies.get(COOKIE_NAMES.OAUTH_PKCE_VERIFIER)?.value;
+
+  // Verify state matches (CSRF protection)
+  if (storedState !== state) {
+    const response = NextResponse.redirect(
+      new URL('/login?error=state_mismatch', baseUrl)
+    );
+    // Clean up cookies
+    response.cookies.delete(COOKIE_NAMES.OAUTH_PKCE_VERIFIER);
+    response.cookies.delete(COOKIE_NAMES.OAUTH_STATE);
+    return response;
+  }
+
+  // Verify we have the PKCE verifier
+  if (!verifier) {
+    const response = NextResponse.redirect(
+      new URL('/login?error=missing_verifier', baseUrl)
+    );
+    response.cookies.delete(COOKIE_NAMES.OAUTH_STATE);
+    return response;
+  }
+
+  try {
+    // Exchange token with PKCE verification
+    const exchangeResponse = await fetch(
+      `${AUTH_CONFIG.backendUrl}/api/auth/web/oauth/exchange`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          exchange_token: exchangeToken,
+          code_verifier: verifier,
+        }),
+        cache: 'no-store',
+      }
+    );
+
+    if (!exchangeResponse.ok) {
+      const errorData = await exchangeResponse
+        .json()
+        .catch(() => ({ error: 'exchange_failed' }));
+      const response = NextResponse.redirect(
+        new URL(
+          `/login?error=${encodeURIComponent(errorData.error || 'exchange_failed')}`,
+          baseUrl
+        )
+      );
+      // Clean up cookies
+      response.cookies.delete(COOKIE_NAMES.OAUTH_PKCE_VERIFIER);
+      response.cookies.delete(COOKIE_NAMES.OAUTH_STATE);
+      return response;
+    }
+
+    const { session_token } = await exchangeResponse.json();
+
+    // Success! Create response with session cookie and redirect to dashboard
+    const response = NextResponse.redirect(new URL('/dashboard', baseUrl));
+
+    // Set session cookie
+    response.cookies.set(COOKIE_NAMES.SESSION, session_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: AUTH_CONFIG.sessionMaxAge,
+    });
+
+    // Clean up PKCE cookies
+    response.cookies.delete(COOKIE_NAMES.OAUTH_PKCE_VERIFIER);
+    response.cookies.delete(COOKIE_NAMES.OAUTH_STATE);
+
+    return response;
+  } catch (error) {
+    console.error('OAuth exchange error:', error);
+    const response = NextResponse.redirect(
+      new URL('/login?error=exchange_failed', baseUrl)
+    );
+    // Clean up cookies
+    response.cookies.delete(COOKIE_NAMES.OAUTH_PKCE_VERIFIER);
+    response.cookies.delete(COOKIE_NAMES.OAUTH_STATE);
+    return response;
+  }
+}
+
+/**
+ * Convert error codes to user-friendly messages
+ */
+function getErrorMessage(error: string): string {
+  const errorMessages: Record<string, string> = {
+    invalid_state: 'Session expired. Please try again.',
+    missing_verifier: 'Authentication error. Please try again.',
+    state_mismatch: 'Security check failed. Please try again.',
+    exchange_failed: 'Failed to complete sign in. Please try again.',
+    oauth_failed: 'OAuth provider error. Please try again.',
+    no_session: 'Failed to create session. Please try again.',
+    service_unavailable: 'Service temporarily unavailable. Please try later.',
+    server_error: 'An unexpected error occurred. Please try again.',
+    missing_params: 'Invalid callback. Please try again.',
+    oauth_access_denied: 'Access was denied. Please try again.',
+  };
+
+  // Handle oauth_* prefixed errors
+  if (error.startsWith('oauth_')) {
+    const specificError = errorMessages[error];
+    if (specificError) return specificError;
+    return 'OAuth error. Please try again.';
+  }
+
+  return errorMessages[error] || 'An error occurred. Please try again.';
+}

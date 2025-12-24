@@ -1,0 +1,66 @@
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { COOKIE_NAMES } from "./lib/auth/config";
+
+/**
+ * Authentication proxy (Next.js 16+)
+ *
+ * Protects routes by checking for session cookie presence.
+ * Note: This only checks cookie existence, not validity.
+ * Full session validation happens in server components/actions.
+ *
+ * Routes:
+ * - Protected routes: Redirect to /login if no session
+ * - Auth routes: Redirect to /dashboard if already authenticated
+ * - Public routes: Pass through
+ */
+
+// Routes that require authentication
+const protectedRoutes = ["/dashboard", "/settings", "/profile"];
+
+// Routes that should redirect to dashboard if already authenticated
+const authRoutes = ["/login", "/register", "/forgot-password"];
+
+// Routes that are always public
+const publicRoutes = ["/", "/auth/callback", "/reset-password", "/verify-email"];
+
+export function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const sessionToken = request.cookies.get(COOKIE_NAMES.SESSION)?.value;
+
+  // Check if current path matches any protected routes
+  const isProtectedRoute = protectedRoutes.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`)
+  );
+
+  // Check if current path matches any auth routes
+  const isAuthRoute = authRoutes.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`)
+  );
+
+  // Redirect unauthenticated users from protected routes
+  if (isProtectedRoute && !sessionToken) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("redirect", pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Redirect authenticated users from auth routes to dashboard
+  if (isAuthRoute && sessionToken) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  return NextResponse.next();
+}
+
+export const config = {
+  /*
+   * Match all routes except:
+   * - API routes (/api/*)
+   * - Static files (/_next/static/*, /favicon.ico, etc.)
+   * - Public assets (/images/*, /fonts/*, etc.)
+   */
+  matcher: [
+    "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
+};

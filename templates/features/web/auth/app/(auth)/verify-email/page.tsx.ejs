@@ -1,0 +1,198 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { verifyEmail } from "@/lib/auth/actions";
+
+export default function VerifyEmailPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const token = searchParams.get("token");
+  const email = searchParams.get("email");
+
+  const [status, setStatus] = useState<"idle" | "verifying" | "success" | "error">(
+    token ? "verifying" : "idle"
+  );
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (token && status === "verifying") {
+      handleVerify(token);
+    }
+  }, [token, status]);
+
+  const handleVerify = async (verificationToken: string) => {
+    try {
+      const result = await verifyEmail(verificationToken);
+
+      if (!result.success) {
+        setStatus("error");
+        setError(result.error || "Failed to verify email");
+        return;
+      }
+
+      setStatus("success");
+      // Redirect to login after 3 seconds
+      setTimeout(() => {
+        router.push("/login?message=Email+verified+successfully");
+      }, 3000);
+    } catch (err) {
+      setStatus("error");
+      setError("An unexpected error occurred");
+      console.error("Email verification error:", err);
+    }
+  };
+
+  // Waiting for user to check their email
+  if (status === "idle" && email) {
+    return (
+      <div className="space-y-6">
+        <div className="space-y-2 text-center">
+          <div className="mx-auto w-12 h-12 bg-blue-100 dark:bg-blue-950/20 rounded-full flex items-center justify-center">
+            <svg
+              className="w-6 h-6 text-blue-600 dark:text-blue-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+              />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold">Check your email</h2>
+          <p className="text-muted-foreground">
+            We&apos;ve sent a verification link to <strong>{email}</strong>
+          </p>
+        </div>
+
+        <div className="text-sm text-muted-foreground text-center space-y-2">
+          <p>Click the link in the email to verify your account.</p>
+          <p>
+            Didn&apos;t receive the email? Check your spam folder.
+          </p>
+        </div>
+
+        <Link href="/login">
+          <Button variant="outline" className="w-full">
+            Back to sign in
+          </Button>
+        </Link>
+      </div>
+    );
+  }
+
+  // Verifying token
+  if (status === "verifying") {
+    return (
+      <div className="space-y-6">
+        <div className="space-y-2 text-center">
+          <div className="mx-auto w-12 h-12 flex items-center justify-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          </div>
+          <h2 className="text-2xl font-bold">Verifying your email</h2>
+          <p className="text-muted-foreground">
+            Please wait while we verify your email address...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Verification successful
+  if (status === "success") {
+    return (
+      <div className="space-y-6">
+        <div className="space-y-2 text-center">
+          <div className="mx-auto w-12 h-12 bg-green-100 dark:bg-green-950/20 rounded-full flex items-center justify-center">
+            <svg
+              className="w-6 h-6 text-green-600 dark:text-green-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold">Email verified!</h2>
+          <p className="text-muted-foreground">
+            Your email has been verified. Redirecting you to sign in...
+          </p>
+        </div>
+
+        <Link href="/login">
+          <Button className="w-full">Continue to sign in</Button>
+        </Link>
+      </div>
+    );
+  }
+
+  // Verification error
+  if (status === "error") {
+    return (
+      <div className="space-y-6">
+        <div className="space-y-2 text-center">
+          <div className="mx-auto w-12 h-12 bg-red-100 dark:bg-red-950/20 rounded-full flex items-center justify-center">
+            <svg
+              className="w-6 h-6 text-red-600 dark:text-red-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold">Verification failed</h2>
+          <p className="text-muted-foreground">
+            {error || "Unable to verify your email address"}
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground text-center">
+            The verification link may have expired or already been used.
+          </p>
+
+          <Link href="/login">
+            <Button variant="outline" className="w-full">
+              Back to sign in
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // No token or email - generic page
+  return (
+    <div className="space-y-6">
+      <div className="space-y-2 text-center">
+        <h2 className="text-2xl font-bold">Verify your email</h2>
+        <p className="text-muted-foreground">
+          Please check your email for a verification link.
+        </p>
+      </div>
+
+      <Link href="/login">
+        <Button variant="outline" className="w-full">
+          Back to sign in
+        </Button>
+      </Link>
+    </div>
+  );
+}

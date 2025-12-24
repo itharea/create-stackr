@@ -26,7 +26,7 @@ export default function Home() {
   const scale = useTransform(scrollYProgress, [0, 0.5], [1, 0.95]);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText('npx create-core-stack@latest');
+    navigator.clipboard.writeText('npx create-stackr@latest');
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -59,8 +59,8 @@ export default function Home() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.1 }}
             >
-              Build Production-Ready <br />
-              <span className="text-gradient">Mobile Apps Fast</span>
+              Ship Full-Stack Apps <br />
+              <span className="text-gradient">In Minutes, Not Months</span>
             </motion.h1>
 
             <motion.p
@@ -69,8 +69,8 @@ export default function Home() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
             >
-              The ultimate starter kit for React Native, Expo, and Node.js.
-              Authentication, payments, analytics, and more — pre-configured and ready to go.
+              Production-ready mobile, web, and backend — all from one CLI.
+              Expo, Next.js, Fastify, Docker, Auth, and more. Configured and ready to deploy.
             </motion.p>
 
             <motion.div
@@ -84,7 +84,7 @@ export default function Home() {
               </Button>
               <div className={styles.command} onClick={handleCopy}>
                 <span className={styles.prompt}>$</span>
-                npx create-core-stack@latest
+                npx create-stackr@latest
                 <div className={styles.copyIcon}>
                   {copied ? <Check size={14} color="#10b981" /> : <Copy size={14} />}
                 </div>
@@ -128,6 +128,10 @@ export default function Home() {
             <span>Expo</span>
           </div>
           <div className={styles.techItem}>
+            <Globe size={20} className={styles.techIcon} />
+            <span>Next.js</span>
+          </div>
+          <div className={styles.techItem}>
             <svg viewBox="0 0 24 24" className={styles.techIcon}>
               <path fill="currentColor" d="M3 3h18v18H3V3zm16.525 13.707c-.131-.821-.666-1.511-2.252-2.155-.552-.259-1.165-.438-1.349-.854-.068-.248-.078-.382-.034-.529.113-.484.687-.629 1.137-.495.293.086.567.327.733.663.775-.507.775-.507 1.316-.844-.203-.314-.304-.454-.439-.586-.473-.528-1.103-.798-2.126-.775l-.528.067c-.507.124-.991.395-1.283.754-.855.968-.608 2.655.427 3.354 1.023.765 2.521.933 2.712 1.653.18.878-.652 1.159-1.475 1.058-.607-.136-.945-.439-1.316-1.002l-1.372.788c.157.359.337.517.607.832 1.305 1.316 4.568 1.249 5.153-.754.021-.067.18-.528.056-1.237l.034.049zm-6.737-5.434h-1.686c0 1.453-.007 2.898-.007 4.354 0 .924.047 1.772-.104 2.033-.247.517-.886.451-1.175.359-.297-.146-.448-.349-.623-.641-.047-.078-.082-.146-.095-.146l-1.368.844c.229.473.563.879.994 1.137.641.383 1.502.507 2.404.305.588-.17 1.095-.519 1.358-1.059.384-.697.302-1.553.299-2.509.008-1.541 0-3.083 0-4.635l.003-.042z" />
             </svg>
@@ -146,6 +150,22 @@ export default function Home() {
           <div className={styles.techItem}>
             <Layers size={20} className={styles.techIcon} />
             <span>Prisma</span>
+          </div>
+          <div className={styles.techItem}>
+            <Layers size={20} className={styles.techIcon} />
+            <span>Drizzle</span>
+          </div>
+          <div className={styles.techItem}>
+            <svg viewBox="0 0 24 24" className={styles.techIcon}>
+              <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z" />
+            </svg>
+            <span>Redis</span>
+          </div>
+          <div className={styles.techItem}>
+            <svg viewBox="0 0 24 24" className={styles.techIcon}>
+              <path fill="currentColor" d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z" />
+            </svg>
+            <span>BetterAuth</span>
           </div>
           <div className={styles.techItem}>
             <svg viewBox="0 0 24 24" className={styles.techIcon}>
@@ -190,14 +210,14 @@ export default function Home() {
 
       {/* Feature 1: The Universal Stack */}
       <FeatureSection
-        title="The Universal Stack"
-        description="Any UI framework. Any communication protocol. One unified backend. Connect React Native, Next.js, or TanStack Start to REST, Event Queues, or GraphQL — your architecture, your choice."
+        title="One Stack, Every Platform"
+        description="Generate mobile (Expo), web (Next.js), and backend (Fastify) from a single command. Shared authentication, unified database, and Docker-ready infrastructure — everything wired together."
         visual={<UniversalStackVisual />}
       >
         <ul className={styles.featureList}>
-          <li><Check size={16} className={styles.checkIcon} /> Connect any frontend framework</li>
-          <li><Check size={16} className={styles.checkIcon} /> Choose your communication protocol</li>
-          <li><Check size={16} className={styles.checkIcon} /> Shared type-safe contracts across all layers</li>
+          <li><Check size={16} className={styles.checkIcon} /> Mobile + Web + Backend in one project</li>
+          <li><Check size={16} className={styles.checkIcon} /> Shared auth across all platforms</li>
+          <li><Check size={16} className={styles.checkIcon} /> Docker dev & production configs included</li>
         </ul>
       </FeatureSection>
 
@@ -209,7 +229,7 @@ export default function Home() {
         visual={
           <CodeWindow
             title="Terminal"
-            code={`$ npx create-core-stack@latest
+            code={`$ npx create-stackr@latest
 
 ? What is your project name? my-app
 ? Choose a starting template: Full-Featured
@@ -244,25 +264,25 @@ Next steps:
 
       {/* Feature 3: Backend & Security */}
       <FeatureSection
-        title="Enterprise-Grade Backend"
-        description="A robust Node.js backend powered by Fastify, Prisma, and PostgreSQL. Secure by default with JWT authentication and role-based access control."
+        title="Production-Grade Infrastructure"
+        description="Docker-ready from day one. PostgreSQL with your choice of ORM (Prisma or Drizzle), Redis for caching and queues, and BetterAuth for enterprise authentication with OAuth, 2FA, and session management."
         visual={
           <div className={styles.backendVisual}>
             <div className={styles.backendCard}>
               <Shield size={32} className={styles.backendIcon} />
-              <h3>Authentication</h3>
-              <p>JWT, OAuth, and RBAC built-in.</p>
+              <h3>Enterprise Auth</h3>
+              <p>OAuth, 2FA, email verification, sessions.</p>
             </div>
             <div className={styles.backendCard}>
               <Zap size={32} className={styles.backendIcon} />
-              <h3>Performance</h3>
-              <p>Fastify is 20% faster than Express.</p>
+              <h3>Deploy-Ready</h3>
+              <p>Docker Compose for dev & production.</p>
             </div>
           </div>
         }
       >
-        <Button variant="outline" href="/docs/features/authentication">
-          Explore Architecture
+        <Button variant="outline" href="/docs/getting-started">
+          View Full Stack
         </Button>
       </FeatureSection>
 
@@ -272,13 +292,13 @@ Next steps:
           <div className={styles.ctaGlow} />
           <h2 className={styles.ctaTitle}>Ready to ship your next idea?</h2>
           <p className={styles.ctaText}>
-            Join thousands of developers building the future with create-core-stack.
+            Join thousands of developers building the future with create-stackr.
           </p>
           <div className={styles.ctaButtons}>
             <Button href="/docs/getting-started" variant="primary">
               Start Building Now
             </Button>
-            <Button href="https://github.com/itharea/create-core-stack" variant="outline">
+            <Button href="https://github.com/itharea/create-stackr" variant="outline">
               View on GitHub
             </Button>
           </div>

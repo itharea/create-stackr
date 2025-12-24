@@ -1,17 +1,17 @@
 export const metadata = {
     title: 'Getting Started',
-    description: 'Learn how to get started with create-core-stack.',
+    description: 'Learn how to get started with create-stackr.',
 };
 
 <div className="prose">
 
 # Getting Started
 
-Welcome to `create-core-stack`, the ultimate starter kit for building
-production-ready mobile applications with React Native, Expo, and Node.js.
+Welcome to `create-stackr`, the CLI for scaffolding production-ready
+full-stack applications with Expo (mobile), Next.js (web), and Fastify (backend).
 
 <Callout type="info" title="Prerequisites">
-    Before you begin, ensure you have Node.js 18+ installed on your machine.
+    Before you begin, ensure you have Node.js 18+ and Docker installed on your machine.
 </Callout>
 
 ## Quick Start
@@ -19,16 +19,17 @@ production-ready mobile applications with React Native, Expo, and Node.js.
 The fastest way to get started is by using our CLI tool. It will guide you through
 the setup process and generate a new project with your preferred configuration.
 
-<CodeBlock code="npx create-core-stack@latest" language="bash" />
+<CodeBlock code="npx create-stackr@latest" language="bash" />
 
 ## What is included?
 
-This stack comes pre-configured with everything you need to build a modern mobile app:
+This stack comes pre-configured with everything you need to build modern full-stack apps:
 
-- **Expo Router** for file-based navigation
-- **Zustand** for state management
-- **Authentication** (Google, Apple, Email)
-- **Backend API** with Fastify & Prisma
+- **Expo** for cross-platform mobile (iOS & Android)
+- **Next.js** for web applications
+- **Fastify Backend** with PostgreSQL, Redis, and Docker
+- **BetterAuth** for authentication (OAuth, 2FA, email verification)
+- **ORM Choice** between Prisma or Drizzle
 - **In-App Purchases** with RevenueCat
 - **Analytics** with Adjust & Scate
 

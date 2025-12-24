@@ -1,0 +1,40 @@
+import { redirect } from "next/navigation";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { PasswordResetForm } from "@/components/auth/password-reset-form";
+
+interface ResetPasswordPageProps {
+  searchParams: Promise<{
+    token?: string;
+  }>;
+}
+
+export default async function ResetPasswordPage({ searchParams }: ResetPasswordPageProps) {
+  const params = await searchParams;
+  const { token } = params;
+
+  // Redirect if no token provided
+  if (!token) {
+    redirect("/forgot-password");
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="space-y-2 text-center">
+        <h2 className="text-2xl font-bold">Reset your password</h2>
+        <p className="text-muted-foreground">
+          Enter your new password below
+        </p>
+      </div>
+
+      <PasswordResetForm token={token} />
+
+      <p className="text-center text-sm text-muted-foreground">
+        Remember your password?{" "}
+        <Link href="/login" className="text-primary hover:underline">
+          Sign in
+        </Link>
+      </p>
+    </div>
+  );
+}

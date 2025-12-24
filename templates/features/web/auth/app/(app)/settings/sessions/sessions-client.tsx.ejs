@@ -1,0 +1,77 @@
+"use client";
+
+import { Button } from "@/components/ui/button";
+import { SessionCard } from "@/components/settings/session-card";
+import { type SessionInfo } from "@/lib/auth/sessions";
+
+interface SessionsClientProps {
+  sessions: SessionInfo[];
+  currentSessionId?: string;
+}
+
+export function SessionsClient({ sessions, currentSessionId }: SessionsClientProps) {
+  const otherSessions = sessions.filter((s) => s.id !== currentSessionId);
+  const currentSession = sessions.find((s) => s.id === currentSessionId);
+
+  const handleRevokeAll = () => {
+    // Session revocation requires WebSocket support for proper real-time notification
+    // Without it, the revoked devices would experience broken states (401 errors, failed forms)
+    alert("Session revocation will be available after WebSocket support is implemented.");
+  };
+
+  if (sessions.length === 0) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        No active sessions found.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Revoke All Button */}
+      {otherSessions.length > 0 && (
+        <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+          <div>
+            <p className="font-medium">Sign out of other sessions</p>
+            <p className="text-sm text-muted-foreground">
+              This will revoke access from {otherSessions.length} other{" "}
+              {otherSessions.length === 1 ? "session" : "sessions"}.
+            </p>
+          </div>
+          <Button
+            variant="destructive"
+            onClick={handleRevokeAll}
+          >
+            Revoke all
+          </Button>
+        </div>
+      )}
+
+      {/* Session List */}
+      <div className="space-y-3">
+        {/* Current Session First */}
+        {currentSession && (
+          <SessionCard
+            session={currentSession}
+            isCurrentSession={true}
+          />
+        )}
+
+        {/* Other Sessions */}
+        {otherSessions.map((session) => (
+          <SessionCard
+            key={session.id}
+            session={session}
+            isCurrentSession={false}
+          />
+        ))}
+      </div>
+
+      {/* Session Count */}
+      <p className="text-sm text-muted-foreground text-center">
+        {sessions.length} active {sessions.length === 1 ? "session" : "sessions"}
+      </p>
+    </div>
+  );
+}

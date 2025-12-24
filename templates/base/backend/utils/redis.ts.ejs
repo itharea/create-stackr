@@ -1,0 +1,279 @@
+import Redis from 'ioredis';
+import { REDIS_KEYS, TTL } from '../lib/constants';
+
+const redisHost = process.env.REDIS_HOST || 'localhost';
+const redisPort = parseInt(process.env.REDIS_PORT || '6379', 10);
+const redisPassword = process.env.REDIS_PASSWORD;
+const redisDb = parseInt(process.env.REDIS_DB || '0', 10);
+const isDevelopment = process.env.NODE_ENV === 'development';
+
+// =============================================================================
+// In-Memory Store (Development Fallback Only)
+// =============================================================================
+// This store is ONLY used when Redis is unavailable in development.
+// In production, Redis unavailability will cause OAuth to fail (as intended).
+
+interface MemoryStoreEntry {
+  data: string;
+  expiresAt: number;
+}
+
+class InMemoryStore {
+  private store = new Map<string, MemoryStoreEntry>();
+  private cleanupInterval: ReturnType<typeof setInterval> | null = null;
+
+  constructor() {
+    // Cleanup expired entries every 60 seconds
+    this.cleanupInterval = setInterval(() => this.cleanup(), 60000);
+  }
+
+  async setex(key: string, ttlSeconds: number, value: string): Promise<void> {
+    this.store.set(key, {
+      data: value,
+      expiresAt: Date.now() + ttlSeconds * 1000,
+    });
+  }
+
+  async get(key: string): Promise<string | null> {
+    const entry = this.store.get(key);
+    if (!entry) return null;
+    if (Date.now() > entry.expiresAt) {
+      this.store.delete(key);
+      return null;
+    }
+    return entry.data;
+  }
+
+  async del(key: string): Promise<void> {
+    this.store.delete(key);
+  }
+
+  async getdel(key: string): Promise<string | null> {
+    const value = await this.get(key);
+    if (value) {
+      this.store.delete(key);
+    }
+    return value;
+  }
+
+  // Lua script simulation for atomic get-and-delete
+  async eval(_script: string, _numKeys: number, ...args: string[]): Promise<string | null> {
+    // For our use case, this is always the atomic get-delete pattern
+    const key = args[0];
+    return this.getdel(key);
+  }
+
+  private cleanup(): void {
+    const now = Date.now();
+    for (const [key, entry] of this.store.entries()) {
+      if (now > entry.expiresAt) {
+        this.store.delete(key);
+      }
+    }
+  }
+
+  destroy(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+    }
+    this.store.clear();
+  }
+}
+
+// =============================================================================
+// Redis Client
+// =============================================================================
+
+let redis: Redis | null = null;
+let redisAvailable = false;
+let memoryStore: InMemoryStore | null = null;
+let usingMemoryFallback = false;
+
+function createRedisClient(): Redis {
+  const client = new Redis({
+    host: redisHost,
+    port: redisPort,
+    password: redisPassword || undefined,
+    db: redisDb,
+    maxRetriesPerRequest: 3,
+    retryStrategy(times) {
+      if (times > 3) return null; // Stop retrying after 3 attempts
+      return Math.min(times * 100, 3000); // Exponential backoff
+    },
+    enableOfflineQueue: false, // Don't queue commands when disconnected
+  });
+
+  client.on('error', (err) => {
+    console.error('Redis connection error:', err.message);
+    redisAvailable = false;
+
+    // In development, activate memory fallback when Redis fails
+    if (isDevelopment && !usingMemoryFallback) {
+      console.warn('⚠️  Redis unavailable in development - using in-memory store fallback');
+      console.warn('⚠️  OAuth state will NOT persist across server restarts!');
+      usingMemoryFallback = true;
+      if (!memoryStore) {
+        memoryStore = new InMemoryStore();
+      }
+    }
+  });
+
+  client.on('connect', () => {
+    console.log('Connected to Redis');
+    redisAvailable = true;
+    usingMemoryFallback = false;
+  });
+
+  client.on('close', () => {
+    redisAvailable = false;
+  });
+
+  return client;
+}
+
+// Initialize Redis client
+export async function initRedis(): Promise<void> {
+  if (!redis) {
+    redis = createRedisClient();
+    try {
+      await redis.ping();
+      redisAvailable = true;
+      console.log('✅ Redis connected successfully');
+    } catch (err) {
+      console.error('Failed to connect to Redis:', (err as Error).message);
+      redisAvailable = false;
+
+      if (isDevelopment) {
+        console.warn('⚠️  Using in-memory store fallback for development');
+        usingMemoryFallback = true;
+        memoryStore = new InMemoryStore();
+      }
+    }
+  }
+}
+
+// Get the active store (Redis or in-memory fallback)
+function getStore(): Redis | InMemoryStore {
+  if (redisAvailable && redis) {
+    return redis;
+  }
+
+  if (isDevelopment && usingMemoryFallback && memoryStore) {
+    return memoryStore;
+  }
+
+  throw new Error('Redis is not available');
+}
+
+// Check if Redis (or fallback) is available
+export function isRedisAvailable(): boolean {
+  return redisAvailable || (isDevelopment && usingMemoryFallback);
+}
+
+// Check if using in-memory fallback
+export function isUsingMemoryFallback(): boolean {
+  return usingMemoryFallback;
+}
+
+/**
+ * OAuth store helpers with graceful error handling
+ * Uses Redis when available, falls back to in-memory store in development
+ */
+export const oauthStore = {
+  /**
+   * Store PKCE challenge during OAuth init
+   * @throws if store is unavailable (Redis down in production)
+   */
+  async storeOAuthState(
+    state: string,
+    data: {
+      code_challenge: string;
+      callback_url: string;
+      provider: string;
+    }
+  ): Promise<void> {
+    const store = getStore();
+    await store.setex(
+      `${REDIS_KEYS.OAUTH_WEB_STATE}${state}`,
+      TTL.OAUTH_STATE,
+      JSON.stringify({ ...data, created_at: Date.now() })
+    );
+  },
+
+  /**
+   * Retrieve OAuth state (does NOT delete - caller should delete after use)
+   */
+  async getOAuthState(state: string): Promise<{
+    code_challenge: string;
+    callback_url: string;
+    provider: string;
+    created_at: number;
+  } | null> {
+    const store = getStore();
+    const data = await store.get(`${REDIS_KEYS.OAUTH_WEB_STATE}${state}`);
+    if (!data) return null;
+    return JSON.parse(data);
+  },
+
+  /**
+   * Delete OAuth state after use
+   */
+  async deleteOAuthState(state: string): Promise<void> {
+    const store = getStore();
+    await store.del(`${REDIS_KEYS.OAUTH_WEB_STATE}${state}`);
+  },
+
+  /**
+   * Store exchange token after OAuth callback
+   */
+  async storeExchangeToken(
+    token: string,
+    data: {
+      session_token: string;
+      code_challenge: string;
+    }
+  ): Promise<void> {
+    const store = getStore();
+    await store.setex(
+      `${REDIS_KEYS.OAUTH_EXCHANGE}${token}`,
+      TTL.EXCHANGE_TOKEN,
+      JSON.stringify(data)
+    );
+  },
+
+  /**
+   * Retrieve and delete exchange token (single use)
+   * Uses atomic operations to prevent race conditions
+   */
+  async consumeExchangeToken(token: string): Promise<{
+    session_token: string;
+    code_challenge: string;
+  } | null> {
+    const store = getStore();
+    const key = `${REDIS_KEYS.OAUTH_EXCHANGE}${token}`;
+
+    // Use GETDEL for atomic get-and-delete (Redis 6.2+ / in-memory store)
+    let data: string | null = null;
+
+    try {
+      data = await store.getdel(key);
+    } catch {
+      // Fallback for older Redis versions using Lua script for atomicity
+      // This ensures the token can only be consumed once even under concurrent requests
+      const luaScript = `
+        local value = redis.call('GET', KEYS[1])
+        if value then
+          redis.call('DEL', KEYS[1])
+        end
+        return value
+      `;
+      data = (await store.eval(luaScript, 1, key)) as string | null;
+    }
+
+    if (!data) return null;
+    return JSON.parse(data);
+  },
+};
+
+// Export for direct Redis access if needed (use getStore() for fallback support)
+export { redis, getStore };

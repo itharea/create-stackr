@@ -1,10 +1,10 @@
 {
-  "name": "create-core-stack",
+  "name": "create-stackr",
   "version": "0.1.0",
   "description": "Create production-ready full-stack mobile apps with React Native (Expo) and Node.js backend",
   "type": "module",
   "bin": {
-    "create-core-stack": "./bin/cli.js"
+    "create-stackr": "./bin/cli.js"
   },
   "files": [
     "bin",
@@ -53,12 +53,12 @@
   "author": "itharea",
   "repository": {
     "type": "git",
-    "url": "https://github.com/itharea/create-core-stack"
+    "url": "https://github.com/itharea/create-stackr"
   },
   "bugs": {
-    "url": "https://github.com/itharea/create-core-stack/issues"
+    "url": "https://github.com/itharea/create-stackr/issues"
   },
-  "homepage": "https://github.com/itharea/create-core-stack#readme",
+  "homepage": "https://github.com/itharea/create-stackr#readme",
   "engines": {
     "node": ">=18.0.0"
   },
