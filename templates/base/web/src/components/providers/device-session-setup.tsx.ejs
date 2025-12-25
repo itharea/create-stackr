@@ -1,0 +1,56 @@
+"use client";
+
+import { useEffect } from "react";
+import {
+  useDeviceSessionStore,
+  useDeviceSessionActions,
+} from "@/store/deviceSession.store";
+import { AUTH_CONFIG } from "@/lib/auth/config";
+
+/**
+ * DeviceSessionSetup handles:
+ * 1. Session initialization on mount
+ * 2. Periodic heartbeat (every 5 minutes)
+ * 3. Visibility-based activity updates
+ */
+export function DeviceSessionSetup() {
+  const deviceSession = useDeviceSessionStore((s) => s.deviceSession);
+  const isInitialized = useDeviceSessionStore((s) => s.isInitialized);
+  const { initializeSession, sendHeartbeat } = useDeviceSessionActions();
+
+  // Initialize on mount
+  useEffect(() => {
+    if (!isInitialized) {
+      initializeSession();
+    }
+  }, [isInitialized, initializeSession]);
+
+  // Heartbeat - update activity every 5 minutes
+  useEffect(() => {
+    if (!deviceSession) return;
+
+    const interval = setInterval(() => {
+      sendHeartbeat();
+    }, AUTH_CONFIG.deviceHeartbeatInterval);
+
+    return () => clearInterval(interval);
+  }, [deviceSession, sendHeartbeat]);
+
+  // Update activity on visibility change (tab becomes visible)
+  useEffect(() => {
+    if (!deviceSession) return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        sendHeartbeat();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [deviceSession, sendHeartbeat]);
+
+  return null;
+}

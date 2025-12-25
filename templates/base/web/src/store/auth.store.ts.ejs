@@ -1,0 +1,89 @@
+"use client";
+
+import { create } from "zustand";
+import { useShallow } from "zustand/react/shallow";
+import { signOut as signOutAction, type AuthSession } from "@/lib/auth/actions";
+
+interface AuthState {
+  // State
+  session: AuthSession | null;
+  isLoading: boolean;
+  error: string | null;
+  _isHydrated: boolean;
+
+  // Actions
+  setSession: (session: AuthSession | null) => void;
+  signOut: () => Promise<void>;
+  hydrate: (initialSession: AuthSession | null) => void;
+  clearError: () => void;
+
+  // Called when a server action returns auth error (401)
+  handleAuthError: () => void;
+}
+
+export const useAuthStore = create<AuthState>((set, get) => ({
+  session: null,
+  isLoading: true,
+  error: null,
+  _isHydrated: false,
+
+  // Hydrate from RSC (runs once on initial load)
+  hydrate: (initialSession) => {
+    if (get()._isHydrated) return;
+    set({ session: initialSession, isLoading: false, _isHydrated: true });
+  },
+
+  // Update session (after sign-in, profile update, etc.)
+  setSession: (session) => set({ session, error: null }),
+
+  // Sign out
+  signOut: async () => {
+    try {
+      set({ isLoading: true, error: null });
+      await signOutAction();
+      set({ session: null });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : "Sign out failed" });
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  // Called when any server action returns 401/auth error
+  handleAuthError: () => {
+    set({ session: null, error: "Session expired" });
+  },
+
+  clearError: () => set({ error: null }),
+}));
+
+// ============================================================================
+// Selector Hooks (using useShallow for React 19 compatibility)
+// ============================================================================
+
+/**
+ * Session data and status - use for reading auth state
+ */
+export const useAuth = () =>
+  useAuthStore(
+    useShallow((s) => ({
+      session: s.session,
+      user: s.session?.user ?? null,
+      isLoading: s.isLoading,
+      isAuthenticated: !!s.session?.user,
+      error: s.error,
+    }))
+  );
+
+/**
+ * Auth actions - use for triggering auth operations
+ */
+export const useAuthActions = () =>
+  useAuthStore(
+    useShallow((s) => ({
+      setSession: s.setSession,
+      signOut: s.signOut,
+      handleAuthError: s.handleAuthError,
+      clearError: s.clearError,
+    }))
+  );

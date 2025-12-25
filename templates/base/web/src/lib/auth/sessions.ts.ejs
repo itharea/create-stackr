@@ -1,0 +1,135 @@
+'use server';
+
+import { revalidatePath } from 'next/cache';
+import { getSessionToken } from './cookies';
+import { buildAuthHeaders } from './actions';
+import { AUTH_CONFIG } from './config';
+
+export interface SessionInfo {
+  id: string;
+  userId: string;
+  token: string;
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+/**
+ * List all active sessions for the current user
+ */
+export async function listSessions(): Promise<{
+  sessions: SessionInfo[];
+}> {
+  const sessionToken = await getSessionToken();
+
+  if (!sessionToken) {
+    return { sessions: [] };
+  }
+
+  try {
+    const response = await fetch(`${AUTH_CONFIG.backendUrl}/api/auth/list-sessions`, {
+      method: 'GET',
+      headers: await buildAuthHeaders(),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      console.error('Failed to list sessions:', response.status);
+      return { sessions: [] };
+    }
+
+    const data = await response.json();
+
+    // Better Auth returns sessions array
+    return {
+      sessions: data.sessions || data || [],
+    };
+  } catch (error) {
+    console.error('List sessions error:', error);
+    return { sessions: [] };
+  }
+}
+
+/**
+ * Revoke a specific session by its ID
+ * Uses BFF endpoint that looks up the token and calls Better Auth natively
+ */
+export async function revokeSession(sessionId: string): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  const sessionToken = await getSessionToken();
+
+  if (!sessionToken) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  try {
+    const response = await fetch(`${AUTH_CONFIG.backendUrl}/api/auth/revoke-session-by-id`, {
+      method: 'POST',
+      headers: await buildAuthHeaders(),
+      body: JSON.stringify({ sessionId }),
+      cache: 'no-store',
+    });
+
+    const responseData = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: responseData.message || responseData.error || 'Failed to revoke session',
+      };
+    }
+
+    // Revalidate the sessions page to reflect the change
+    revalidatePath('/settings/sessions');
+
+    return { success: true };
+  } catch (error) {
+    console.error('Revoke session error:', error);
+    return { success: false, error: 'An error occurred' };
+  }
+}
+
+/**
+ * Revoke all other sessions (keep current session active)
+ */
+export async function revokeOtherSessions(): Promise<{
+  success: boolean;
+  revokedCount?: number;
+  error?: string;
+}> {
+  const sessionToken = await getSessionToken();
+
+  if (!sessionToken) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  try {
+    const response = await fetch(`${AUTH_CONFIG.backendUrl}/api/auth/revoke-other-sessions`, {
+      method: 'POST',
+      headers: await buildAuthHeaders(),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      return {
+        success: false,
+        error: error.message || 'Failed to revoke sessions',
+      };
+    }
+
+    const data = await response.json();
+
+    // Revalidate the sessions page to reflect the change
+    revalidatePath('/settings/sessions');
+
+    return { success: true, revokedCount: data.revokedCount || 0 };
+  } catch (error) {
+    console.error('Revoke other sessions error:', error);
+    return { success: false, error: 'An error occurred' };
+  }
+}

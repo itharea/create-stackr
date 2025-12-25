@@ -1,0 +1,74 @@
+import { cookies } from 'next/headers';
+import { AUTH_CONFIG, COOKIE_NAMES } from './config';
+
+/**
+ * Set the session cookie after successful authentication
+ */
+export async function setSessionCookie(sessionToken: string): Promise<void> {
+  const cookieStore = await cookies();
+
+  cookieStore.set(COOKIE_NAMES.SESSION, sessionToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: AUTH_CONFIG.sessionMaxAge,
+  });
+}
+
+/**
+ * Get the session token from cookies
+ */
+export async function getSessionToken(): Promise<string | undefined> {
+  const cookieStore = await cookies();
+  return cookieStore.get(COOKIE_NAMES.SESSION)?.value;
+}
+
+/**
+ * Clear the session cookie (for sign out)
+ */
+export async function clearSessionCookie(): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.delete(COOKIE_NAMES.SESSION);
+}
+
+/**
+ * Clear all auth-related cookies
+ */
+export async function clearAuthCookies(): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.delete(COOKIE_NAMES.SESSION);
+  cookieStore.delete(COOKIE_NAMES.OAUTH_PKCE_VERIFIER);
+  cookieStore.delete(COOKIE_NAMES.OAUTH_STATE);
+}
+
+/**
+ * Set device session cookie
+ */
+export async function setDeviceSessionCookie(token: string): Promise<void> {
+  const cookieStore = await cookies();
+
+  cookieStore.set(COOKIE_NAMES.DEVICE_SESSION, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: AUTH_CONFIG.deviceSessionMaxAge,
+  });
+}
+
+/**
+ * Get device session token from cookies
+ */
+export async function getDeviceSessionToken(): Promise<string | undefined> {
+  const cookieStore = await cookies();
+  return cookieStore.get(COOKIE_NAMES.DEVICE_SESSION)?.value;
+}
+
+/**
+ * Clear device session cookie
+ */
+export async function clearDeviceSessionCookie(): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.delete(COOKIE_NAMES.DEVICE_SESSION);
+}

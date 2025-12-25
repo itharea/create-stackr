@@ -1,0 +1,65 @@
+/**
+ * Auth configuration and constants
+ *
+ * Centralized configuration for authentication.
+ * Cookie names are constants to avoid magic strings scattered across the codebase.
+ */
+
+export const AUTH_CONFIG = {
+  // Public URL of the web app (for OAuth callbacks)
+  appUrl: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+
+  // Backend URL for server-to-server calls
+  // In development, you can use the Next.js proxy or direct URL
+  backendUrl: process.env.BACKEND_URL || "http://localhost:8080",
+
+  // Session cookie max age in seconds (should match Fastify config)
+  sessionMaxAge: 60 * 60 * 24 * 7, // 7 days
+
+  // Device session cookie max age
+  deviceSessionMaxAge: 60 * 60 * 24 * 30, // 30 days
+
+  // Device session heartbeat interval (client-side)
+  deviceHeartbeatInterval: 5 * 60 * 1000, // 5 minutes
+
+  // Enabled OAuth providers (from template config)
+<% if (features.authentication.providers.google) { %>
+  googleEnabled: true,
+<% } else { %>
+  googleEnabled: false,
+<% } %>
+<% if (features.authentication.providers.apple) { %>
+  appleEnabled: true,
+<% } else { %>
+  appleEnabled: false,
+<% } %>
+<% if (features.authentication.providers.github) { %>
+  githubEnabled: true,
+<% } else { %>
+  githubEnabled: false,
+<% } %>
+} as const;
+
+/**
+ * Cookie names used throughout the auth system
+ * Centralized to ensure consistency and make updates easier
+ */
+export const COOKIE_NAMES = {
+  // Session token from Better Auth (stored after sign in)
+  SESSION: "session_token",
+
+  // Device session token (for anonymous sessions)
+  DEVICE_SESSION: "device_session_token",
+
+  // OAuth PKCE verifier (temporary, during OAuth flow)
+  OAUTH_PKCE_VERIFIER: "oauth_pkce_verifier",
+
+  // OAuth state for CSRF protection (temporary, during OAuth flow)
+  OAUTH_STATE: "oauth_state",
+} as const;
+
+/**
+ * Better Auth cookie name (used when reading cookies set by Fastify)
+ * This must match the cookie name that Better Auth uses
+ */
+export const BETTER_AUTH_COOKIE_NAME = "better-auth.session_token";

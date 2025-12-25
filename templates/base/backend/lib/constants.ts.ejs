@@ -1,0 +1,29 @@
+/**
+ * Shared constants for authentication
+ * Centralized to avoid magic strings scattered across the codebase
+ */
+
+// Better Auth cookie name pattern
+export const BETTER_AUTH_COOKIE_NAME = 'better-auth.session_token';
+
+// Web-specific cookie names
+export const SESSION_COOKIE_NAME = 'session_token';
+export const DEVICE_SESSION_COOKIE_NAME = 'device_session_token';
+
+// OAuth-related cookie names (used in PKCE flow)
+export const OAUTH_PKCE_VERIFIER_COOKIE = 'oauth_pkce_verifier';
+export const OAUTH_STATE_COOKIE = 'oauth_state';
+
+// Redis key prefixes
+export const REDIS_KEYS = {
+  OAUTH_WEB_STATE: 'oauth:web:', // oauth:web:{state}
+  OAUTH_EXCHANGE: 'oauth:exchange:', // oauth:exchange:{token}
+} as const;
+
+// TTLs in seconds
+export const TTL = {
+  OAUTH_STATE: 600, // 10 minutes
+  EXCHANGE_TOKEN: 60, // 1 minute (very short!)
+  SESSION: 60 * 60 * 24 * 7, // 7 days
+  DEVICE_SESSION: 60 * 60 * 24 * 30, // 30 days
+} as const;

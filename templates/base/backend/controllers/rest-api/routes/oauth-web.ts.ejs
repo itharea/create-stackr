@@ -1,0 +1,375 @@
+import { FastifyPluginAsync } from 'fastify';
+import crypto from 'crypto';
+import { oauthStore, isRedisAvailable, isUsingMemoryFallback } from '../../../utils/redis';
+import { auth } from '../../../lib/auth';
+import { BETTER_AUTH_COOKIE_NAME } from '../../../lib/constants';
+import { Type } from '@sinclair/typebox';
+
+/**
+ * Web OAuth routes with PKCE support
+ *
+ * These routes wrap Better Auth's OAuth flow to support the BFF pattern
+ * where Next.js manages cookies and Fastify manages sessions.
+ *
+ * FLOW:
+ * 1. /init - Store PKCE challenge, call Better Auth to get OAuth URL, redirect
+ * 2. OAuth provider authenticates user
+ * 3. Better Auth /api/auth/callback/:provider handles OAuth callback
+ * 4. /callback/:provider - Read session from cookies (set by Better Auth), create exchange token
+ * 5. /exchange - Verify PKCE, return session token
+ */
+const oauthWebRoutes: FastifyPluginAsync = async (server) => {
+  // Health check for OAuth subsystem
+  server.get('/health', async (request, reply) => {
+    const redisOk = isRedisAvailable();
+    return reply.status(redisOk ? 200 : 503).send({
+      status: redisOk ? 'ok' : 'degraded',
+      redis: redisOk,
+      usingMemoryFallback: isUsingMemoryFallback(),
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  /**
+   * Step 1: Initialize OAuth flow
+   *
+   * Called by Next.js server action after setting PKCE cookies.
+   * Stores PKCE challenge in Redis and redirects to OAuth provider via Better Auth.
+   */
+  server.get(
+    '/init',
+    {
+      schema: {
+        querystring: Type.Object({
+          provider: Type.Union([
+            Type.Literal('google'),
+            Type.Literal('apple'),
+            Type.Literal('github'),
+          ]),
+          code_challenge: Type.String({ minLength: 43, maxLength: 128 }),
+          code_challenge_method: Type.Literal('S256'),
+          state: Type.String({ pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' }),
+          callback_url: Type.String(),
+        }),
+      },
+    },
+    async (request, reply) => {
+      const { provider, code_challenge, state, callback_url } = request.query as {
+        provider: 'google' | 'apple' | 'github';
+        code_challenge: string;
+        state: string;
+        callback_url: string;
+      };
+
+      // Check Redis availability
+      if (!isRedisAvailable()) {
+        server.log.error('Redis unavailable during OAuth init');
+        return reply.redirect(`${callback_url}?error=service_unavailable`);
+      }
+
+      // Validate callback URL is from allowed origins
+      const allowedOrigins = (process.env.WEB_APP_URL || 'http://localhost:3000')
+        .split(',')
+        .map((o) => o.trim());
+
+      let callbackOrigin: string;
+      try {
+        callbackOrigin = new URL(callback_url).origin;
+      } catch {
+        return reply.status(400).send({ error: 'Invalid callback URL' });
+      }
+
+      if (!allowedOrigins.some((origin) => callbackOrigin === origin)) {
+        server.log.warn(
+          `OAuth init rejected: callback origin ${callbackOrigin} not in allowed list`
+        );
+        return reply.status(400).send({ error: 'Invalid callback URL origin' });
+      }
+
+      try {
+        // Store PKCE challenge in store (Redis or in-memory fallback in dev)
+        await oauthStore.storeOAuthState(state, {
+          code_challenge,
+          callback_url,
+          provider,
+        });
+
+        if (isUsingMemoryFallback()) {
+          server.log.warn('OAuth state stored in memory - will be lost on server restart');
+        }
+      } catch (err) {
+        server.log.error({ err }, 'Failed to store OAuth state');
+        return reply.redirect(`${callback_url}?error=service_unavailable`);
+      }
+
+      // Build the callback URL for Better Auth that points to our callback handler
+      // Include web_state so we can retrieve PKCE data later
+      const backendUrl = process.env.BETTER_AUTH_URL || `${request.protocol}://${request.hostname}`;
+      const internalCallback = `${backendUrl}/api/auth/web/oauth/callback/${provider}?web_state=${state}`;
+
+      try {
+        // Use Better Auth's server-side API to get the OAuth redirect URL
+        // This properly handles OAuth state, nonce, and provider-specific configuration
+        //
+        // CRITICAL: We must forward the Set-Cookie headers from Better Auth to the browser.
+        // Better Auth stores a state value in a cookie during OAuth init, and verifies it
+        // on callback. Without forwarding these cookies, we get state_mismatch errors.
+        //
+        // We use returnHeaders: true to get both the response data and headers.
+        // See: https://www.better-auth.com/docs/concepts/api
+        const { headers, response } = await auth.api.signInSocial({
+          returnHeaders: true,
+          body: {
+            provider,
+            callbackURL: internalCallback,
+          },
+        });
+
+        // Forward Set-Cookie headers from Better Auth to the browser
+        // This ensures the OAuth state cookie is properly set before redirecting to Google
+        const setCookies = headers.getSetCookie?.() ?? [];
+        for (const cookie of setCookies) {
+          reply.header('Set-Cookie', cookie);
+        }
+
+        if (setCookies.length > 0) {
+          server.log.debug(
+            { cookieCount: setCookies.length },
+            'Forwarded Better Auth cookies to browser'
+          );
+        }
+
+        // Extract redirect URL from response
+        // The response object contains { url, redirect } when using returnHeaders
+        const responseData = response as { url?: string; redirect?: boolean } | null;
+        const redirectUrl = responseData?.url;
+
+        if (redirectUrl) {
+          return reply.redirect(redirectUrl);
+        }
+
+        server.log.error('Better Auth signInSocial did not return a redirect URL');
+        return reply.redirect(`${callback_url}?error=oauth_init_failed`);
+      } catch (err) {
+        server.log.error({ err }, 'Failed to initiate OAuth with Better Auth');
+        // Clean up stored state on failure
+        await oauthStore.deleteOAuthState(state).catch(() => {});
+        return reply.redirect(`${callback_url}?error=oauth_init_failed`);
+      }
+    }
+  );
+
+  /**
+   * Step 2: Handle OAuth callback from Better Auth
+   *
+   * IMPORTANT: This is called AFTER Better Auth has:
+   * 1. Received the callback from the OAuth provider
+   * 2. Exchanged the auth code for tokens
+   * 3. Created/updated the user in the database
+   * 4. Created a session
+   * 5. Set the session cookie
+   * 6. Redirected to this URL
+   *
+   * The session token is already in the REQUEST COOKIES at this point.
+   * We do NOT call Better Auth's handler again.
+   */
+  server.get(
+    '/callback/:provider',
+    {
+      schema: {
+        params: Type.Object({
+          provider: Type.String(),
+        }),
+        querystring: Type.Object({
+          web_state: Type.Optional(Type.String({ pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' })),
+          // OAuth error params (returned by provider on failure)
+          error: Type.Optional(Type.String()),
+          error_description: Type.Optional(Type.String()),
+        }),
+      },
+    },
+    async (request, reply) => {
+      const { provider } = request.params as { provider: string };
+      const { web_state, error, error_description } = request.query as {
+        web_state?: string;
+        error?: string;
+        error_description?: string;
+      };
+
+      // Default error redirect
+      const defaultErrorUrl = `${process.env.WEB_APP_URL || 'http://localhost:3000'}/login`;
+
+      // Handle OAuth provider errors (e.g., user denied access)
+      if (error) {
+        server.log.warn(
+          { provider, error, error_description },
+          'OAuth provider returned an error'
+        );
+        return reply.redirect(
+          `${defaultErrorUrl}?error=oauth_${error}${error_description ? `&message=${encodeURIComponent(error_description)}` : ''}`
+        );
+      }
+
+      // Validate required web_state parameter
+      if (!web_state) {
+        server.log.warn('OAuth callback: missing web_state parameter');
+        return reply.redirect(`${defaultErrorUrl}?error=invalid_callback`);
+      }
+
+      // Check Redis availability
+      if (!isRedisAvailable()) {
+        server.log.error('Redis unavailable during OAuth callback');
+        return reply.redirect(`${defaultErrorUrl}?error=service_unavailable`);
+      }
+
+      // Retrieve PKCE data from store
+      let pkceData;
+      try {
+        pkceData = await oauthStore.getOAuthState(web_state);
+      } catch (err) {
+        server.log.error({ err }, 'Failed to retrieve OAuth state from store');
+        return reply.redirect(`${defaultErrorUrl}?error=service_unavailable`);
+      }
+
+      if (!pkceData) {
+        server.log.warn(`OAuth callback: invalid or expired state ${web_state}`);
+        return reply.redirect(`${defaultErrorUrl}?error=invalid_state`);
+      }
+
+      // CRITICAL: Read session token from REQUEST cookies
+      // Better Auth has already set this cookie when it processed the OAuth callback
+      const sessionToken = extractSessionTokenFromCookies(request.headers.cookie);
+
+      if (!sessionToken) {
+        server.log.warn('OAuth callback: no session token in cookies');
+        await oauthStore.deleteOAuthState(web_state);
+        return reply.redirect(`${pkceData.callback_url}?error=no_session`);
+      }
+
+      // Generate exchange token
+      const exchangeToken = crypto.randomUUID();
+
+      try {
+        // Store exchange token with session and challenge
+        await oauthStore.storeExchangeToken(exchangeToken, {
+          session_token: sessionToken,
+          code_challenge: pkceData.code_challenge,
+        });
+      } catch (err) {
+        server.log.error({ err }, 'Failed to store exchange token');
+        await oauthStore.deleteOAuthState(web_state);
+        return reply.redirect(`${pkceData.callback_url}?error=service_unavailable`);
+      }
+
+      // Clean up OAuth state
+      await oauthStore.deleteOAuthState(web_state);
+
+      // Redirect to Next.js callback with exchange token
+      const redirectUrl = new URL(pkceData.callback_url);
+      redirectUrl.searchParams.set('exchange_token', exchangeToken);
+      redirectUrl.searchParams.set('state', web_state);
+
+      server.log.info(
+        { provider, state: web_state },
+        'OAuth callback successful, redirecting with exchange token'
+      );
+      return reply.redirect(redirectUrl.toString());
+    }
+  );
+
+  /**
+   * Step 3: Exchange token for session with PKCE verification
+   *
+   * Called by Next.js server to exchange the short-lived token for a session.
+   * Verifies PKCE challenge to prevent token interception attacks.
+   */
+  server.post(
+    '/exchange',
+    {
+      schema: {
+        body: Type.Object({
+          exchange_token: Type.String({ pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' }),
+          code_verifier: Type.String({ minLength: 43, maxLength: 128 }),
+        }),
+        response: {
+          200: Type.Object({
+            session_token: Type.String(),
+          }),
+          400: Type.Object({
+            error: Type.String(),
+          }),
+          503: Type.Object({
+            error: Type.String(),
+          }),
+        },
+      },
+    },
+    async (request, reply) => {
+      const { exchange_token, code_verifier } = request.body as {
+        exchange_token: string;
+        code_verifier: string;
+      };
+
+      // Check Redis availability
+      if (!isRedisAvailable()) {
+        return reply.status(503).send({ error: 'Service temporarily unavailable' });
+      }
+
+      // Retrieve and consume exchange token (single use)
+      let exchangeData;
+      try {
+        exchangeData = await oauthStore.consumeExchangeToken(exchange_token);
+      } catch (err) {
+        server.log.error({ err }, 'Failed to retrieve exchange token from store');
+        return reply.status(503).send({ error: 'Service temporarily unavailable' });
+      }
+
+      if (!exchangeData) {
+        server.log.warn('Token exchange: invalid or expired exchange token');
+        return reply.status(400).send({ error: 'Invalid or expired exchange token' });
+      }
+
+      // Verify PKCE: SHA256(verifier) should equal stored challenge
+      const computedChallenge = crypto
+        .createHash('sha256')
+        .update(code_verifier)
+        .digest('base64url');
+
+      if (computedChallenge !== exchangeData.code_challenge) {
+        // PKCE verification failed - possible interception attempt
+        server.log.warn('Token exchange: PKCE verification failed');
+        return reply.status(400).send({ error: 'PKCE verification failed' });
+      }
+
+      // PKCE verified! Return session token
+      server.log.info('Token exchange successful');
+      return reply.send({ session_token: exchangeData.session_token });
+    }
+  );
+};
+
+/**
+ * Extract Better Auth session token from cookie header
+ *
+ * @param cookieHeader - The Cookie header string from the request
+ * @returns The session token or null if not found
+ */
+function extractSessionTokenFromCookies(cookieHeader: string | undefined): string | null {
+  if (!cookieHeader) return null;
+
+  // Parse cookies (simple parser, handles most cases)
+  const cookies = cookieHeader.split(';').reduce(
+    (acc, cookie) => {
+      const [key, ...valueParts] = cookie.trim().split('=');
+      if (key) {
+        acc[key.trim()] = valueParts.join('='); // Handle values with = in them
+      }
+      return acc;
+    },
+    {} as Record<string, string>
+  );
+
+  return cookies[BETTER_AUTH_COOKIE_NAME] || null;
+}
+
+export default oauthWebRoutes;

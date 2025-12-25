@@ -1,0 +1,33 @@
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/auth/actions";
+import { listSessions } from "@/lib/auth/sessions";
+import { SessionsClient } from "./sessions-client";
+
+export default async function SessionsPage() {
+  // Check authentication
+  const authSession = await getSession();
+  if (!authSession) {
+    redirect("/login?redirect=/settings/sessions");
+  }
+
+  // Fetch all sessions
+  const { sessions } = await listSessions();
+
+  return (
+    <div className="container max-w-2xl py-8">
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold">Active Sessions</h1>
+          <p className="text-muted-foreground">
+            Manage your active sessions across devices. You can revoke access to any session except your current one.
+          </p>
+        </div>
+
+        <SessionsClient
+          sessions={sessions}
+          currentSessionId={authSession.session.id}
+        />
+      </div>
+    </div>
+  );
+}

@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 
 export function constructMetadata({
-    title = 'create-core-stack',
-    description = 'The fastest way to build production-ready mobile apps with React Native, Expo, and Node.js.',
+    title = 'create-stackr',
+    description = 'The fastest way to build production-ready full-stack apps with Expo, Next.js, and Docker.',
     image = '/og-image.png',
     icons = '/favicon.ico',
     noIndex = false,
@@ -33,7 +33,7 @@ export function constructMetadata({
             creator: '@itharea',
         },
         icons,
-        metadataBase: new URL('https://docs.create-core-stack.dev'),
+        metadataBase: new URL('https://stackr.sh'),
         ...(noIndex && {
             robots: {
                 index: false,

@@ -23,8 +23,8 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: 'create-core-stack - Generate Production-Ready Mobile Apps',
-    template: '%s | create-core-stack',
+    default: 'create-stackr - Generate Production-Ready Mobile Apps',
+    template: '%s | create-stackr',
   },
   description:
     'Generate production-ready mobile applications with React Native, Expo, and Node.js backend. Built-in integrations, authentication, and more.',
@@ -39,29 +39,29 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: 'itharea' }],
   creator: 'itharea',
-  metadataBase: new URL('https://docs.create-core-stack.dev'),
+  metadataBase: new URL('https://stackr.sh'),
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://docs.create-core-stack.dev',
-    title: 'create-core-stack Documentation',
+    url: 'https://stackr.sh',
+    title: 'create-stackr Documentation',
     description:
-      'Complete documentation for create-core-stack - the fastest way to build production-ready mobile apps.',
-    siteName: 'create-core-stack',
+      'Complete documentation for create-stackr - the fastest way to build production-ready mobile apps.',
+    siteName: 'create-stackr',
     images: [
       {
         url: '/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'create-core-stack',
+        alt: 'create-stackr',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'create-core-stack Documentation',
+    title: 'create-stackr Documentation',
     description:
-      'Complete documentation for create-core-stack - the fastest way to build production-ready mobile apps.',
+      'Complete documentation for create-stackr - the fastest way to build production-ready mobile apps.',
     images: ['/og-image.png'],
   },
   robots: {

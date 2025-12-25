@@ -24,11 +24,11 @@ export default function Footer() {
                     <div className={styles.left}>
                         <div className={styles.brand}>
                             <div className={styles.logoIcon} />
-                            <span className={styles.logoText}>create-core-stack</span>
+                            <span className={styles.logoText}>create-stackr</span>
                         </div>
                         <span className={styles.separator} />
                         <p className={styles.tagline}>
-                            Build production-ready mobile apps in minutes.
+                            Build production-ready full-stack apps in minutes.
                         </p>
                     </div>
 
@@ -40,7 +40,7 @@ export default function Footer() {
                         </nav>
                         <div className={styles.socials}>
                             <a
-                                href="https://github.com/itharea/create-core-stack"
+                                href="https://github.com/itharea/create-stackr"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 aria-label="GitHub"
@@ -48,7 +48,7 @@ export default function Footer() {
                                 <Github size={18} />
                             </a>
                             <a
-                                href="https://www.npmjs.com/package/create-core-stack"
+                                href="https://www.npmjs.com/package/create-stackr"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 aria-label="npm"

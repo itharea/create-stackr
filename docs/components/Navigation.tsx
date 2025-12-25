@@ -15,7 +15,7 @@ export default function Navigation() {
                 <div className={styles.inner}>
                     {/* Logo */}
                     <Link href="/" className={styles.logo}>
-                        create-core-stack
+                        create-stackr
                     </Link>
 
                     {/* Desktop Navigation */}
@@ -23,14 +23,14 @@ export default function Navigation() {
                         <div className={styles.links}>
                             <Link href="/docs/getting-started">Documentation</Link>
                             <a
-                                href="https://github.com/itharea/create-core-stack"
+                                href="https://github.com/itharea/create-stackr"
                                 target="_blank"
                                 rel="noopener noreferrer"
                             >
                                 GitHub
                             </a>
                             <a
-                                href="https://www.npmjs.com/package/create-core-stack"
+                                href="https://www.npmjs.com/package/create-stackr"
                                 target="_blank"
                                 rel="noopener noreferrer"
                             >
@@ -58,7 +58,7 @@ export default function Navigation() {
                             </button>
 
                             <a
-                                href="https://github.com/itharea/create-core-stack"
+                                href="https://github.com/itharea/create-stackr"
                                 className={styles.iconButton}
                                 aria-label="GitHub Repository"
                                 target="_blank"
@@ -89,14 +89,14 @@ export default function Navigation() {
                         Documentation
                     </Link>
                     <a
-                        href="https://github.com/itharea/create-core-stack"
+                        href="https://github.com/itharea/create-stackr"
                         target="_blank"
                         rel="noopener noreferrer"
                     >
                         GitHub
                     </a>
                     <a
-                        href="https://www.npmjs.com/package/create-core-stack"
+                        href="https://www.npmjs.com/package/create-stackr"
                         target="_blank"
                         rel="noopener noreferrer"
                     >

@@ -1,0 +1,148 @@
+'use server';
+
+import {
+  setDeviceSessionCookie,
+  getDeviceSessionToken,
+  clearDeviceSessionCookie,
+} from '../auth/cookies';
+import { AUTH_CONFIG } from '../auth/config';
+
+export interface DeviceSession {
+  id: string;
+  deviceId: string;
+  sessionToken: string;
+  createdAt: string;
+  lastActiveAt: string;
+  migrated: boolean;
+  migratedToUserId: string | null;
+  preferredCurrency: string;
+}
+
+/**
+ * Create a new device session
+ *
+ * Called on first visit when no device session exists.
+ * The device ID should be generated client-side and stored in localStorage.
+ */
+export async function createDeviceSession(deviceId: string): Promise<{
+  success: boolean;
+  session?: DeviceSession;
+  error?: string;
+}> {
+  try {
+    const response = await fetch(`${AUTH_CONFIG.backendUrl}/device-sessions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deviceId }),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      return {
+        success: false,
+        error: error.message || 'Failed to create device session',
+      };
+    }
+
+    const data = await response.json();
+
+    // Set device session cookie
+    await setDeviceSessionCookie(data.sessionToken);
+
+    return { success: true, session: data.session };
+  } catch (error) {
+    console.error('Create device session error:', error);
+    return { success: false, error: 'An error occurred' };
+  }
+}
+
+/**
+ * Validate existing device session
+ *
+ * Called on page load to check if the existing device session is still valid.
+ */
+export async function validateDeviceSession(): Promise<{
+  valid: boolean;
+  session?: DeviceSession;
+}> {
+  const token = await getDeviceSessionToken();
+
+  if (!token) {
+    return { valid: false };
+  }
+
+  try {
+    const response = await fetch(`${AUTH_CONFIG.backendUrl}/device-sessions/validate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionToken: token }),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      await clearDeviceSessionCookie();
+      return { valid: false };
+    }
+
+    const data = await response.json();
+    return { valid: true, session: data.session };
+  } catch (error) {
+    console.error('Validate device session error:', error);
+    return { valid: false };
+  }
+}
+
+/**
+ * Update device session activity (heartbeat)
+ *
+ * Called periodically while the user is active to prevent session expiry.
+ * This is a fire-and-forget operation - errors are logged but not thrown.
+ */
+export async function updateDeviceActivity(): Promise<void> {
+  const token = await getDeviceSessionToken();
+
+  if (!token) return;
+
+  try {
+    await fetch(`${AUTH_CONFIG.backendUrl}/device-sessions/activity`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ sessionToken: token }),
+      cache: 'no-store',
+    });
+  } catch (error) {
+    // Silently fail - heartbeat is non-critical
+    console.error('Device activity update error:', error);
+  }
+}
+
+/**
+ * Get device session info
+ */
+export async function getDeviceSessionInfo(): Promise<DeviceSession | null> {
+  const token = await getDeviceSessionToken();
+
+  if (!token) return null;
+
+  try {
+    const response = await fetch(`${AUTH_CONFIG.backendUrl}/device-sessions/info`, {
+      method: 'GET',
+      headers: {
+        'X-Device-Session-Token': token,
+      },
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return response.json();
+  } catch (error) {
+    console.error('Get device session info error:', error);
+    return null;
+  }
+}

@@ -63,8 +63,13 @@ export function shouldIncludeFile(
     return false;
   }
 
-  // Auth check updated for new structure
+  // Auth check updated for new structure (mobile)
   if (filePath.includes('features/mobile/auth') && !config.features.authentication.enabled) {
+    return false;
+  }
+
+  // Web auth check (mirrors mobile auth check)
+  if (filePath.includes('features/web/auth') && !config.features.authentication.enabled) {
     return false;
   }
 

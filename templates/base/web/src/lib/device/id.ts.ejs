@@ -1,0 +1,74 @@
+/**
+ * Device ID utilities for web
+ *
+ * Generates and stores a unique device identifier in localStorage.
+ * This follows the same pattern as mobile but adapted for web.
+ *
+ * The device ID is used to create anonymous device sessions that persist
+ * across browser sessions until the user creates an account.
+ */
+
+const DEVICE_ID_KEY = 'device_id';
+
+/**
+ * Generate a unique device ID
+ *
+ * Format: web-{timestamp_base36}-{random_base36}
+ * Example: web-lq2abc5-k8m4n2p1x3
+ */
+function generateDeviceId(): string {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 15);
+  return `web-${timestamp}-${random}`;
+}
+
+/**
+ * Get or create device ID
+ *
+ * Stores in localStorage for persistence across browser sessions.
+ * Returns a temporary ID on the server (will be replaced on client hydration).
+ */
+export function getOrCreateDeviceId(): string {
+  if (typeof window === 'undefined') {
+    // Server-side: return temporary ID
+    // This will be replaced when the client hydrates
+    return `temp-${Date.now()}`;
+  }
+
+  let deviceId = localStorage.getItem(DEVICE_ID_KEY);
+
+  if (!deviceId) {
+    deviceId = generateDeviceId();
+    localStorage.setItem(DEVICE_ID_KEY, deviceId);
+  }
+
+  return deviceId;
+}
+
+/**
+ * Check if device ID exists in localStorage
+ */
+export function hasDeviceId(): boolean {
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem(DEVICE_ID_KEY) !== null;
+}
+
+/**
+ * Clear device ID from localStorage
+ *
+ * Useful for testing or when user wants to reset their device identity.
+ */
+export function clearDeviceId(): void {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(DEVICE_ID_KEY);
+}
+
+/**
+ * Get existing device ID (does not create new one)
+ *
+ * Returns null if no device ID exists.
+ */
+export function getDeviceId(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(DEVICE_ID_KEY);
+}

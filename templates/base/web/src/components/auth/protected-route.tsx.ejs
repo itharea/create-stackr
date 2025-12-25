@@ -1,0 +1,109 @@
+"use client";
+
+import { useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { useSession } from "@/hooks/use-session";
+import { getSession } from "@/lib/auth/actions";
+import { useAuthActions } from "@/store/auth.store";
+
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+  /**
+   * URL to redirect to if not authenticated
+   * @default "/login"
+   */
+  redirectTo?: string;
+  /**
+   * Custom loading component
+   */
+  loadingComponent?: React.ReactNode;
+}
+
+/**
+ * Client-side route protection component
+ *
+ * Wraps content that should only be visible to authenticated users.
+ * Redirects to login if user is not authenticated.
+ *
+ * Note: For server-side protection, use the proxy or check session
+ * in server components. This component provides client-side protection
+ * as an additional layer.
+ *
+ * @example
+ * ```tsx
+ * <ProtectedRoute>
+ *   <DashboardContent />
+ * </ProtectedRoute>
+ * ```
+ */
+export function ProtectedRoute({
+  children,
+  redirectTo = "/login",
+  loadingComponent,
+}: ProtectedRouteProps) {
+  const { isAuthenticated, isLoading } = useSession();
+  const { handleAuthError } = useAuthActions();
+  const router = useRouter();
+
+  // Revalidate session when window regains focus
+  // This detects session expiration when user returns to the tab
+  const revalidateSession = useCallback(async () => {
+    if (!isAuthenticated) return;
+
+    const session = await getSession();
+    if (!session) {
+      // Session expired on backend - update UI state
+      handleAuthError();
+    }
+  }, [isAuthenticated, handleAuthError]);
+
+  // Focus-based revalidation
+  useEffect(() => {
+    window.addEventListener("focus", revalidateSession);
+    return () => window.removeEventListener("focus", revalidateSession);
+  }, [revalidateSession]);
+
+  // Redirect when not authenticated
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      // Include current path as redirect parameter
+      const currentPath = window.location.pathname;
+      const loginUrl = `${redirectTo}?redirect=${encodeURIComponent(currentPath)}`;
+      router.push(loginUrl);
+    }
+  }, [isAuthenticated, isLoading, redirectTo, router]);
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      loadingComponent ?? (
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        </div>
+      )
+    );
+  }
+
+  // Don't render content if not authenticated
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  return <>{children}</>;
+}
+
+/**
+ * HOC version of ProtectedRoute for class components or convenience
+ */
+export function withProtectedRoute<P extends object>(
+  Component: React.ComponentType<P>,
+  options?: Omit<ProtectedRouteProps, "children">
+) {
+  return function ProtectedComponent(props: P) {
+    return (
+      <ProtectedRoute {...options}>
+        <Component {...props} />
+      </ProtectedRoute>
+    );
+  };
+}

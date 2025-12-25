@@ -16,7 +16,8 @@
     "next": "16.1.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "tailwind-merge": "^3.4.0"
+    "tailwind-merge": "^3.4.0"<% if (features.authentication.enabled || features.sessionManagement) { %>,
+    "zustand": "^5.0.2"<% } %>
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

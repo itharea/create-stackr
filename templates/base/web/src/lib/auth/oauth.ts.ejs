@@ -1,0 +1,72 @@
+'use server';
+
+import { cookies } from 'next/headers';
+import crypto from 'crypto';
+import { generatePKCE } from './pkce';
+import { AUTH_CONFIG, COOKIE_NAMES } from './config';
+
+type OAuthProvider = 'google' | 'apple' | 'github';
+
+interface InitiateOAuthResult {
+  url: string;
+}
+
+/**
+ * Initiate OAuth flow with PKCE
+ *
+ * Generates PKCE parameters, stores verifier in secure cookie,
+ * and returns the OAuth initiation URL.
+ *
+ * The browser will redirect to this URL, which starts the OAuth flow.
+ */
+export async function initiateOAuth(provider: OAuthProvider): Promise<InitiateOAuthResult> {
+  const { verifier, challenge } = generatePKCE();
+  const state = crypto.randomUUID();
+
+  const cookieStore = await cookies();
+
+  // Store verifier in httpOnly cookie
+  // This cookie travels with the browser and is read during the callback
+  cookieStore.set(COOKIE_NAMES.OAUTH_PKCE_VERIFIER, verifier, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 600, // 10 minutes
+  });
+
+  // Store state for CSRF verification
+  cookieStore.set(COOKIE_NAMES.OAUTH_STATE, state, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 600,
+  });
+
+  // Build OAuth initiation URL
+  const callbackUrl = `${AUTH_CONFIG.appUrl}/auth/callback`;
+
+  const params = new URLSearchParams({
+    provider,
+    code_challenge: challenge,
+    code_challenge_method: 'S256',
+    state,
+    callback_url: callbackUrl,
+  });
+
+  const url = `${AUTH_CONFIG.backendUrl}/api/auth/web/oauth/init?${params}`;
+
+  return { url };
+}
+
+/**
+ * Get OAuth URL for direct navigation
+ *
+ * This is a convenience wrapper that can be used by OAuth buttons
+ * to get the URL for client-side redirect.
+ */
+export async function getOAuthUrl(provider: OAuthProvider): Promise<string> {
+  const result = await initiateOAuth(provider);
+  return result.url;
+}

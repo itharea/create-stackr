@@ -59,7 +59,7 @@ jobs:
             ## Installation
 
             ```bash
-            npx create-core-stack@${{ steps.version.outputs.VERSION }} my-app
+            npx create-stackr@${{ steps.version.outputs.VERSION }} my-app
             ```
 
             ## Beta Notice

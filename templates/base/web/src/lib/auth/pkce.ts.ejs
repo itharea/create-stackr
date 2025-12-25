@@ -1,0 +1,48 @@
+import crypto from 'crypto';
+
+/**
+ * Generate PKCE (Proof Key for Code Exchange) parameters
+ *
+ * PKCE prevents authorization code interception attacks by requiring
+ * the client to prove it initiated the OAuth request.
+ *
+ * The verifier is stored in a httpOnly cookie and sent during token exchange.
+ * The challenge is sent during OAuth initiation and stored server-side.
+ * When exchanging the token, the server verifies SHA256(verifier) === challenge.
+ *
+ * @returns Object containing verifier and challenge
+ */
+export function generatePKCE(): { verifier: string; challenge: string } {
+  // Generate 32 bytes of random data for verifier (256 bits of entropy)
+  // This exceeds the PKCE spec minimum of 43 characters
+  const verifierBuffer = crypto.randomBytes(32);
+  const verifier = verifierBuffer.toString('base64url');
+
+  // SHA256 hash the verifier for the challenge
+  const challengeBuffer = crypto.createHash('sha256').update(verifier).digest();
+  const challenge = challengeBuffer.toString('base64url');
+
+  return { verifier, challenge };
+}
+
+/**
+ * Verify a PKCE verifier against a challenge
+ *
+ * This is primarily used for testing. In production, the verification
+ * happens on the Fastify server during token exchange.
+ *
+ * @param verifier - The original random string
+ * @param challenge - The SHA256 hash to verify against
+ * @returns true if the verifier produces the challenge
+ */
+export function verifyPKCE(verifier: string, challenge: string): boolean {
+  const computedChallenge = crypto.createHash('sha256').update(verifier).digest('base64url');
+
+  // Use timing-safe comparison to prevent timing attacks
+  try {
+    return crypto.timingSafeEqual(Buffer.from(computedChallenge), Buffer.from(challenge));
+  } catch {
+    // Buffers have different lengths
+    return false;
+  }
+}

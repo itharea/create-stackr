@@ -5,6 +5,10 @@ import auth from "./plugins/auth";
 import errorHandler from "./plugins/error-handler";
 import authRoutes from "./routes/auth";
 import deviceSessionRoutes from "./routes/device-sessions";
+<% if (platforms.includes('web')) { %>
+import oauthWebRoutes from "./routes/oauth-web";
+import { initRedis } from "../../utils/redis";
+<% } %>
 
 const server = fastify({
   ajv: {
@@ -54,11 +58,20 @@ await server.register(import('@fastify/cors'), {
 // Register auth plugin
 await server.register(auth);
 
+<% if (platforms.includes('web')) { %>
+// Initialize Redis for web OAuth PKCE flow
+await initRedis();
+
+<% } %>
 // Register routes
 // Auth routes at /api/auth to match BetterAuth basePath
 await server.register(authRoutes, { prefix: "/api/auth" });
 // Device session routes for anonymous sessions
 await server.register(deviceSessionRoutes, { prefix: "/device-sessions" });
+<% if (platforms.includes('web')) { %>
+// Web OAuth routes for BFF pattern with PKCE
+await server.register(oauthWebRoutes, { prefix: "/api/auth/web/oauth" });
+<% } %>
 
 // Root health check
 server.get("/", async (request, reply) => {

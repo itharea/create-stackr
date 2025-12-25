@@ -1,0 +1,40 @@
+"use client";
+
+import {
+  useDeviceSession as useDeviceSessionStore,
+  useDeviceSessionActions,
+} from "@/store/deviceSession.store";
+
+/**
+ * Hook to access the current device session
+ *
+ * Provides a simplified interface to the device session store.
+ * Use this hook in components that need access to the device session.
+ */
+export function useDeviceSession() {
+  const { deviceSession, deviceId, isLoading, hasSession, error } = useDeviceSessionStore();
+  const { refreshSession, sendHeartbeat, clearError } = useDeviceSessionActions();
+
+  return {
+    // Session data
+    deviceSession,
+    deviceId,
+
+    // Loading state
+    isLoading,
+
+    // Convenience boolean for session checks
+    hasSession,
+
+    // Error state
+    error,
+
+    // Actions
+    refreshSession,
+    sendHeartbeat,
+    clearError,
+  };
+}
+
+// Re-export store hooks for direct access when needed
+export { useDeviceSessionStore, useDeviceSessionActions } from "@/store/deviceSession.store";

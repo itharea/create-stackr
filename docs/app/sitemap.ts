@@ -2,7 +2,7 @@ import { MetadataRoute } from 'next';
 import { navigation } from '@/lib/navigation';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-    const baseUrl = 'https://docs.create-core-stack.dev';
+    const baseUrl = 'https://stackr.sh';
 
     const routes = navigation.flatMap((section) =>
         section.items.map((item) => ({

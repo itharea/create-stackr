@@ -9,7 +9,7 @@ interface TerminalAnimationProps {
   state: GenerationState;
 }
 
-const COMMAND = 'npx create-core-stack@latest';
+const COMMAND = 'npx create-stackr@latest';
 
 const STAGES = [
   { id: 1, text: 'Initializing project' },

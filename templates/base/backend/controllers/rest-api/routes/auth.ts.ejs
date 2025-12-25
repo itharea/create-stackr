@@ -1,8 +1,9 @@
 import type { AuthFastifyRequest } from "fastify";
-import { FastifyPluginAsync, FastifyRequest, FastifyReply } from "fastify";
+import { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { auth } from "../../../lib/auth";
 import { Type } from "@sinclair/typebox";
-import { db } from "../../../utils/db";
+import { updateUserProfile, deleteUser } from "../../../domain/user/repository";
+import { findUserSessionById, revokeSessionByToken } from "../../../domain/session/repository";
 
 /**
  * Convert Fastify request to Fetch API Request for BetterAuth
@@ -102,10 +103,7 @@ const authRoutes: FastifyPluginAsync = async (server) => {
       const { user } = request as AuthFastifyRequest;
       const { name } = request.body as { name?: string };
 
-      const updatedUser = await db.user.update({
-        where: { id: user.id },
-        data: { name },
-      });
+      const updatedUser = await updateUserProfile(user.id, { name });
 
       return reply.send({
         id: updatedUser.id,
@@ -128,16 +126,49 @@ const authRoutes: FastifyPluginAsync = async (server) => {
     async (request, reply) => {
       const { user } = request as AuthFastifyRequest;
 
-      await db.user.delete({
-        where: { id: user.id },
-      });
+      await deleteUser(user.id);
 
       return reply.send({ message: "Account deleted successfully" });
     }
   );
 
+  // Revoke a specific session by ID (BFF endpoint)
+  // Better Auth's native revokeSession requires the token, but list-sessions
+  // doesn't expose tokens for security. This endpoint looks up the token by ID
+  // and calls the native Better Auth revocation.
+  server.post(
+    "/revoke-session-by-id",
+    {
+      onRequest: server.requireAuth,
+      schema: {
+        body: Type.Object({
+          sessionId: Type.String(),
+        }),
+      },
+    },
+    async (request, reply) => {
+      const { user } = request as AuthFastifyRequest;
+      const { sessionId } = request.body as { sessionId: string };
+
+      // Find the session (validates it belongs to user)
+      const session = await findUserSessionById(sessionId, user.id);
+
+      if (!session) {
+        return reply.status(404).send({ error: "Session not found" });
+      }
+
+      // Revoke using Better Auth's native method
+      const response = await revokeSessionByToken(
+        session.token,
+        request.headers as unknown as Headers
+      );
+
+      return reply.send(response);
+    }
+  );
+
   // Health check
-  server.get("/health", async (request, reply) => {
+  server.get("/health", async (_request, reply) => {
     return reply.send({
       status: "ok",
       timestamp: new Date().toISOString(),

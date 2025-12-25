@@ -7,13 +7,13 @@ export const metadata = {
 
 # CLI Reference
 
-The `create-core-stack` CLI is your primary tool for generating new projects.
+The `create-stackr` CLI is your primary tool for generating new projects.
 
 ## Create a New Project
 
 Initialize a new project with the interactive wizard:
 
-<CodeBlock code="npx create-core-stack@latest [project-name]" language="bash" />
+<CodeBlock code="npx create-stackr@latest [project-name]" language="bash" />
 
 ## Command Options
 
@@ -22,9 +22,9 @@ Initialize a new project with the interactive wizard:
 Skip the interactive prompts and use a predefined configuration:
 
 <CodeBlock
-    code={`npx create-core-stack@latest my-app --template minimal
-npx create-core-stack@latest my-app --template full-featured
-npx create-core-stack@latest my-app -t analytics-focused`}
+    code={`npx create-stackr@latest my-app --template minimal
+npx create-stackr@latest my-app --template full-featured
+npx create-stackr@latest my-app -t analytics-focused`}
     language="bash"
 />
 
@@ -32,31 +32,31 @@ npx create-core-stack@latest my-app -t analytics-focused`}
 
 Use the default configuration (minimal preset with npm) without any prompts:
 
-<CodeBlock code="npx create-core-stack@latest my-app --defaults" language="bash" />
+<CodeBlock code="npx create-stackr@latest my-app --defaults" language="bash" />
 
 ### --verbose
 
 Show detailed output during project generation:
 
-<CodeBlock code="npx create-core-stack@latest my-app --verbose" language="bash" />
+<CodeBlock code="npx create-stackr@latest my-app --verbose" language="bash" />
 
 ### --skip-install
 
 Skip automatic dependency installation after project generation:
 
-<CodeBlock code="npx create-core-stack@latest my-app --skip-install" language="bash" />
+<CodeBlock code="npx create-stackr@latest my-app --skip-install" language="bash" />
 
 ### --help
 
 Display help information about available commands and options:
 
-<CodeBlock code="npx create-core-stack@latest --help" language="bash" />
+<CodeBlock code="npx create-stackr@latest --help" language="bash" />
 
 ### --version
 
 Display the current version of the CLI:
 
-<CodeBlock code="npx create-core-stack@latest --version" language="bash" />
+<CodeBlock code="npx create-stackr@latest --version" language="bash" />
 
 ## Package Managers
 
