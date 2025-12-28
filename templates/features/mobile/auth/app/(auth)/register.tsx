@@ -1,12 +1,15 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { View, StyleSheet, SafeAreaView, TouchableOpacity } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { RegisterForm } from '../../src/components/auth';
 import { IconSymbol } from '../../src/components/ui/IconSymbol';
-import { Theme } from '@/constants/Theme';
+import { useAppTheme, AppTheme } from '@/context/ThemeContext';
 import { useAuth } from '../../src/hooks';
 
 export default function RegisterScreen() {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   const { isAuthenticated } = useAuth();
 
   // Watch for auth state changes (handles both native and browser OAuth)
@@ -44,7 +47,7 @@ export default function RegisterScreen() {
           <IconSymbol
             name="chevron.left"
             size={24}
-            color={Theme.colors.text}
+            color={theme.colors.text}
           />
         </TouchableOpacity>
 
@@ -59,10 +62,10 @@ export default function RegisterScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.background,
   },
   backButton: {
     position: 'absolute',
@@ -70,12 +73,12 @@ const styles = StyleSheet.create({
     left: 16,
     width: 44,
     height: 44,
-    backgroundColor: Theme.colors.backgroundSecondary,
+    backgroundColor: theme.colors.backgroundSecondary,
     borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
-    ...Theme.shadows.small,
+    ...theme.shadows.small,
   },
   content: {
     flex: 1,

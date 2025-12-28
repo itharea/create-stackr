@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { ThemeProvider } from "@/components/providers/theme-provider";
 <% if (features.authentication.enabled) { %>
 import { AuthHydrator } from "@/components/auth/auth-hydrator";
 import { getSession } from "@/lib/auth/actions";
@@ -30,22 +31,23 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
 <% if (features.authentication.enabled) { %>
-  // Fetch initial session on server for hydration
   const session = await getSession();
 <% } %>
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <ThemeProvider>
 <% if (features.authentication.enabled) { %>
-        <AuthHydrator session={session} />
+          <AuthHydrator session={session} />
 <% } %>
 <% if (features.sessionManagement) { %>
-        <DeviceSessionSetup />
+          <DeviceSessionSetup />
 <% } %>
-        {children}
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

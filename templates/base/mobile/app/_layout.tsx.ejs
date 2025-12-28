@@ -1,6 +1,7 @@
 import { Stack, router } from 'expo-router';
 import { useEffect<% if (features.sessionManagement) { %>, useState<% } %> } from 'react';
 import Constants from 'expo-constants';
+import { ThemeProvider } from '@/context/ThemeContext';
 <% if (features.onboarding.enabled) { %>import AsyncStorage from '@react-native-async-storage/async-storage';
 <% } %><% if (integrations.revenueCat.enabled || integrations.adjust.enabled || integrations.scate.enabled) { %>import { initializeSDKs } from '@/services/sdkInitializer';
 <% } %><% if (features.sessionManagement) { %>import { useSessionActions, useSession } from '../src/store/deviceSession.store';
@@ -57,12 +58,14 @@ export default function RootLayout() {
   }, [<% if (features.sessionManagement) { %>isSessionChecked, initializeSession, <% } %>onboardingEnabled]);
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-<% if (features.onboarding.enabled) { %>      <Stack.Screen name="(onboarding)" />
-<% } %><% if (features.authentication.enabled) { %>      <Stack.Screen name="(auth)" />
-<% } %><% if (features.paywall) { %>      <Stack.Screen name="paywall" options={{ presentation: 'modal' }} />
-<% } %>      <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="+not-found" />
-    </Stack>
+    <ThemeProvider>
+      <Stack screenOptions={{ headerShown: false }}>
+<% if (features.onboarding.enabled) { %>        <Stack.Screen name="(onboarding)" />
+<% } %><% if (features.authentication.enabled) { %>        <Stack.Screen name="(auth)" />
+<% } %><% if (features.paywall) { %>        <Stack.Screen name="paywall" options={{ presentation: 'modal' }} />
+<% } %>        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="+not-found" />
+      </Stack>
+    </ThemeProvider>
   );
 }

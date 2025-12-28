@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,8 @@ import {
   Platform,
 } from 'react-native';
 import { IconSymbol } from './IconSymbol';
-import { Theme } from '@/constants/Theme';
+import { useAppTheme, AppTheme } from '@/context/ThemeContext';
+import { createTheme } from '@/constants/Theme';
 import { responsive, fontSize, getSpacing } from '@/utils/responsive';
 
 type ThemeType = 'light' | 'dark';
@@ -34,7 +35,7 @@ export default function PaywallLayout({
   children,
   title,
   subtitle,
-  theme = 'light',
+  theme: themeProp = 'light',
   onContinue,
   continueText = 'Continue',
   footerContent,
@@ -44,8 +45,10 @@ export default function PaywallLayout({
   middleContent,
   onBack,
 }: PaywallLayoutProps) {
-
-  const styles = createStyles(theme);
+  // Get reactive theme, but allow prop override for backwards compatibility
+  const contextTheme = useAppTheme();
+  const theme = themeProp === 'dark' ? createTheme('dark') : contextTheme;
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -63,7 +66,7 @@ export default function PaywallLayout({
             <IconSymbol
               name="chevron.left"
               size={responsive.moderateScale(24)}
-              color={theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : Theme.colors.text}
+              color={theme.colors.icon}
             />
           </TouchableOpacity>
         )}
@@ -137,7 +140,7 @@ export default function PaywallLayout({
                 <IconSymbol
                   name="arrow.right"
                   size={20}
-                  color={Theme.colors.textInverse}
+                  color={theme.colors.textInverse}
                 />
               </TouchableOpacity>
             </View>
@@ -149,14 +152,14 @@ export default function PaywallLayout({
   );
 }
 
-const createStyles = (theme: ThemeType) => {
+const createStyles = (theme: AppTheme) => {
   const sectionHeights = responsive.getSectionHeights();
   const imageSize = responsive.getImageContainerSize();
 
   return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: theme === 'dark' ? '#1a1a1a' : Theme.colors.background,
+      backgroundColor: theme.colors.background,
     },
     keyboardAvoidingView: {
       flex: 1,
@@ -167,12 +170,12 @@ const createStyles = (theme: ThemeType) => {
       left: getSpacing(24),
       width: responsive.scale(44),
       height: responsive.scale(44),
-      backgroundColor: theme === 'dark' ? 'rgba(0, 0, 0, 0.3)' : Theme.colors.backgroundSecondary,
+      backgroundColor: theme.colors.backgroundSecondary,
       borderRadius: responsive.scale(22),
       justifyContent: 'center',
       alignItems: 'center',
       zIndex: 10,
-      ...Theme.shadows.small,
+      ...theme.shadows.small,
     },
     content: {
       flex: 1,
@@ -193,17 +196,17 @@ const createStyles = (theme: ThemeType) => {
       height: sectionHeights.topSection,
       justifyContent: 'center',
       alignItems: 'center',
-      minHeight: responsive.verticalScale(200), // Minimum height to prevent squishing
+      minHeight: responsive.verticalScale(200),
     },
 
     // Image placeholder
     imagePlaceholder: {
       width: imageSize.width,
       height: imageSize.height,
-      backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : Theme.colors.backgroundSecondary,
+      backgroundColor: theme.colors.backgroundTertiary,
       borderRadius: responsive.scale(20),
       borderWidth: 2,
-      borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : Theme.colors.borderLight,
+      borderColor: theme.colors.borderLight,
       borderStyle: 'dashed',
     },
 
@@ -216,7 +219,7 @@ const createStyles = (theme: ThemeType) => {
     title: {
       fontSize: fontSize(24),
       fontWeight: '700',
-      color: theme === 'dark' ? '#FFFFFF' : Theme.colors.text,
+      color: theme.colors.text,
       textAlign: 'center',
       lineHeight: fontSize(30),
       marginTop: responsive.scale(-12),
@@ -224,7 +227,7 @@ const createStyles = (theme: ThemeType) => {
     },
     subtitle: {
       fontSize: fontSize(16),
-      color: theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : Theme.colors.textSecondary,
+      color: theme.colors.textSecondary,
       textAlign: 'center',
       lineHeight: fontSize(22),
     },
@@ -239,7 +242,7 @@ const createStyles = (theme: ThemeType) => {
 
     // Bottom padding for ScrollView to prevent content overlap with fixed bottom
     bottomPadding: {
-      height: responsive.verticalScale(140), // Reduced space for better centering (button + footer content, no indicators)
+      height: responsive.verticalScale(140),
     },
 
     // Fixed bottom content container
@@ -248,7 +251,7 @@ const createStyles = (theme: ThemeType) => {
       bottom: 0,
       left: 0,
       right: 0,
-      backgroundColor: theme === 'dark' ? '#1a1a1a' : Theme.colors.background,
+      backgroundColor: theme.colors.background,
       paddingHorizontal: getSpacing(24),
       paddingTop: getSpacing(20),
     },
@@ -267,23 +270,23 @@ const createStyles = (theme: ThemeType) => {
       right: getSpacing(24),
     },
     continueButton: {
-      backgroundColor: Theme.colors.primary,
+      backgroundColor: theme.colors.primary,
       borderRadius: responsive.scale(25),
       paddingVertical: responsive.scale(18),
       paddingHorizontal: getSpacing(32),
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      ...Theme.shadows.button,
+      ...theme.shadows.button,
     },
     continueButtonDisabled: {
-      backgroundColor: Theme.colors.textLight,
-      ...Theme.shadows.small,
+      backgroundColor: theme.colors.textLight,
+      ...theme.shadows.small,
     },
     continueButtonText: {
       fontSize: fontSize(16),
       fontWeight: '600',
-      color: Theme.colors.textInverse,
+      color: theme.colors.textInverse,
       position: 'absolute',
       left: 0,
       right: 0,

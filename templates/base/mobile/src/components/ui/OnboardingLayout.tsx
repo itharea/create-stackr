@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import { IconSymbol } from './IconSymbol';
-import { Theme } from '@/constants/Theme';
+import { useAppTheme, AppTheme } from '@/context/ThemeContext';
 import { responsive, fontSize, getSpacing } from '@/utils/responsive';
 
 interface OnboardingLayoutProps {
@@ -46,6 +46,8 @@ export default function OnboardingLayout({
   onSkip,
   showSkipAfter = 3,
 }: OnboardingLayoutProps) {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [showSkipButton, setShowSkipButton] = useState(false);
 
   useEffect(() => {
@@ -74,7 +76,7 @@ export default function OnboardingLayout({
             <IconSymbol
               name="xmark"
               size={responsive.moderateScale(20)}
-              color={Theme.colors.textMuted}
+              color={theme.colors.textMuted}
             />
           </TouchableOpacity>
         )}
@@ -163,7 +165,7 @@ export default function OnboardingLayout({
                   <IconSymbol
                     name="arrow.right"
                     size={20}
-                    color={Theme.colors.textInverse}
+                    color={theme.colors.textInverse}
                   />
                 </TouchableOpacity>
               </View>
@@ -175,178 +177,180 @@ export default function OnboardingLayout({
   );
 }
 
-const sectionHeights = responsive.getSectionHeights();
-const imageSize = responsive.getImageContainerSize();
+const createStyles = (theme: AppTheme) => {
+  const sectionHeights = responsive.getSectionHeights();
+  const imageSize = responsive.getImageContainerSize();
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Theme.colors.background,
-  },
-  keyboardAvoidingView: {
-    flex: 1,
-  },
-  skipButton: {
-    position: 'absolute',
-    top: responsive.verticalScale(60),
-    right: getSpacing(24),
-    width: responsive.scale(32),
-    height: responsive.scale(32),
-    backgroundColor: Theme.colors.backgroundSecondary,
-    borderRadius: responsive.scale(16),
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
-    ...Theme.shadows.small,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: getSpacing(24),
-  },
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    keyboardAvoidingView: {
+      flex: 1,
+    },
+    skipButton: {
+      position: 'absolute',
+      top: responsive.verticalScale(60),
+      right: getSpacing(24),
+      width: responsive.scale(32),
+      height: responsive.scale(32),
+      backgroundColor: theme.colors.backgroundSecondary,
+      borderRadius: responsive.scale(16),
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 10,
+      ...theme.shadows.small,
+    },
+    content: {
+      flex: 1,
+      paddingHorizontal: getSpacing(24),
+    },
 
-  // ScrollView styles
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingTop: getSpacing(16),
-  },
+    // ScrollView styles
+    scrollView: {
+      flex: 1,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      paddingTop: getSpacing(16),
+    },
 
-  // Top Section - Image area
-  topSection: {
-    height: sectionHeights.topSection,
-    justifyContent: 'center',
-    alignItems: 'center',
-    minHeight: responsive.verticalScale(200), // Minimum height to prevent squishing
-  },
+    // Top Section - Image area
+    topSection: {
+      height: sectionHeights.topSection,
+      justifyContent: 'center',
+      alignItems: 'center',
+      minHeight: responsive.verticalScale(200), // Minimum height to prevent squishing
+    },
 
-  // Image placeholder
-  imagePlaceholder: {
-    width: imageSize.width,
-    height: imageSize.height,
-    backgroundColor: Theme.colors.backgroundSecondary,
-    borderRadius: responsive.scale(20),
-    borderWidth: 2,
-    borderColor: Theme.colors.borderLight,
-    borderStyle: 'dashed',
-  },
+    // Image placeholder
+    imagePlaceholder: {
+      width: imageSize.width,
+      height: imageSize.height,
+      backgroundColor: theme.colors.backgroundSecondary,
+      borderRadius: responsive.scale(20),
+      borderWidth: 2,
+      borderColor: theme.colors.borderLight,
+      borderStyle: 'dashed',
+    },
 
-  // Text content
-  textContainer: {
-    alignItems: 'center',
-    paddingHorizontal: responsive.scale(20),
-    marginBottom: responsive.scale(16),
-  },
+    // Text content
+    textContainer: {
+      alignItems: 'center',
+      paddingHorizontal: responsive.scale(20),
+      marginBottom: responsive.scale(16),
+    },
 
-  title: {
-    fontSize: fontSize(24),
-    fontWeight: '700',
-    color: Theme.colors.text,
-    textAlign: 'center',
-    lineHeight: fontSize(30),
-    marginTop: responsive.scale(-12),
-    marginBottom: responsive.scale(8),
-  },
-  subtitle: {
-    fontSize: fontSize(16),
-    color: Theme.colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: fontSize(22),
-  },
+    title: {
+      fontSize: fontSize(24),
+      fontWeight: '700',
+      color: theme.colors.text,
+      textAlign: 'center',
+      lineHeight: fontSize(30),
+      marginTop: responsive.scale(-12),
+      marginBottom: responsive.scale(8),
+    },
+    subtitle: {
+      fontSize: fontSize(16),
+      color: theme.colors.textSecondary,
+      textAlign: 'center',
+      lineHeight: fontSize(22),
+    },
 
-  // Middle content wrapper (for subscription plans)
-  middleContentWrapper: {
-    marginTop: getSpacing(16),
-    marginBottom: getSpacing(12),
-    flex: 1,
-    justifyContent: 'center',
-  },
+    // Middle content wrapper (for subscription plans)
+    middleContentWrapper: {
+      marginTop: getSpacing(16),
+      marginBottom: getSpacing(12),
+      flex: 1,
+      justifyContent: 'center',
+    },
 
-  // Bottom padding for ScrollView to prevent content overlap with fixed bottom
-  bottomPadding: {
-    height: sectionHeights.bottomPadding,
-  },
+    // Bottom padding for ScrollView to prevent content overlap with fixed bottom
+    bottomPadding: {
+      height: sectionHeights.bottomPadding,
+    },
 
-  // Fixed bottom content container
-  fixedBottomContent: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: Theme.colors.background,
-    paddingHorizontal: getSpacing(24),
-    paddingTop: getSpacing(20),
-  },
-  fixedBottomContentWithFooter: {
-    paddingBottom: 0,
-  },
-  fixedBottomContentNoFooter: {
-    paddingBottom: getSpacing(20),
-  },
+    // Fixed bottom content container
+    fixedBottomContent: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: theme.colors.background,
+      paddingHorizontal: getSpacing(24),
+      paddingTop: getSpacing(20),
+    },
+    fixedBottomContentWithFooter: {
+      paddingBottom: 0,
+    },
+    fixedBottomContentNoFooter: {
+      paddingBottom: getSpacing(20),
+    },
 
-  // Page indicators
-  pageIndicators: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: responsive.scale(8),
-    marginBottom: sectionHeights.pageIndicatorMargin,
-    height: responsive.scale(8),
-  },
-  indicator: {
-    width: responsive.scale(8),
-    height: responsive.scale(8),
-    borderRadius: responsive.scale(4),
-    backgroundColor: Theme.colors.borderLight,
-  },
-  indicatorActive: {
-    backgroundColor: Theme.colors.primary,
-    width: responsive.scale(24),
-  },
+    // Page indicators
+    pageIndicators: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      gap: responsive.scale(8),
+      marginBottom: sectionHeights.pageIndicatorMargin,
+      height: responsive.scale(8),
+    },
+    indicator: {
+      width: responsive.scale(8),
+      height: responsive.scale(8),
+      borderRadius: responsive.scale(4),
+      backgroundColor: theme.colors.borderLight,
+    },
+    indicatorActive: {
+      backgroundColor: theme.colors.primary,
+      width: responsive.scale(8), // Reverted to dot instead of pill
+    },
 
-  // Continue button - Fixed position from bottom
-  buttonContainer: {
-    position: 'absolute',
-    bottom: responsive.getButtonBottomPosition(),
-    left: getSpacing(24),
-    right: getSpacing(24),
-  },
-  continueButton: {
-    backgroundColor: Theme.colors.primary,
-    borderRadius: responsive.scale(25),
-    paddingVertical: responsive.scale(18),
-    paddingHorizontal: getSpacing(32),
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    ...Theme.shadows.button,
-  },
-  continueButtonDisabled: {
-    backgroundColor: Theme.colors.textLight,
-    ...Theme.shadows.small,
-  },
-  continueButtonText: {
-    fontSize: fontSize(16),
-    fontWeight: '600',
-    color: Theme.colors.textInverse,
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    textAlign: 'center',
-  },
-  buttonSpacer: {
-    width: responsive.scale(20),
-  },
+    // Continue button - Fixed position from bottom
+    buttonContainer: {
+      position: 'absolute',
+      bottom: responsive.getButtonBottomPosition(),
+      left: getSpacing(24),
+      right: getSpacing(24),
+    },
+    continueButton: {
+      backgroundColor: theme.colors.primary,
+      borderRadius: responsive.scale(25),
+      paddingVertical: responsive.scale(18),
+      paddingHorizontal: getSpacing(32),
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      ...theme.shadows.button,
+    },
+    continueButtonDisabled: {
+      backgroundColor: theme.colors.textLight,
+      ...theme.shadows.small,
+    },
+    continueButtonText: {
+      fontSize: fontSize(16),
+      fontWeight: '600',
+      color: theme.colors.textInverse,
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      textAlign: 'center',
+    },
+    buttonSpacer: {
+      width: responsive.scale(20),
+    },
 
-  // Footer content wrapper
-  footerContentWrapper: {
-    alignItems: 'center',
-  },
+    // Footer content wrapper
+    footerContentWrapper: {
+      alignItems: 'center',
+    },
 
-  // Loading wrapper
-  loadingWrapper: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});
+    // Loading wrapper
+    loadingWrapper: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+  });
+};

@@ -1,5 +1,5 @@
 <% const hasOAuth = features.authentication.providers.google || features.authentication.providers.apple || features.authentication.providers.github; %>
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import {
 import { Button, Input } from '../ui';
 import { useAuth } from '../../hooks';
 import { isValidEmail } from '../../utils/formatters';
+import { useAppTheme, AppTheme } from '@/context/ThemeContext';
 
 interface RegisterFormProps {
   onSuccess?: () => void;
@@ -39,6 +40,9 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
   onSuccess,
   onSwitchToLogin,
 }) => {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   const [formData, setFormData] = useState<FormData>({
     name: '',
     email: '',
@@ -241,34 +245,34 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
           <View style={styles.oauthContainer}>
 <% if (features.authentication.providers.google) { %>
             <TouchableOpacity
-              style={[styles.oauthButton, styles.googleButton]}
+              style={styles.oauthButton}
               onPress={handleGoogleSignIn}
               disabled={isLoading}
               activeOpacity={0.7}
             >
-              <Text style={styles.googleButtonText}>
+              <Text style={styles.oauthButtonText}>
                 <Text style={styles.googleIcon}>G</Text>{'  '}Google
               </Text>
             </TouchableOpacity>
 <% } %>
 <% if (features.authentication.providers.apple) { %>
             <TouchableOpacity
-              style={[styles.oauthButton, styles.appleButton]}
+              style={styles.oauthButton}
               onPress={handleAppleSignIn}
               disabled={isLoading}
               activeOpacity={0.7}
             >
-              <Text style={styles.appleButtonText}>Apple</Text>
+              <Text style={styles.oauthButtonText}>Apple</Text>
             </TouchableOpacity>
 <% } %>
 <% if (features.authentication.providers.github) { %>
             <TouchableOpacity
-              style={[styles.oauthButton, styles.githubButton]}
+              style={styles.oauthButton}
               onPress={handleGitHubSignIn}
               disabled={isLoading}
               activeOpacity={0.7}
             >
-              <Text style={styles.githubButtonText}>GitHub</Text>
+              <Text style={styles.oauthButtonText}>GitHub</Text>
             </TouchableOpacity>
 <% } %>
           </View>
@@ -294,7 +298,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -302,7 +306,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: 20,
+    padding: theme.spacing[5],
   },
 
   form: {
@@ -312,27 +316,27 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize: 28,
+    fontSize: theme.typography.fontSize['2xl'],
     fontWeight: 'bold',
-    color: '#000000',
+    color: theme.colors.text,
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
   },
 
   subtitle: {
-    fontSize: 16,
-    color: '#8E8E93',
+    fontSize: theme.typography.fontSize.base,
+    color: theme.colors.textSecondary,
     textAlign: 'center',
-    marginBottom: 32,
+    marginBottom: theme.spacing[8],
   },
 
   inputContainer: {
-    marginBottom: 20,
+    marginBottom: theme.spacing[5],
   },
 
   submitButton: {
-    marginTop: 8,
-    marginBottom: 24,
+    marginTop: theme.spacing[2],
+    marginBottom: theme.spacing[6],
   },
 <% if (hasOAuth) { %>
 
@@ -340,76 +344,44 @@ const styles = StyleSheet.create({
   dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: theme.spacing[6],
   },
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#E5E5EA',
+    backgroundColor: theme.colors.border,
   },
   dividerText: {
-    marginHorizontal: 16,
-    fontSize: 14,
-    color: '#8E8E93',
+    marginHorizontal: theme.spacing[4],
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.textSecondary,
   },
 
-  // OAuth buttons
+  // OAuth buttons - theme-aware (matches web app pattern)
   oauthContainer: {
-    gap: 12,
-    marginBottom: 24,
+    gap: theme.spacing[3],
+    marginBottom: theme.spacing[6],
   },
   oauthButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 14,
-    borderRadius: 8,
+    borderRadius: theme.borderRadius.md,
     borderWidth: 1,
+    backgroundColor: 'transparent',
+    borderColor: theme.colors.border,
   },
-<% if (features.authentication.providers.google) { %>
-
-  // Google
-  googleButton: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#DADCE0',
-  },
-  googleButtonText: {
-    fontSize: 16,
+  oauthButtonText: {
+    fontSize: theme.typography.fontSize.base,
     fontWeight: '600',
-    color: '#1F1F1F',
+    color: theme.colors.text,
   },
   googleIcon: {
-    color: '#4285F4',
+    color: theme.colors.primary,
     fontWeight: '700',
     fontSize: 18,
   },
-<% } %>
-<% if (features.authentication.providers.apple) { %>
-
-  // Apple
-  appleButton: {
-    backgroundColor: '#000000',
-    borderColor: '#000000',
-  },
-  appleButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-<% } %>
-<% if (features.authentication.providers.github) { %>
-
-  // GitHub
-  githubButton: {
-    backgroundColor: '#24292F',
-    borderColor: '#24292F',
-  },
-  githubButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-<% } %>
 <% } %>
 
   switchContainer: {
@@ -419,17 +391,17 @@ const styles = StyleSheet.create({
   },
 
   switchText: {
-    fontSize: 16,
-    color: '#8E8E93',
+    fontSize: theme.typography.fontSize.base,
+    color: theme.colors.textSecondary,
   },
 
   switchButton: {
     paddingHorizontal: 0,
     paddingVertical: 0,
-    minHeight: 'auto',
+    minHeight: 'auto' as unknown as number,
   },
 
   switchButtonText: {
-    fontSize: 16,
+    fontSize: theme.typography.fontSize.base,
   },
 });
