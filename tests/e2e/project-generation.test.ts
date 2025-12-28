@@ -444,4 +444,185 @@ describe('E2E: Full Project Generation', () => {
       expect(packageJson.dependencies['drizzle-orm']).toBeUndefined();
     });
   });
+
+  describe('Web Platform Generation', () => {
+    it('should generate complete web-only project', async () => {
+      const config: ProjectConfig = {
+        projectName: 'e2e-web-only',
+        packageManager: 'npm',
+        appScheme: 'e2ewebonly',
+        platforms: ['web'],
+        features: {
+          onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
+          authentication: {
+            enabled: true,
+            providers: { emailPassword: true, google: true, apple: false, github: false },
+            emailVerification: true,
+            passwordReset: true,
+            twoFactor: false,
+          },
+          paywall: false,
+          sessionManagement: true,
+        },
+        integrations: {
+          revenueCat: { enabled: false, iosKey: '', androidKey: '' },
+          adjust: { enabled: false, appToken: '', environment: 'sandbox' },
+          scate: { enabled: false, apiKey: '' },
+          att: { enabled: false },
+        },
+        backend: {
+          database: 'postgresql',
+          orm: 'prisma',
+          eventQueue: false,
+          docker: true,
+        },
+        preset: 'custom',
+        customized: true,
+      };
+
+      const generator = new ProjectGenerator(config);
+      const projectDir = path.join(tempDir, 'e2e-web-only');
+      await generator.generate(projectDir);
+
+      // Verify top-level structure (no mobile)
+      expect(await fs.pathExists(path.join(projectDir, 'web'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'backend'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'mobile'))).toBe(false);
+
+      // Verify web structure
+      expect(await fs.pathExists(path.join(projectDir, 'web/package.json'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'web/tsconfig.json'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'web/next.config.ts'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'web/.env.example'))).toBe(true);
+
+      // Verify auth pages
+      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(auth)/login/page.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(auth)/register/page.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(auth)/forgot-password/page.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(auth)/verify-email/page.tsx'))).toBe(true);
+
+      // Verify OAuth (Google enabled)
+      expect(await fs.pathExists(path.join(projectDir, 'web/src/components/auth/oauth-buttons.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/auth/callback/route.ts'))).toBe(true);
+
+      // Verify dashboard
+      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(app)/dashboard/page.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(app)/layout.tsx'))).toBe(true);
+
+      // Verify package.json validity
+      const webPkg = await fs.readJSON(path.join(projectDir, 'web/package.json'));
+      expect(webPkg.name).toBe('e2e-web-only-web');
+      expect(webPkg.dependencies.next).toBeDefined();
+      expect(webPkg.dependencies.react).toBeDefined();
+      expect(webPkg.dependencies['next-themes']).toBeDefined();
+    });
+
+    it('should generate web project with valid TypeScript files', async () => {
+      const config: ProjectConfig = {
+        projectName: 'e2e-web-ts',
+        packageManager: 'npm',
+        appScheme: 'e2ewebts',
+        platforms: ['web'],
+        features: {
+          onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
+          authentication: {
+            enabled: true,
+            providers: { emailPassword: true, google: false, apple: false, github: false },
+            emailVerification: false,
+            passwordReset: true,
+            twoFactor: false,
+          },
+          paywall: false,
+          sessionManagement: true,
+        },
+        integrations: {
+          revenueCat: { enabled: false, iosKey: '', androidKey: '' },
+          adjust: { enabled: false, appToken: '', environment: 'sandbox' },
+          scate: { enabled: false, apiKey: '' },
+          att: { enabled: false },
+        },
+        backend: {
+          database: 'postgresql',
+          orm: 'prisma',
+          eventQueue: false,
+          docker: true,
+        },
+        preset: 'minimal',
+        customized: false,
+      };
+
+      const generator = new ProjectGenerator(config);
+      const projectDir = path.join(tempDir, 'e2e-web-ts');
+      await generator.generate(projectDir);
+
+      // Verify TypeScript files have no unprocessed EJS
+      const tsFiles = [
+        'web/src/app/layout.tsx',
+        'web/src/app/page.tsx',
+        'web/src/app/(auth)/login/page.tsx',
+        'web/src/components/auth/login-form.tsx',
+        'web/src/components/ui/button.tsx',
+        'web/src/lib/utils.ts',
+      ];
+
+      for (const file of tsFiles) {
+        const filePath = path.join(projectDir, file);
+        expect(await fs.pathExists(filePath)).toBe(true);
+
+        const content = await fs.readFile(filePath, 'utf-8');
+        expect(content.length).toBeGreaterThan(0);
+        expect(content).not.toContain('<%'); // No unprocessed EJS
+        expect(content).not.toContain('%>'); // No unprocessed EJS
+      }
+    });
+
+    it('should generate web project with Drizzle ORM', async () => {
+      const config: ProjectConfig = {
+        projectName: 'e2e-web-drizzle',
+        packageManager: 'npm',
+        appScheme: 'e2ewebdrizzle',
+        platforms: ['web'],
+        features: {
+          onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
+          authentication: {
+            enabled: true,
+            providers: { emailPassword: true, google: false, apple: false, github: false },
+            emailVerification: false,
+            passwordReset: true,
+            twoFactor: false,
+          },
+          paywall: false,
+          sessionManagement: true,
+        },
+        integrations: {
+          revenueCat: { enabled: false, iosKey: '', androidKey: '' },
+          adjust: { enabled: false, appToken: '', environment: 'sandbox' },
+          scate: { enabled: false, apiKey: '' },
+          att: { enabled: false },
+        },
+        backend: {
+          database: 'postgresql',
+          orm: 'drizzle',
+          eventQueue: false,
+          docker: true,
+        },
+        preset: 'minimal',
+        customized: false,
+      };
+
+      const generator = new ProjectGenerator(config);
+      const projectDir = path.join(tempDir, 'e2e-web-drizzle');
+      await generator.generate(projectDir);
+
+      // Verify web exists
+      expect(await fs.pathExists(path.join(projectDir, 'web'))).toBe(true);
+
+      // Verify Drizzle backend
+      expect(await fs.pathExists(path.join(projectDir, 'backend/drizzle/schema.ts'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'backend/drizzle.config.ts'))).toBe(true);
+
+      const backendPkg = await fs.readJSON(path.join(projectDir, 'backend/package.json'));
+      expect(backendPkg.dependencies['drizzle-orm']).toBeDefined();
+    });
+  });
 });
