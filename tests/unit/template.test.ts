@@ -213,9 +213,28 @@ describe('Template Utils', () => {
       it('should not include redundant scaffolding metadata in extra', async () => {
         const rendered = await renderTemplate('base/mobile/app.json.ejs', mockConfig);
         const parsed = JSON.parse(rendered);
-        // features and appScheme are scaffolding config, not runtime config
-        expect(parsed.expo.extra.features).toBeUndefined();
+        // appScheme is scaffolding config, not runtime config
         expect(parsed.expo.extra.appScheme).toBeUndefined();
+      });
+
+      it('should include onboarding feature flag in extra when enabled', async () => {
+        const rendered = await renderTemplate('base/mobile/app.json.ejs', mockConfig);
+        const parsed = JSON.parse(rendered);
+        // onboarding enabled flag is needed at runtime for navigation logic
+        expect(parsed.expo.extra.features.onboarding.enabled).toBe(true);
+      });
+
+      it('should include onboarding feature flag as false when disabled', async () => {
+        const configWithoutOnboarding = {
+          ...mockConfig,
+          features: {
+            ...mockConfig.features,
+            onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false }
+          }
+        };
+        const rendered = await renderTemplate('base/mobile/app.json.ejs', configWithoutOnboarding);
+        const parsed = JSON.parse(rendered);
+        expect(parsed.expo.extra.features.onboarding.enabled).toBe(false);
       });
 
       it('should include revenueCat config in extra when enabled', async () => {
