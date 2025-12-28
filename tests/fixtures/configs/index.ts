@@ -5,6 +5,8 @@ export { fullFeaturedConfig } from './full-featured.js';
 export { analyticsFocusedConfig } from './analytics-focused.js';
 export { mobileOnlyConfig } from './mobile-only.js';
 export { webOnlyConfig } from './web-only.js';
+export { webWithOAuthConfig } from './web-with-oauth.js';
+export { webMinimalConfig } from './web-minimal.js';
 export { invalidConfigs } from './invalid.js';
 
 // Helper to create custom configs

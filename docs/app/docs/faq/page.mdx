@@ -17,6 +17,45 @@ Absolutely! It is licensed under the MIT license.
 
 ## Do you support Web?
 
-Not currently. We are focused on delivering a great mobile experience first. However, we plan to add Next.js support in the near future for web applications.
+Yes! We support both Expo for mobile (iOS & Android) and Next.js for web. Both share the same
+backend and authentication. See the [Web Platform](/docs/features/web-platform) documentation
+for details.
+
+## Can I use the web app without mobile?
+
+Yes! During CLI setup, select "web" as your only platform. This generates just the web app
+and backend, without any mobile code.
+
+## Why does web use cookies instead of tokens?
+
+Cookie-based sessions are more secure for web applications - they're HTTP-only (no JavaScript
+access), automatically included in requests, and protected against XSS attacks. Mobile apps
+use secure token storage because they don't have cookie support.
+
+## Can I share authentication between web and mobile?
+
+Yes, both platforms authenticate against the same backend and share the same user database.
+However, sessions are separate - logging in on web doesn't log you in on mobile and vice versa.
+
+## Why doesn't Apple Sign In work on localhost?
+
+Apple requires HTTPS for OAuth redirect URIs. Use ngrok or a similar tunneling service for
+local development, or test Apple Sign In in a staging environment with a valid SSL certificate.
+
+## How do I add more pages to the web app?
+
+Create new files in `web/src/app/`. For protected pages, put them in `(app)/`. For public
+pages, put them directly in `app/`. See the
+[Next.js App Router docs](https://nextjs.org/docs/app/building-your-application/routing).
+
+## How do I customize the web design?
+
+The web app uses Tailwind CSS and shadcn/ui components. Edit `globals.css` for color scheme
+changes, or modify individual components in `src/components/ui/`.
+
+## Does the web app support SSR?
+
+Yes, Next.js App Router uses React Server Components by default. Client components (marked
+with `"use client"`) handle interactive features like forms and auth state.
 
 </div>

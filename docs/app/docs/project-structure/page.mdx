@@ -7,14 +7,15 @@ export const metadata = {
 
 # Project Structure
 
-The generated project contains two main directories: `mobile/` for the
-React Native (Expo) app and `backend/` for the Node.js API server.
+The generated project contains three main directories: `mobile/` for the
+React Native (Expo) app, `web/` for the Next.js web app, and `backend/` for the Node.js API server.
 
 ## Root Level
 
 <CodeBlock
     code={`my-app/
 ├── mobile/              # React Native (Expo) app
+├── web/                 # Next.js web app
 ├── backend/             # Node.js (Fastify) backend
 ├── scripts/             # Setup and deployment scripts
 ├── docker-compose.yml   # Development Docker config
@@ -69,6 +70,47 @@ of concerns between app routes and reusable code.
 └── package.json`}
     language="text"
 />
+
+## Web App Structure
+
+The web app uses Next.js App Router with a clear separation between public and protected routes.
+
+<CodeBlock
+    code={`web/
+├── src/
+│   ├── app/                 # Next.js App Router
+│   │   ├── (auth)/          # Public auth pages
+│   │   │   ├── login/
+│   │   │   ├── register/
+│   │   │   └── forgot-password/
+│   │   ├── (app)/           # Protected app pages
+│   │   │   ├── dashboard/
+│   │   │   └── settings/
+│   │   ├── auth/            # OAuth callback routes
+│   │   │   └── callback/
+│   │   ├── globals.css      # Global styles with dark mode
+│   │   ├── layout.tsx       # Root layout with providers
+│   │   └── page.tsx         # Home page
+│   ├── components/
+│   │   ├── ui/              # shadcn/ui base components
+│   │   ├── auth/            # Auth forms and buttons
+│   │   ├── settings/        # Settings page components
+│   │   └── providers/       # React context providers
+│   ├── lib/
+│   │   ├── auth/            # Auth utilities and server actions
+│   │   └── utils.ts         # Helper functions
+│   └── store/               # Zustand state stores
+├── public/                  # Static assets
+├── tailwind.config.ts       # Tailwind configuration
+├── next.config.ts           # Next.js configuration
+└── package.json`}
+    language="text"
+/>
+
+<Callout type="info" title="Route Groups">
+    The `(auth)` and `(app)` folders are Next.js route groups. They organize routes without
+    affecting the URL structure. `(auth)` routes are public, while `(app)` routes require authentication.
+</Callout>
 
 ## Backend Structure
 

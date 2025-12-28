@@ -9,7 +9,9 @@ export const metadata = {
 
 Here are some common issues you might encounter and how to fix them.
 
-## CocoaPods Issues
+## Mobile Issues
+
+### CocoaPods Issues
 
 If you see errors related to CocoaPods, try cleaning the build folder and reinstalling pods.
 
@@ -20,11 +22,109 @@ pod install`}
     language="bash"
 />
 
-## Metro Bundler Issues
+### Metro Bundler Issues
 
 If the bundler gets stuck, try clearing the cache.
 
 <CodeBlock code="npx expo start -c" language="bash" />
+
+## Web Platform Issues
+
+### Hydration Mismatch Errors
+
+If you see "Hydration failed because the initial UI does not match" errors:
+
+1. **Theme-related**: Ensure `suppressHydrationWarning` is on the `<html>` tag in `layout.tsx`
+2. **Auth state**: The `AuthHydrator` component handles this - don't access auth state in server components
+3. **Date/time rendering**: Use `useEffect` for time-sensitive content
+
+<CodeBlock
+    code={`// Bad - causes hydration mismatch
+const date = new Date().toLocaleDateString();
+
+// Good - renders client-side only
+const [date, setDate] = useState<string>();
+useEffect(() => {
+  setDate(new Date().toLocaleDateString());
+}, []);`}
+    language="typescript"
+/>
+
+### OAuth Callback Fails
+
+<Callout type="warning" title="Common OAuth Issues">
+    OAuth problems are usually caused by redirect URI mismatches or CORS configuration.
+</Callout>
+
+1. **Check redirect URI**: Must exactly match what's configured in OAuth provider
+2. **Check CORS**: Backend must allow your web origin
+3. **Check cookies**: Ensure you're not blocking third-party cookies in development
+4. **Apple Sign In**: Remember that Apple requires HTTPS - won't work on localhost
+
+Debug with:
+
+<CodeBlock
+    code={`# Check backend logs
+docker logs backend-container
+
+# Verify CORS headers
+curl -I http://localhost:8080/api/auth/session`}
+    language="bash"
+/>
+
+### Apple Sign In Not Working in Development
+
+Apple Sign In requires HTTPS redirect URIs and will not work with `http://localhost`. Options:
+
+1. **Use ngrok or Cloudflare Tunnel**: Create an HTTPS tunnel to your backend
+
+<CodeBlock
+    code={`ngrok http 8080
+# Use the https://xxx.ngrok.io/api/auth/callback/apple URL as your redirect URI`}
+    language="bash"
+/>
+
+2. **Skip Apple in dev**: Test Apple Sign In only in staging/production environments
+3. **Use mobile**: Apple Sign In works in development on the mobile app via native SDKs
+
+### Session Not Persisting
+
+1. **Cookie settings**: In development, cookies require `SameSite=Lax` and `Secure=false`
+2. **Domain mismatch**: Ensure frontend and backend are on the same domain (or properly configured for cross-domain)
+3. **Check browser DevTools**: Network tab -> Cookies to see if session cookie is being set
+
+### 404 on Refresh (Deployed)
+
+If routes work initially but 404 on refresh:
+
+1. **Vercel**: Should work out of the box
+2. **Netlify**: Install the `@netlify/plugin-nextjs` plugin
+
+<CodeBlock
+    code={`[[plugins]]
+  package = "@netlify/plugin-nextjs"`}
+    language="toml"
+    filename="netlify.toml"
+/>
+
+<Callout type="warning" title="Avoid SPA Redirects">
+    Do NOT use SPA-style redirects on Netlify - Next.js uses SSR, not static file serving.
+</Callout>
+
+3. **Self-hosted Node.js**: Ensure you're running `next start` (not serving static files)
+4. **Docker/Nginx**: Use a reverse proxy to the Node.js server, not static file serving
+
+### Build Fails with Module Errors
+
+<CodeBlock
+    code={`# Clear Next.js cache
+rm -rf web/.next
+
+# Reinstall dependencies
+rm -rf web/node_modules
+bun install`}
+    language="bash"
+/>
 
 <Callout type="info" title="Still stuck?">
     Join our Discord server for help from the community.

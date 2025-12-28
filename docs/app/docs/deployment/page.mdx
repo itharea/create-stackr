@@ -1,29 +1,132 @@
 export const metadata = {
     title: 'Deployment',
-    description: 'Deploying your app to the App Store and Google Play.',
+    description: 'Deploying your mobile app, web app, and backend.',
 };
 
 <div className="prose">
 
 # Deployment
 
-We use EAS Build (Expo Application Services) for building and deploying your app.
+This guide covers deploying all parts of your stack: mobile app, web app, and backend.
 
-## Prerequisites
+## Mobile App
+
+We use EAS Build (Expo Application Services) for building and deploying your mobile app.
+
+### Prerequisites
 
 1. Install EAS CLI: `npm install -g eas-cli`
 2. Log in to your Expo account: `eas login`
 
-## Building
+### Building
 
 To build your app for production:
 
 <CodeBlock code="eas build --profile production" language="bash" />
 
-## Submitting
+### Submitting
 
 To submit your app to the stores:
 
 <CodeBlock code="eas submit --profile production" language="bash" />
+
+## Web App
+
+The web app is a standard Next.js application that can be deployed to any hosting platform
+that supports Node.js or static exports.
+
+### Vercel (Recommended)
+
+Vercel is the easiest option for Next.js apps:
+
+<CodeBlock
+    code={`# Install Vercel CLI
+npm install -g vercel
+
+# Deploy
+vercel deploy`}
+    language="bash"
+/>
+
+Or connect your Git repository for automatic deployments.
+
+### Netlify
+
+For Netlify deployment, add the Next.js plugin:
+
+<CodeBlock
+    code={`[[plugins]]
+  package = "@netlify/plugin-nextjs"`}
+    language="toml"
+    filename="netlify.toml"
+/>
+
+<Callout type="warning" title="SSR Required">
+    Next.js App Router uses Server Components. Do not configure Netlify for static file
+    serving or SPA-style redirects.
+</Callout>
+
+### Docker
+
+Build and run the web app in a container:
+
+<CodeBlock
+    code={`# Build the image
+docker build -t my-app-web ./web
+
+# Run the container
+docker run -p 3000:3000 my-app-web`}
+    language="bash"
+/>
+
+### Node.js Hosting
+
+For any Node.js hosting (Railway, Render, AWS, etc.):
+
+<CodeBlock
+    code={`cd web
+bun run build
+bun start`}
+    language="bash"
+/>
+
+### Production Environment Variables
+
+Update environment variables for production:
+
+<CodeBlock
+    code={`NEXT_PUBLIC_APP_URL=https://yourdomain.com
+BACKEND_URL=https://api.yourdomain.com`}
+    language="bash"
+    filename="web/.env.production"
+/>
+
+## Backend
+
+The backend can be deployed to any Node.js hosting platform.
+
+### Recommended Platforms
+
+- **Railway** - Simple Git-based deployments
+- **Render** - Free tier available
+- **Heroku** - Classic PaaS option
+- **AWS/GCP/Azure** - Enterprise-grade
+- **Your own VPS** - Full control
+
+### Configuration
+
+Configure environment variables from `.env.example`:
+
+<CodeBlock
+    code={`DATABASE_URL="postgresql://user:password@host:5432/mydb"
+REDIS_URL="redis://host:6379"
+CORS_ORIGINS="https://yourdomain.com,https://www.yourdomain.com"
+JWT_SECRET="your-production-secret"`}
+    language="bash"
+/>
+
+<Callout type="warning" title="CORS Configuration">
+    Make sure `CORS_ORIGINS` includes all your frontend URLs (both web and any mobile deep link origins).
+</Callout>
 
 </div>
