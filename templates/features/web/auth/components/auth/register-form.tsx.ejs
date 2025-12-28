@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { signUp } from "@/lib/auth/actions";
 
 export function RegisterForm() {
@@ -19,13 +21,11 @@ export function RegisterForm() {
     e.preventDefault();
     setError(null);
 
-    // Validate passwords match
     if (password !== confirmPassword) {
       setError("Passwords do not match");
       return;
     }
 
-    // Validate password strength
     if (password.length < 8) {
       setError("Password must be at least 8 characters");
       return;
@@ -43,48 +43,42 @@ export function RegisterForm() {
 
 <% if (features.authentication.emailVerification) { %>
       if (result.needsEmailVerification) {
-        // Redirect to verification notice page
         router.push(`/verify-email?email=${encodeURIComponent(email)}`);
       } else {
-        // Redirect to dashboard
         router.push("/dashboard");
         router.refresh();
       }
 <% } else { %>
-      // Redirect to dashboard
       router.push("/dashboard");
       router.refresh();
 <% } %>
-    } catch (err) {
+    } catch {
       setError("An unexpected error occurred");
-      console.error("Registration error:", err);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-2">
-        <label htmlFor="name" className="text-sm font-medium">
-          Name <span className="text-muted-foreground">(optional)</span>
-        </label>
-        <input
+    <form onSubmit={handleSubmit} className="space-y-3">
+      <div className="space-y-1.5">
+        <Label htmlFor="name" className="text-sm">
+          Name <span className="text-muted-foreground font-normal">(optional)</span>
+        </Label>
+        <Input
           id="name"
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="John Doe"
           disabled={isLoading}
-          className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
+          autoComplete="name"
         />
       </div>
 
-      <div className="space-y-2">
-        <label htmlFor="email" className="text-sm font-medium">
-          Email
-        </label>
-        <input
+      <div className="space-y-1.5">
+        <Label htmlFor="email" className="text-sm">Email</Label>
+        <Input
           id="email"
           type="email"
           value={email}
@@ -92,34 +86,27 @@ export function RegisterForm() {
           placeholder="you@example.com"
           required
           disabled={isLoading}
-          className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
+          autoComplete="email"
         />
       </div>
 
-      <div className="space-y-2">
-        <label htmlFor="password" className="text-sm font-medium">
-          Password
-        </label>
-        <input
+      <div className="space-y-1.5">
+        <Label htmlFor="password" className="text-sm">Password</Label>
+        <Input
           id="password"
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="Create a password"
+          placeholder="Min. 8 characters"
           required
           disabled={isLoading}
-          className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
+          autoComplete="new-password"
         />
-        <p className="text-xs text-muted-foreground">
-          Must be at least 8 characters
-        </p>
       </div>
 
-      <div className="space-y-2">
-        <label htmlFor="confirmPassword" className="text-sm font-medium">
-          Confirm Password
-        </label>
-        <input
+      <div className="space-y-1.5">
+        <Label htmlFor="confirmPassword" className="text-sm">Confirm Password</Label>
+        <Input
           id="confirmPassword"
           type="password"
           value={confirmPassword}
@@ -127,12 +114,12 @@ export function RegisterForm() {
           placeholder="Confirm your password"
           required
           disabled={isLoading}
-          className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
+          autoComplete="new-password"
         />
       </div>
 
       {error && (
-        <div className="p-3 text-sm text-red-500 bg-red-50 dark:bg-red-950/20 rounded-md">
+        <div className="p-2.5 text-sm text-destructive bg-destructive/10 rounded-lg border border-destructive/20">
           {error}
         </div>
       )}
@@ -143,7 +130,7 @@ export function RegisterForm() {
 
       <p className="text-center text-sm text-muted-foreground">
         Already have an account?{" "}
-        <Link href="/login" className="text-primary hover:underline">
+        <Link href="/login" className="text-primary hover:underline font-medium">
           Sign in
         </Link>
       </p>

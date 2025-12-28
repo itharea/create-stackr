@@ -6,7 +6,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/images/splash.png",
       "resizeMode": "contain",
@@ -61,7 +61,12 @@
       "eas": {
         "projectId": "your-eas-project-id-here"
       },
-      "apiUrl": "http://localhost:8080"<% if (features.authentication.providers.google) { %>,
+      "apiUrl": "http://localhost:8080",
+      "features": {
+        "onboarding": {
+          "enabled": <%= features.onboarding.enabled %>
+        }
+      }<% if (features.authentication.providers.google) { %>,
       "googleOAuth": {
         "webClientId": "YOUR_GOOGLE_WEB_CLIENT_ID",
         "iosClientId": "YOUR_GOOGLE_IOS_CLIENT_ID",

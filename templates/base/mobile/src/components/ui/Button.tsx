@@ -1,15 +1,17 @@
-import React from 'react';
+import React, { useRef, useMemo } from 'react';
 import {
-  TouchableOpacity,
+  Pressable,
   Text,
   StyleSheet,
   ActivityIndicator,
   ViewStyle,
   TextStyle,
-  TouchableOpacityProps,
+  PressableProps,
+  Animated,
 } from 'react-native';
+import { useAppTheme, AppTheme } from '@/context/ThemeContext';
 
-interface ButtonProps extends Omit<TouchableOpacityProps, 'style'> {
+interface ButtonProps extends Omit<PressableProps, 'style'> {
   title: string;
   loading?: boolean;
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
@@ -30,123 +32,100 @@ export const Button: React.FC<ButtonProps> = ({
   textStyle,
   ...props
 }) => {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   const isDisabled = disabled || loading;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
 
-  const buttonStyle = [
-    styles.base,
-    styles[variant],
-    styles[size],
-    fullWidth && styles.fullWidth,
-    isDisabled && styles.disabled,
-    style,
-  ];
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.97,
+      useNativeDriver: true,
+      speed: 50,
+      bounciness: 4,
+    }).start();
+  };
 
-  const textStyles = [
-    styles.text,
-    styles[`${variant}Text` as keyof typeof styles],
-    styles[`${size}Text` as keyof typeof styles],
-    isDisabled && styles.disabledText,
-    textStyle,
-  ];
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 50,
+      bounciness: 4,
+    }).start();
+  };
 
   return (
-    <TouchableOpacity
-      style={buttonStyle}
-      disabled={isDisabled}
-      activeOpacity={0.7}
-      {...props}
-    >
-      {loading ? (
-        <ActivityIndicator
-          size={size === 'small' ? 'small' : 'small'}
-          color={variant === 'primary' ? '#FFFFFF' : '#007AFF'}
-        />
-      ) : (
-        <Text style={textStyles}>{title}</Text>
-      )}
-    </TouchableOpacity>
+    <Animated.View style={[
+      fullWidth && styles.fullWidth,
+      { transform: [{ scale: scaleAnim }] },
+    ]}>
+      <Pressable
+        style={[
+          styles.base,
+          styles[variant],
+          styles[size],
+          fullWidth && styles.fullWidth,
+          isDisabled && styles.disabled,
+          variant === 'primary' && !isDisabled && theme.shadows.button,
+          style,
+        ]}
+        disabled={isDisabled}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        {...props}
+      >
+        {loading ? (
+          <ActivityIndicator
+            size="small"
+            color={variant === 'primary' ? theme.colors.textInverse : theme.colors.primary}
+          />
+        ) : (
+          <Text style={[
+            styles.text,
+            styles[`${variant}Text` as keyof typeof styles],
+            styles[`${size}Text` as keyof typeof styles],
+            isDisabled && styles.disabledText,
+            textStyle,
+          ]}>
+            {title}
+          </Text>
+        )}
+      </Pressable>
+    </Animated.View>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   base: {
-    borderRadius: 8,
+    borderRadius: theme.borderRadius.lg,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: 'transparent',
   },
-  
-  // Variants
-  primary: {
-    backgroundColor: '#007AFF',
-  },
-  secondary: {
-    backgroundColor: '#F2F2F7',
-  },
-  outline: {
-    backgroundColor: 'transparent',
-    borderColor: '#007AFF',
-  },
-  ghost: {
-    backgroundColor: 'transparent',
-  },
+  primary: { backgroundColor: theme.colors.primary },
+  secondary: { backgroundColor: theme.colors.backgroundSecondary },
+  outline: { backgroundColor: 'transparent', borderColor: theme.colors.borderStrong },
+  ghost: { backgroundColor: 'transparent' },
 
-  // Sizes
-  small: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    minHeight: 32,
-  },
-  medium: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    minHeight: 44,
-  },
-  large: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    minHeight: 52,
-  },
+  small: { paddingHorizontal: theme.spacing[3], paddingVertical: theme.spacing[2], minHeight: 36 },
+  medium: { paddingHorizontal: theme.spacing[4], paddingVertical: theme.spacing[3], minHeight: 48 },
+  large: { paddingHorizontal: theme.spacing[6], paddingVertical: theme.spacing[4], minHeight: 56 },
 
-  fullWidth: {
-    width: '100%',
-  },
+  fullWidth: { width: '100%' },
+  disabled: { opacity: 0.5 },
 
-  disabled: {
-    opacity: 0.6,
-  },
+  text: { fontWeight: '600', textAlign: 'center' },
+  primaryText: { color: theme.colors.textInverse },
+  secondaryText: { color: theme.colors.text },
+  outlineText: { color: theme.colors.text },
+  ghostText: { color: theme.colors.primary },
 
-  // Text styles
-  text: {
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  
-  primaryText: {
-    color: '#FFFFFF',
-  },
-  secondaryText: {
-    color: '#007AFF',
-  },
-  outlineText: {
-    color: '#007AFF',
-  },
-  ghostText: {
-    color: '#007AFF',
-  },
+  smallText: { fontSize: theme.typography.fontSize.sm },
+  mediumText: { fontSize: theme.typography.fontSize.base },
+  largeText: { fontSize: theme.typography.fontSize.lg },
 
-  smallText: {
-    fontSize: 14,
-  },
-  mediumText: {
-    fontSize: 16,
-  },
-  largeText: {
-    fontSize: 18,
-  },
-
-  disabledText: {
-    opacity: 0.6,
-  },
+  disabledText: {},
 });

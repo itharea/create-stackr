@@ -384,6 +384,24 @@ setup_env_files() {
 
         if [ "$skip_file_creation" = true ]; then
             print_status "Using existing environment files (credentials match current configuration)"
+<% if (platforms.includes('web')) { %>
+            # Still check if web/.env.local needs to be created
+            if [ -d "web" ] && [ ! -f "web/.env.local" ]; then
+                print_info "Creating web/.env.local..."
+                cat > web/.env.local << EOF
+# =============================================================================
+# Web App Environment Configuration
+# =============================================================================
+
+# Public URL of the web app (used for OAuth callbacks)
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# Backend API URL (server-side only, used by server actions)
+BACKEND_URL=http://localhost:8080
+EOF
+                print_status "Created web/.env.local"
+            fi
+<% } %>
             return 0
         fi
     fi
@@ -494,6 +512,25 @@ REDIS_PASSWORD=${REDIS_CONFIG_PASSWORD}
 LOG_LEVEL=debug
 EOF
     print_status "Created root .env file with configured values"
+<% if (platforms.includes('web')) { %>
+
+    # Web app environment file
+    if [ -d "web" ]; then
+        print_info "Creating web/.env.local..."
+        cat > web/.env.local << EOF
+# =============================================================================
+# Web App Environment Configuration
+# =============================================================================
+
+# Public URL of the web app (used for OAuth callbacks)
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# Backend API URL (server-side only, used by server actions)
+BACKEND_URL=http://localhost:8080
+EOF
+        print_status "Created web/.env.local"
+    fi
+<% } %>
 }
 
 # Install backend dependencies

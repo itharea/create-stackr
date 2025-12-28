@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   View,
   TextInput,
@@ -7,8 +7,10 @@ import {
   ViewStyle,
   TextStyle,
   TextInputProps,
-  TouchableOpacity,
+  Pressable,
+  Animated,
 } from 'react-native';
+import { useAppTheme, AppTheme } from '@/context/ThemeContext';
 
 interface InputProps extends Omit<TextInputProps, 'style'> {
   label?: string;
@@ -16,12 +18,8 @@ interface InputProps extends Omit<TextInputProps, 'style'> {
   hint?: string;
   containerStyle?: ViewStyle;
   inputStyle?: TextStyle;
-  labelStyle?: TextStyle;
-  errorStyle?: TextStyle;
-  hintStyle?: TextStyle;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
-  secureTextEntry?: boolean;
   showPasswordToggle?: boolean;
 }
 
@@ -31,33 +29,51 @@ export const Input: React.FC<InputProps> = ({
   hint,
   containerStyle,
   inputStyle,
-  labelStyle,
-  errorStyle,
-  hintStyle,
   leftIcon,
   rightIcon,
   secureTextEntry,
   showPasswordToggle = false,
   ...props
 }) => {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   const [isSecure, setIsSecure] = useState(secureTextEntry);
   const [isFocused, setIsFocused] = useState(false);
+  const borderAnim = useRef(new Animated.Value(0)).current;
 
   const hasError = !!error;
-  
-  const inputContainerStyle = [
-    styles.inputContainer,
-    isFocused && styles.focused,
-    hasError && styles.error,
-  ];
+
+  const handleFocus = () => {
+    setIsFocused(true);
+    Animated.timing(borderAnim, {
+      toValue: 1,
+      duration: theme.timing.fast,
+      useNativeDriver: false,
+    }).start();
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+    Animated.timing(borderAnim, {
+      toValue: 0,
+      duration: theme.timing.fast,
+      useNativeDriver: false,
+    }).start();
+  };
+
+  const borderColor = borderAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [
+      hasError ? theme.colors.error : theme.colors.border,
+      hasError ? theme.colors.error : theme.colors.primary,
+    ],
+  });
 
   const actualRightIcon = showPasswordToggle && secureTextEntry ? (
-    <TouchableOpacity
-      onPress={() => setIsSecure(!isSecure)}
-      style={styles.iconContainer}
-    >
+    <Pressable onPress={() => setIsSecure(!isSecure)} style={styles.iconContainer} hitSlop={8}>
       <Text style={styles.toggleText}>{isSecure ? 'Show' : 'Hide'}</Text>
-    </TouchableOpacity>
+    </Pressable>
   ) : rightIcon ? (
     <View style={styles.iconContainer}>{rightIcon}</View>
   ) : null;
@@ -65,113 +81,62 @@ export const Input: React.FC<InputProps> = ({
   return (
     <View style={[styles.container, containerStyle]}>
       {label && (
-        <Text style={[styles.label, hasError && styles.errorLabel, labelStyle]}>
-          {label}
-        </Text>
+        <Text style={[styles.label, hasError && styles.errorLabel]}>{label}</Text>
       )}
-      
-      <View style={inputContainerStyle}>
+
+      <Animated.View style={[styles.inputContainer, { borderColor }]}>
         {leftIcon && <View style={styles.iconContainer}>{leftIcon}</View>}
-        
         <TextInput
           style={[
             styles.input,
-            leftIcon ? styles.inputWithLeftIcon : undefined,
-            (actualRightIcon || rightIcon) ? styles.inputWithRightIcon : undefined,
+            leftIcon && styles.inputWithLeftIcon,
+            actualRightIcon && styles.inputWithRightIcon,
             inputStyle,
           ]}
           secureTextEntry={isSecure}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
-          placeholderTextColor="#999999"
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          placeholderTextColor={theme.colors.textMuted}
+          selectionColor={theme.colors.primary}
           {...props}
         />
-        
         {actualRightIcon}
-      </View>
-      
-      {error && (
-        <Text style={[styles.errorText, errorStyle]}>{error}</Text>
-      )}
-      
-      {hint && !error && (
-        <Text style={[styles.hintText, hintStyle]}>{hint}</Text>
-      )}
+      </Animated.View>
+
+      {error && <Text style={styles.errorText}>{error}</Text>}
+      {hint && !error && <Text style={styles.hintText}>{hint}</Text>}
     </View>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    marginBottom: 16,
-  },
-  
+const createStyles = (theme: AppTheme) => StyleSheet.create({
+  container: { marginBottom: theme.spacing[4] },
   label: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000000',
-    marginBottom: 8,
+    fontSize: theme.typography.fontSize.sm,
+    fontWeight: '500',
+    color: theme.colors.text,
+    marginBottom: theme.spacing[2],
   },
-  
-  errorLabel: {
-    color: '#FF3B30',
-  },
-  
+  errorLabel: { color: theme.colors.error },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#D1D1D6',
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF',
-    minHeight: 44,
+    borderRadius: theme.borderRadius.lg,
+    backgroundColor: theme.colors.background,
+    minHeight: 48,
   },
-  
-  focused: {
-    borderColor: '#007AFF',
-  },
-  
-  error: {
-    borderColor: '#FF3B30',
-  },
-  
   input: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: '#000000',
+    paddingHorizontal: theme.spacing[4],
+    paddingVertical: theme.spacing[3],
+    fontSize: theme.typography.fontSize.base,
+    color: theme.colors.text,
   },
-  
-  inputWithLeftIcon: {
-    paddingLeft: 8,
-  },
-  
-  inputWithRightIcon: {
-    paddingRight: 8,
-  },
-  
-  iconContainer: {
-    paddingHorizontal: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  
-  toggleText: {
-    fontSize: 14,
-    color: '#007AFF',
-    fontWeight: '600',
-  },
-  
-  errorText: {
-    fontSize: 14,
-    color: '#FF3B30',
-    marginTop: 4,
-  },
-  
-  hintText: {
-    fontSize: 14,
-    color: '#8E8E93',
-    marginTop: 4,
-  },
+  inputWithLeftIcon: { paddingLeft: theme.spacing[2] },
+  inputWithRightIcon: { paddingRight: theme.spacing[2] },
+  iconContainer: { paddingHorizontal: theme.spacing[3], justifyContent: 'center', alignItems: 'center' },
+  toggleText: { fontSize: theme.typography.fontSize.sm, color: theme.colors.primary, fontWeight: '600' },
+  errorText: { fontSize: theme.typography.fontSize.sm, color: theme.colors.error, marginTop: theme.spacing[1] },
+  hintText: { fontSize: theme.typography.fontSize.sm, color: theme.colors.textMuted, marginTop: theme.spacing[1] },
 });

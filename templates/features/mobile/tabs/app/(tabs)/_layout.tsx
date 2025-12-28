@@ -7,30 +7,18 @@ export default function TabLayout() {
 
   // This layout should only render if user is authenticated
   // The root layout handles the redirect
-  
+
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#007AFF',
-        tabBarInactiveTintColor: '#8E8E93',
-        tabBarStyle: {
-          backgroundColor: '#FFFFFF',
-          borderTopColor: '#E5E5EA',
-        },
-        headerStyle: {
-          backgroundColor: '#FFFFFF',
-        },
-        headerTintColor: '#000000',
-        headerTitleStyle: {
-          fontWeight: '600',
-        },
+        headerShown: false,
+        tabBarStyle: { display: 'none' },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
-          headerTitle: 'Home',
         }}
       />
     </Tabs>

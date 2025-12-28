@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { signIn } from "@/lib/auth/actions";
 import { useAuthStore } from "@/store/auth.store";
 
@@ -26,35 +28,25 @@ export function LoginForm({ redirectTo = "/dashboard" }: LoginFormProps) {
 
     try {
       const result = await signIn(email, password);
-
       if (!result.success) {
         setError(result.error || "Failed to sign in");
         return;
       }
-
-      // Update auth store with new session
-      if (result.session) {
-        setSession(result.session);
-      }
-
-      // Redirect to dashboard or specified redirect URL
+      if (result.session) setSession(result.session);
       router.push(redirectTo);
       router.refresh();
-    } catch (err) {
+    } catch {
       setError("An unexpected error occurred");
-      console.error("Login error:", err);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-2">
-        <label htmlFor="email" className="text-sm font-medium">
-          Email
-        </label>
-        <input
+    <form onSubmit={handleSubmit} className="space-y-3">
+      <div className="space-y-1.5">
+        <Label htmlFor="email" className="text-sm">Email</Label>
+        <Input
           id="email"
           type="email"
           value={email}
@@ -62,25 +54,20 @@ export function LoginForm({ redirectTo = "/dashboard" }: LoginFormProps) {
           placeholder="you@example.com"
           required
           disabled={isLoading}
-          className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
+          autoComplete="email"
         />
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         <div className="flex items-center justify-between">
-          <label htmlFor="password" className="text-sm font-medium">
-            Password
-          </label>
+          <Label htmlFor="password" className="text-sm">Password</Label>
 <% if (features.authentication.passwordReset) { %>
-          <Link
-            href="/forgot-password"
-            className="text-sm text-primary hover:underline"
-          >
+          <Link href="/forgot-password" className="text-xs text-primary hover:underline">
             Forgot password?
           </Link>
 <% } %>
         </div>
-        <input
+        <Input
           id="password"
           type="password"
           value={password}
@@ -88,12 +75,12 @@ export function LoginForm({ redirectTo = "/dashboard" }: LoginFormProps) {
           placeholder="Enter your password"
           required
           disabled={isLoading}
-          className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
+          autoComplete="current-password"
         />
       </div>
 
       {error && (
-        <div className="p-3 text-sm text-red-500 bg-red-50 dark:bg-red-950/20 rounded-md">
+        <div className="p-2.5 text-sm text-destructive bg-destructive/10 rounded-lg border border-destructive/20">
           {error}
         </div>
       )}
@@ -104,7 +91,7 @@ export function LoginForm({ redirectTo = "/dashboard" }: LoginFormProps) {
 
       <p className="text-center text-sm text-muted-foreground">
         Don&apos;t have an account?{" "}
-        <Link href="/register" className="text-primary hover:underline">
+        <Link href="/register" className="text-primary hover:underline font-medium">
           Sign up
         </Link>
       </p>

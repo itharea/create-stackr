@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,15 +8,23 @@ import {
   Modal,
   Pressable,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { router } from 'expo-router';
 import Constants from 'expo-constants';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../src/hooks';
 import { useSessionActions } from '../../src/store/deviceSession.store';
 import { Button, Input } from '../../src/components/ui';
+import { IconSymbol } from '../../src/components/ui/IconSymbol';
 import { formatDisplayName } from '../../src/utils/formatters';
+import { useAppTheme, AppTheme } from '@/context/ThemeContext';
 
 export default function HomeScreen() {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   const { user, signOut, deleteAccount, isLoading, isAuthenticated } = useAuth();
   const { deleteSession, initializeSession } = useSessionActions();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -26,13 +34,16 @@ export default function HomeScreen() {
   const [deleteSessionConfirmText, setDeleteSessionConfirmText] = useState('');
   const [isDeletingSession, setIsDeletingSession] = useState(false);
 
+  // Gradient colors based on theme
+  const gradientColors = theme.mode === 'dark'
+    ? [theme.colors.card, 'transparent'] as const
+    : ['#ffffff', '#f8fafc'] as const; // Subtle fade for light mode
+
   const handleLogout = async () => {
     const result = await signOut();
     if (!result.success) {
       Alert.alert('Error', 'Failed to sign out. Please try again.');
     }
-    // Button visibility updates automatically via isAuthenticated state
-    // Navigation handled by _layout.tsx reactively
   };
 
   const handleDeleteAccount = async () => {
@@ -45,17 +56,10 @@ export default function HomeScreen() {
     setIsDeleting(false);
 
     if (result.success) {
-      // Clear BetterAuth session (important for UI to update)
       await signOut();
-
-      // Close modal
       setShowDeleteModal(false);
       setDeleteConfirmText('');
-
-      // Navigation to login is handled reactively by _layout.tsx
-      // since isAuthenticated becomes false after signOut
     } else {
-      // Show error to user
       Alert.alert('Error', result.error || 'Failed to delete account. Please try again.');
     }
   };
@@ -67,33 +71,18 @@ export default function HomeScreen() {
 
     setIsDeletingSession(true);
     try {
-      // Delete session (store action handles onboarding flag clearing)
       await deleteSession();
-
-      // Get feature flags from app.json
       const onboardingEnabled = Constants.expoConfig?.extra?.features?.onboarding?.enabled ?? false;
-
-      // Close modal first
       setShowDeleteSessionModal(false);
       setDeleteSessionConfirmText('');
 
-      // Configuration-based post-deletion behavior
       if (!onboardingEnabled) {
-        // MINIMAL CONFIG: Recreate session immediately (data reset)
-        console.log('Minimal config: Recreating session after deletion...');
         await initializeSession();
-        console.log('Session recreated successfully - data reset complete');
-        // Stay on current screen (tabs/home) - user sees fresh start
       } else {
-        // ONBOARDING ENABLED: Navigate to onboarding
-        // Session will be created after onboarding completes
-        console.log('Navigating to onboarding...');
         router.replace('/(onboarding)/page-1');
       }
-
     } catch (error) {
       console.error('Failed to delete/recreate session:', error);
-      // Still close modal since store clears local state even on error
       setShowDeleteSessionModal(false);
       setDeleteSessionConfirmText('');
     } finally {
@@ -103,40 +92,64 @@ export default function HomeScreen() {
 
   const isDeleteButtonEnabled = deleteConfirmText === 'DELETE' && !isDeleting;
 
+  const features = [
+    'Authentication system',
+    'Zustand state management',
+    'Error handling',
+    'Form validation',
+    'API integration',
+  ];
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.content}>
           <Text style={styles.title}>Welcome to Your App!</Text>
-          
+
           {user && (
-            <View style={styles.userInfo}>
+            <LinearGradient
+              colors={gradientColors}
+              style={styles.userInfo}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+            >
               <Text style={styles.greeting}>
                 Hello, {formatDisplayName(user.name)}!
               </Text>
               <Text style={styles.email}>{user.email}</Text>
               <Text style={styles.userId}>User ID: {user.id}</Text>
-            </View>
+            </LinearGradient>
           )}
 
-          <View style={styles.section}>
+          <LinearGradient
+            colors={gradientColors}
+            style={styles.section}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+          >
             <Text style={styles.sectionTitle}>Getting Started</Text>
             <Text style={styles.sectionText}>
               This is your main app screen. You can now start building your amazing features!
             </Text>
-            
+
             <View style={styles.featureList}>
-              <Text style={styles.feature}>✅ Authentication system</Text>
-              <Text style={styles.feature}>✅ Zustand state management</Text>
-              <Text style={styles.feature}>✅ Error handling</Text>
-              <Text style={styles.feature}>✅ Form validation</Text>
-              <Text style={styles.feature}>✅ API integration</Text>
+              {features.map((feature, index) => (
+                <View key={index} style={styles.featureRow}>
+                  <View style={styles.featureIcon}>
+                    <IconSymbol
+                      name="checkmark.circle.fill"
+                      size={16}
+                      color={theme.colors.success}
+                    />
+                  </View>
+                  <Text style={styles.featureText}>{feature}</Text>
+                </View>
+              ))}
             </View>
-          </View>
+          </LinearGradient>
 
           <View style={styles.actions}>
             {isAuthenticated ? (
-              // Authenticated users - show logout and delete account
               <>
                 <Button
                   title="Logout"
@@ -155,7 +168,6 @@ export default function HomeScreen() {
                 />
               </>
             ) : (
-              // Anonymous users (session only) - show login/register and delete session
               <>
                 <Button
                   title="Sign In"
@@ -190,62 +202,68 @@ export default function HomeScreen() {
         transparent
         animationType="fade"
         onRequestClose={() => setShowDeleteModal(false)}
+        statusBarTranslucent
       >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setShowDeleteModal(false)}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardAvoidingModal}
         >
           <Pressable
-            style={styles.modalContent}
-            onPress={(e) => e.stopPropagation()}
+            style={styles.modalOverlay}
+            onPress={() => setShowDeleteModal(false)}
           >
-            <Text style={styles.modalTitle}>Delete Account</Text>
+            <Pressable
+              style={styles.modalContent}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <Text style={styles.modalTitle}>Delete Account</Text>
 
-            <View style={styles.warningContainer}>
-              <Text style={styles.warningTitle}>⚠️ Warning</Text>
-              <Text style={styles.warningText}>
-                This action is permanent and cannot be undone. All your account data will be deleted immediately.
-              </Text>
-            </View>
+              <View style={styles.warningContainer}>
+                <Text style={styles.warningTitle}>Warning</Text>
+                <Text style={styles.warningText}>
+                  This action is permanent and cannot be undone. All your account data will be deleted immediately.
+                </Text>
+              </View>
 
-            <View style={styles.gdprNotice}>
-              <Text style={styles.gdprTitle}>Third-Party Data Notice</Text>
-              <Text style={styles.gdprText}>
-                Please note that data stored by third-party services (RevenueCat, Adjust, Scate) may persist on their servers and cannot be deleted through this app. For complete data deletion, you may need to contact these services directly or submit a GDPR data deletion request.
-              </Text>
-            </View>
+              <View style={styles.gdprNotice}>
+                <Text style={styles.gdprTitle}>Third-Party Data Notice</Text>
+                <Text style={styles.gdprText}>
+                  Please note that data stored by third-party services (RevenueCat, Adjust, Scate) may persist on their servers.
+                </Text>
+              </View>
 
-            <Input
-              label="Type DELETE to confirm"
-              value={deleteConfirmText}
-              onChangeText={setDeleteConfirmText}
-              placeholder="DELETE"
-              autoCapitalize="characters"
-              containerStyle={styles.confirmInput}
-            />
-
-            <View style={styles.modalActions}>
-              <Button
-                title="Cancel"
-                variant="outline"
-                onPress={() => {
-                  setShowDeleteModal(false);
-                  setDeleteConfirmText('');
-                }}
-                style={styles.modalButton}
+              <Input
+                label="Type DELETE to confirm"
+                value={deleteConfirmText}
+                onChangeText={setDeleteConfirmText}
+                placeholder="DELETE"
+                autoCapitalize="characters"
+                containerStyle={styles.confirmInput}
               />
 
-              <Button
-                title={isDeleting ? "Deleting..." : "Confirm Delete"}
-                variant="primary"
-                onPress={handleDeleteAccount}
-                disabled={!isDeleteButtonEnabled}
-                loading={isDeleting}
-                style={StyleSheet.flatten([styles.modalButton, styles.deleteConfirmButton])}
-              />
-            </View>
+              <View style={styles.modalActions}>
+                <Button
+                  title="Cancel"
+                  variant="outline"
+                  onPress={() => {
+                    setShowDeleteModal(false);
+                    setDeleteConfirmText('');
+                  }}
+                  style={styles.modalButton}
+                />
+
+                <Button
+                  title={isDeleting ? "Deleting..." : "Delete"}
+                  variant="primary"
+                  onPress={handleDeleteAccount}
+                  disabled={!isDeleteButtonEnabled}
+                  loading={isDeleting}
+                  style={StyleSheet.flatten([styles.modalButton, styles.deleteConfirmButton])}
+                />
+              </View>
+            </Pressable>
           </Pressable>
-        </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Delete Session Confirmation Modal */}
@@ -254,260 +272,286 @@ export default function HomeScreen() {
         transparent
         animationType="fade"
         onRequestClose={() => setShowDeleteSessionModal(false)}
+        statusBarTranslucent
       >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setShowDeleteSessionModal(false)}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardAvoidingModal}
         >
           <Pressable
-            style={styles.modalContent}
-            onPress={(e) => e.stopPropagation()}
+            style={styles.modalOverlay}
+            onPress={() => setShowDeleteSessionModal(false)}
           >
-            <Text style={styles.modalTitle}>Delete Session</Text>
+            <Pressable
+              style={styles.modalContent}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <Text style={styles.modalTitle}>Delete Session</Text>
 
-            <View style={styles.warningContainer}>
-              <Text style={styles.warningTitle}>⚠️ Warning</Text>
-              <Text style={styles.warningText}>
-                This will delete your anonymous session and all local data. You'll need to go through onboarding again.
-              </Text>
-            </View>
+              <View style={styles.warningContainer}>
+                <Text style={styles.warningTitle}>Warning</Text>
+                <Text style={styles.warningText}>
+                  This will delete your anonymous session and all local data. You'll need to go through onboarding again.
+                </Text>
+              </View>
 
-            <Input
-              label="Type DELETE to confirm"
-              value={deleteSessionConfirmText}
-              onChangeText={setDeleteSessionConfirmText}
-              placeholder="DELETE"
-              autoCapitalize="characters"
-              containerStyle={styles.confirmInput}
-            />
-
-            <View style={styles.modalActions}>
-              <Button
-                title="Cancel"
-                variant="outline"
-                onPress={() => {
-                  setShowDeleteSessionModal(false);
-                  setDeleteSessionConfirmText('');
-                }}
-                style={styles.modalButton}
+              <Input
+                label="Type DELETE to confirm"
+                value={deleteSessionConfirmText}
+                onChangeText={setDeleteSessionConfirmText}
+                placeholder="DELETE"
+                autoCapitalize="characters"
+                containerStyle={styles.confirmInput}
               />
 
-              <Button
-                title={isDeletingSession ? "Deleting..." : "Confirm Delete"}
-                variant="primary"
-                onPress={handleDeleteSession}
-                disabled={deleteSessionConfirmText !== 'DELETE'}
-                loading={isDeletingSession}
-                style={StyleSheet.flatten([styles.modalButton, styles.deleteConfirmButton])}
-              />
-            </View>
+              <View style={styles.modalActions}>
+                <Button
+                  title="Cancel"
+                  variant="outline"
+                  onPress={() => {
+                    setShowDeleteSessionModal(false);
+                    setDeleteSessionConfirmText('');
+                  }}
+                  style={styles.modalButton}
+                />
+
+                <Button
+                  title={isDeletingSession ? "Deleting..." : "Delete"}
+                  variant="primary"
+                  onPress={handleDeleteSession}
+                  disabled={deleteSessionConfirmText !== 'DELETE'}
+                  loading={isDeletingSession}
+                  style={StyleSheet.flatten([styles.modalButton, styles.deleteConfirmButton])}
+                />
+              </View>
+            </Pressable>
           </Pressable>
-        </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: theme.colors.background,
   },
-  
+
   scrollContent: {
     flexGrow: 1,
   },
-  
+
   content: {
     flex: 1,
-    padding: 20,
+    padding: theme.spacing[5],
   },
-  
+
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#000000',
+    fontSize: theme.typography.fontSize['3xl'],
+    fontWeight: '800',
+    color: theme.colors.text,
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: theme.spacing[8],
+    letterSpacing: -1,
   },
-  
+
   userInfo: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 24,
+    // Removed solid background
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing[5],
+    marginBottom: theme.spacing[6],
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.borderLight,
   },
-  
+
   greeting: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#000000',
-    marginBottom: 8,
+    fontSize: theme.typography.fontSize.lg,
+    fontWeight: '700',
+    color: theme.colors.text,
+    marginBottom: theme.spacing[2],
   },
-  
+
   email: {
-    fontSize: 16,
-    color: '#007AFF',
-    marginBottom: 4,
+    fontSize: theme.typography.fontSize.base,
+    color: theme.colors.textSecondary,
+    marginBottom: theme.spacing[1],
   },
-  
+
   userId: {
-    fontSize: 14,
-    color: '#8E8E93',
-    fontFamily: 'monospace',
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.textMuted,
   },
-  
+
   section: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 24,
+    // Removed solid background
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing[6],
+    marginBottom: theme.spacing[6],
+    borderWidth: 1,
+    borderColor: theme.colors.borderLight,
   },
-  
+
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#000000',
-    marginBottom: 12,
+    fontSize: theme.typography.fontSize.lg,
+    fontWeight: '700',
+    color: theme.colors.text,
+    marginBottom: theme.spacing[3],
   },
-  
+
   sectionText: {
-    fontSize: 16,
-    color: '#8E8E93',
-    lineHeight: 22,
-    marginBottom: 16,
+    fontSize: theme.typography.fontSize.base,
+    color: theme.colors.textSecondary,
+    lineHeight: 24,
+    marginBottom: theme.spacing[5],
   },
-  
+
   featureList: {
-    gap: 8,
+    gap: theme.spacing[3],
   },
-  
-  feature: {
-    fontSize: 16,
-    color: '#34C759',
+
+  featureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing[3],
+  },
+
+  featureIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: theme.borderRadius.full,
+    backgroundColor: theme.mode === 'dark' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  featureText: {
+    fontSize: theme.typography.fontSize.base,
+    color: theme.colors.text,
     fontWeight: '500',
   },
-  
+
   actions: {
     marginTop: 'auto',
-    paddingTop: 20,
+    paddingTop: theme.spacing[5],
   },
 
   logoutButton: {
-    marginTop: 16,
+    marginTop: theme.spacing[4],
   },
 
   deleteButton: {
-    marginTop: 12,
-    borderColor: '#FF3B30',
+    marginTop: theme.spacing[3],
+    borderColor: theme.colors.error,
   },
 
   deleteButtonText: {
-    color: '#FF3B30',
+    color: theme.colors.error,
   },
 
   signInButton: {
-    marginTop: 16,
+    marginTop: theme.spacing[4],
   },
 
   createAccountButton: {
-    marginTop: 12,
+    marginTop: theme.spacing[3],
   },
 
   deleteSessionButton: {
-    marginTop: 12,
-    borderColor: '#FF3B30',
+    marginTop: theme.spacing[3],
+    borderColor: theme.colors.error,
   },
 
   deleteSessionButtonText: {
-    color: '#FF3B30',
+    color: theme.colors.error,
   },
 
   // Modal styles
+  keyboardAvoidingModal: {
+    flex: 1,
+  },
+
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: theme.spacing[5],
   },
 
   modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 24,
+    backgroundColor: theme.colors.background,
+    borderRadius: 24,
+    padding: theme.spacing[6],
+    paddingBottom: theme.spacing[12],
     width: '100%',
     maxWidth: 400,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    borderWidth: 1,
+    borderColor: theme.colors.borderLight,
+    ...theme.shadows.large,
   },
 
   modalTitle: {
-    fontSize: 24,
+    fontSize: theme.typography.fontSize['xl'],
     fontWeight: 'bold',
-    color: '#000000',
-    marginBottom: 20,
+    color: theme.colors.text,
+    marginBottom: theme.spacing[6],
     textAlign: 'center',
   },
 
   warningContainer: {
-    backgroundColor: '#FFF3CD',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 16,
+    backgroundColor: 'transparent', // No more solid gray block
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing[4],
+    marginBottom: theme.spacing[5],
     borderWidth: 1,
-    borderColor: '#FFE69C',
+    borderColor: theme.colors.warning, // Outline instead
+    borderStyle: 'dashed', // Optional stylish touch
   },
 
   warningTitle: {
-    fontSize: 16,
+    fontSize: theme.typography.fontSize.base,
     fontWeight: '700',
-    color: '#856404',
-    marginBottom: 8,
+    color: theme.colors.warning,
+    marginBottom: theme.spacing[2],
   },
 
   warningText: {
-    fontSize: 14,
-    color: '#856404',
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.textSecondary,
     lineHeight: 20,
   },
 
   gdprNotice: {
-    backgroundColor: '#E3F2FD',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 20,
+    backgroundColor: 'transparent',
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing[4],
+    marginBottom: theme.spacing[5],
     borderWidth: 1,
-    borderColor: '#BBDEFB',
+    borderColor: theme.colors.info,
   },
 
   gdprTitle: {
-    fontSize: 14,
+    fontSize: theme.typography.fontSize.sm,
     fontWeight: '600',
-    color: '#1565C0',
-    marginBottom: 8,
+    color: theme.colors.info,
+    marginBottom: theme.spacing[2],
   },
 
   gdprText: {
-    fontSize: 13,
-    color: '#1976D2',
+    fontSize: theme.typography.fontSize.xs,
+    color: theme.colors.textMuted,
     lineHeight: 18,
   },
 
   confirmInput: {
-    marginBottom: 20,
+    marginBottom: theme.spacing[6],
   },
 
   modalActions: {
     flexDirection: 'row',
-    gap: 12,
+    gap: theme.spacing[3],
   },
 
   modalButton: {
@@ -515,6 +559,7 @@ const styles = StyleSheet.create({
   },
 
   deleteConfirmButton: {
-    backgroundColor: '#FF3B30',
+    backgroundColor: theme.colors.error,
+    borderWidth: 0, // Solid button
   },
 });
