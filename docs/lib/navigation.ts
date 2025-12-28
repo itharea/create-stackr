@@ -26,6 +26,7 @@ export const navigation: NavSection[] = [
             { title: 'Onboarding', href: '/docs/features/onboarding' },
             { title: 'Paywall', href: '/docs/features/paywall' },
             { title: 'Session Management', href: '/docs/features/session-management' },
+            { title: 'Web Platform', href: '/docs/features/web-platform' },
             { title: 'Backend', href: '/docs/features/backend' },
         ],
     },

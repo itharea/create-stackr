@@ -4,6 +4,7 @@ import Image from 'next/image';
 import CodeBlock from '@/components/CodeBlock';
 import Callout from '@/components/Callout';
 import { PresetComparison } from '@/components/ui/PresetComparison';
+import { Table } from '@/components/ui/Table';
 
 export function useMDXComponents(components: MDXComponents): MDXComponents {
     return {
@@ -37,6 +38,7 @@ export function useMDXComponents(components: MDXComponents): MDXComponents {
         CodeBlock,
         Callout,
         PresetComparison,
+        Table,
         ...components,
     };
 }
