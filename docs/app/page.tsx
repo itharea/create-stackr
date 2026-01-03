@@ -50,7 +50,7 @@ export default function Home() {
               transition={{ duration: 0.5 }}
             >
               <span className={styles.badgeDot} />
-              v1.0 is now available
+              v0.2.0 is now available
             </motion.div>
 
             <motion.h1
