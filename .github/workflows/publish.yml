@@ -34,8 +34,14 @@ jobs:
       - name: Build
         run: bun run build
 
-      - name: Run tests
-        run: bun test
+      - name: Run unit tests
+        run: bun run test:unit
+
+      - name: Run integration tests
+        run: bun run test:integration
+
+      - name: Run E2E tests
+        run: bun run test:e2e
 
       - name: Publish to npm
         run: npm publish --provenance --access public
