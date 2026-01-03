@@ -21,13 +21,6 @@ const palette = {
     900: '#18181b',
     950: '#09090b',
   },
-  primary: {
-    50: '#eff6ff',
-    100: '#dbeafe',
-    500: '#3b82f6',
-    600: '#2563eb',
-    700: '#1d4ed8',
-  },
   semantic: {
     success: '#22c55e',
     warning: '#f59e0b',
@@ -55,7 +48,7 @@ const fontFamily = Platform.OS === 'ios'
   ? { regular: 'System', medium: 'System', semiBold: 'System', bold: 'System' }
   : { regular: 'Roboto', medium: 'Roboto-Medium', semiBold: 'Roboto-Medium', bold: 'Roboto-Bold' };
 
-// Light theme colors
+// Light theme colors (monochrome primary matching web)
 const lightColors = {
   background: palette.neutral[0],
   backgroundSecondary: palette.neutral[50],
@@ -72,9 +65,10 @@ const lightColors = {
   borderLight: palette.neutral[100],
   borderStrong: palette.neutral[400],
 
-  primary: palette.primary[600],
-  primaryDark: palette.primary[700],
-  primaryLight: palette.primary[100],
+  // Monochrome primary (matches web design system)
+  primary: palette.neutral[900],
+  primaryDark: palette.neutral[950],
+  primaryLight: palette.neutral[100],
 
   icon: palette.neutral[700],
   iconMuted: palette.neutral[400],
@@ -85,7 +79,7 @@ const lightColors = {
   info: palette.semantic.info,
 };
 
-// Dark theme colors
+// Dark theme colors (monochrome primary matching web)
 const darkColors = {
   background: palette.neutral[950],
   backgroundSecondary: palette.neutral[900],
@@ -102,9 +96,10 @@ const darkColors = {
   borderLight: palette.neutral[900],
   borderStrong: palette.neutral[500],
 
-  primary: palette.primary[500],
-  primaryDark: palette.primary[600],
-  primaryLight: palette.primary[700],
+  // Monochrome primary (matches web design system)
+  primary: palette.neutral[50],
+  primaryDark: palette.neutral[0],
+  primaryLight: palette.neutral[800],
 
   icon: palette.neutral[300],
   iconMuted: palette.neutral[500],
@@ -141,7 +136,7 @@ const createShadows = (mode: 'light' | 'dark') => {
       elevation: 8,
     },
     button: {
-      shadowColor: palette.primary[600],
+      shadowColor: palette.neutral[900],
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.15,
       shadowRadius: 4,

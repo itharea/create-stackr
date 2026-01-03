@@ -82,7 +82,7 @@ export const auth = betterAuth({
   },
   trustedOrigins: [
     // Web origins (includes development and production URLs)
-    ...(process.env.TRUSTED_ORIGINS?.split(",") || ["http://localhost:3000"]),
+    ...(process.env.TRUSTED_ORIGINS?.split(",").map(o => o.trim()) || ["http://localhost:3000"]),
     // Mobile deep link scheme (required for OAuth callbacks)
     "<%= appScheme %>://",
     // Expo development URLs (development only)
