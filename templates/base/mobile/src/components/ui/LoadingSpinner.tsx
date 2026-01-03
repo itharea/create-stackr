@@ -7,6 +7,7 @@ import {
   ViewStyle,
   TextStyle,
 } from 'react-native';
+import { useAppTheme } from '@/context/ThemeContext';
 
 interface LoadingSpinnerProps {
   size?: 'small' | 'large';
@@ -19,27 +20,48 @@ interface LoadingSpinnerProps {
 
 export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
   size = 'large',
-  color = '#007AFF',
+  color,
   text,
   overlay = false,
   style,
   textStyle,
 }) => {
+  const theme = useAppTheme();
+
+  // Use provided color or fall back to theme primary
+  const spinnerColor = color ?? theme.colors.primary;
+
+  // Dynamic styles based on theme
+  const overlayStyle = {
+    backgroundColor: theme.mode === 'dark'
+      ? 'rgba(9, 9, 11, 0.9)'  // neutral-950 with opacity
+      : 'rgba(255, 255, 255, 0.9)',
+    borderRadius: theme.borderRadius.lg,
+  };
+
+  const overlayBackgroundStyle = {
+    backgroundColor: theme.mode === 'dark'
+      ? 'rgba(0, 0, 0, 0.5)'
+      : 'rgba(0, 0, 0, 0.3)',
+  };
+
   const containerStyle = [
     styles.container,
-    overlay && styles.overlay,
+    overlay && [styles.overlay, overlayStyle],
     style,
   ];
 
   const Wrapper = overlay ? View : React.Fragment;
-  const wrapperProps = overlay ? { style: styles.overlayBackground } : {};
+  const wrapperProps = overlay
+    ? { style: [styles.overlayBackground, overlayBackgroundStyle] }
+    : {};
 
   return (
     <Wrapper {...wrapperProps}>
       <View style={containerStyle}>
-        <ActivityIndicator size={size} color={color} />
+        <ActivityIndicator size={size} color={spinnerColor} />
         {text && (
-          <Text style={[styles.text, { color }, textStyle]}>
+          <Text style={[styles.text, { color: spinnerColor }, textStyle]}>
             {text}
           </Text>
         )}
@@ -54,22 +76,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
-  
+
   overlay: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 12,
     minWidth: 100,
     minHeight: 100,
   },
-  
+
   overlayBackground: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
   },
-  
+
   text: {
     marginTop: 12,
     fontSize: 16,

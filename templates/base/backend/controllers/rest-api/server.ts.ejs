@@ -45,7 +45,7 @@ await server.register(errorHandler);
 await server.register(import('@fastify/cors'), {
   // In production, use explicit origins; in development, allow all
   origin: process.env.NODE_ENV === 'production'
-    ? (process.env.ALLOWED_ORIGINS?.split(',') || [])
+    ? (process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()) || [])
     : true,
   // Required for cookie-based auth - allows cookies to be sent cross-origin
   credentials: true,
