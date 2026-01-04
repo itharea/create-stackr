@@ -1,26 +1,26 @@
 import Sidebar from '@/components/Sidebar';
 import TableOfContents from '@/components/TableOfContents';
-import styles from '@/components/Sidebar.module.css'; // Reusing for container structure if needed, or inline styles
+import Breadcrumbs from '@/components/Breadcrumbs';
+import { SidebarProvider } from '@/lib/sidebar-context';
+import SidebarToggle from '@/components/SidebarToggle';
+import styles from './layout.module.css';
 
-export default function DocsLayout({
-    children,
-}: {
-    children: React.ReactNode;
-}) {
+export default function DocsLayout({ children }: { children: React.ReactNode }) {
     return (
-        <div className="container" style={{ display: 'flex', gap: 'var(--space-8)' }}>
-            <Sidebar />
-            <main
-                style={{
-                    flex: 1,
-                    minWidth: 0, // Prevent flex item from overflowing
-                    paddingTop: 'var(--space-8)',
-                    paddingBottom: 'var(--space-16)',
-                }}
-            >
-                {children}
-            </main>
-            <TableOfContents />
-        </div>
+        <SidebarProvider>
+            <div className={styles.layout}>
+                <SidebarToggle />
+                <Sidebar />
+                <main className={styles.main}>
+                    <div className={styles.content}>
+                        <Breadcrumbs />
+                        <article className="prose">
+                            {children}
+                        </article>
+                    </div>
+                    <TableOfContents />
+                </main>
+            </div>
+        </SidebarProvider>
     );
 }

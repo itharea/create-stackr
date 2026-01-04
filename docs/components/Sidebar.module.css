@@ -1,3 +1,19 @@
+.backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity var(--transition-base), visibility var(--transition-base);
+    z-index: calc(var(--z-modal) - 1);
+}
+
+.backdropVisible {
+    opacity: 1;
+    visibility: visible;
+}
+
 .sidebar {
     width: var(--sidebar-width);
     height: calc(100vh - var(--header-height));
@@ -6,6 +22,41 @@
     overflow-y: auto;
     padding: var(--space-8) var(--space-4) var(--space-8) 0;
     border-right: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+}
+
+.mobileHeader {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-4);
+    border-bottom: 1px solid var(--border-subtle);
+    margin-bottom: var(--space-4);
+}
+
+.mobileTitle {
+    font-weight: 600;
+    font-size: var(--text-base);
+    color: var(--fg-primary);
+}
+
+.closeButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: none;
+    border: none;
+    color: var(--fg-secondary);
+    cursor: pointer;
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+}
+
+.closeButton:hover {
+    background: var(--bg-surface-hover);
+    color: var(--fg-primary);
 }
 
 .nav {
@@ -60,8 +111,39 @@
     pointer-events: none;
 }
 
+/* Mobile styles */
 @media (max-width: 1024px) {
+    .backdrop {
+        display: block;
+    }
+
     .sidebar {
-        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        width: 100%;
+        max-width: 320px;
+        background: var(--bg-canvas);
+        border-right: 1px solid var(--border-subtle);
+        transform: translateX(-100%);
+        transition: transform var(--transition-base);
+        z-index: var(--z-modal);
+        padding: 0;
+        padding-bottom: var(--space-8);
+    }
+
+    .sidebarOpen {
+        transform: translateX(0);
+    }
+
+    .mobileHeader {
+        display: flex;
+    }
+
+    .nav {
+        padding: 0 var(--space-4);
+        overflow-y: auto;
+        flex: 1;
     }
 }

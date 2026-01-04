@@ -1,0 +1,26 @@
+.layout {
+    display: flex;
+    max-width: var(--max-width);
+    margin: 0 auto;
+    position: relative;
+}
+
+.main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    gap: var(--space-8);
+}
+
+.content {
+    flex: 1;
+    min-width: 0;
+    max-width: var(--content-max-width);
+    padding: var(--space-8) var(--space-6);
+}
+
+@media (max-width: 1280px) {
+    .main {
+        flex-direction: column;
+    }
+}

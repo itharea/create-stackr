@@ -83,6 +83,7 @@
 
   /* Backgrounds */
   --bg-canvas: #ffffff;
+  --bg-canvas-rgb: 255, 255, 255;
   --bg-surface: #fafafa;
   --bg-surface-hover: #f4f4f5;
   --bg-surface-active: #e4e4e7;
@@ -322,7 +323,31 @@ code {
 .container {
   max-width: var(--max-width);
   margin: 0 auto;
-  padding: 0 var(--space-6);
+  padding: 0 var(--space-4);
+}
+
+@media (min-width: 640px) {
+  .container {
+    padding: 0 var(--space-6);
+  }
+}
+
+@media (min-width: 768px) {
+  .container {
+    padding: 0 var(--space-8);
+  }
+}
+
+@media (min-width: 1024px) {
+  .container {
+    padding: 0 var(--space-12);
+  }
+}
+
+@media (min-width: 1280px) {
+  .container {
+    padding: 0 var(--space-6);
+  }
 }
 
 .visually-hidden {

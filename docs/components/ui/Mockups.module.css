@@ -88,4 +88,15 @@
     flex: 1;
     position: relative;
     background: var(--bg-canvas);
+    transform-style: preserve-3d;
+}
+
+@media (max-width: 640px) {
+    .browser {
+        height: 400px;
+    }
+
+    .browserContent {
+        overflow: visible;
+    }
 }

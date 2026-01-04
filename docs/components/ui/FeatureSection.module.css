@@ -1,8 +1,26 @@
 .section {
-    padding: 140px 0;
+    padding: 140px var(--space-4);
     position: relative;
     max-width: 1100px;
     margin: 0 auto;
+}
+
+@media (min-width: 640px) {
+    .section {
+        padding: 140px var(--space-6);
+    }
+}
+
+@media (min-width: 768px) {
+    .section {
+        padding: 140px var(--space-8);
+    }
+}
+
+@media (min-width: 1024px) {
+    .section {
+        padding: 140px 0;
+    }
 }
 
 .grid {
@@ -28,8 +46,20 @@
     direction: ltr;
 }
 
+@media (max-width: 959px) {
+    .reverse {
+        direction: ltr;
+    }
+}
+
 .content {
     max-width: 540px;
+}
+
+@media (max-width: 959px) {
+    .content {
+        max-width: 100%;
+    }
 }
 
 .title {
