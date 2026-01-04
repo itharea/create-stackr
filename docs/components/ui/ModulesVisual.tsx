@@ -14,7 +14,7 @@ const modules: { name: LogoName; lat: number; lng: number }[] = [
     { name: 'Stripe', lat: 20, lng: 280 },        // NORTH
 ];
 
-const BASE_GLOBE_RADIUS = 220;
+const BASE_GLOBE_RADIUS = 240;
 const MOBILE_BREAKPOINT = 640;
 const LOGO_SIZE = 10; // Smaller, subtler logos
 
