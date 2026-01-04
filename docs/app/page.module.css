@@ -53,29 +53,26 @@
 
 .title {
   font-family: var(--font-display);
-  font-size: 5rem;
+  font-size: clamp(2.5rem, 8vw, 5rem);
   font-weight: 800;
-  line-height: 1.05;
+  line-height: 1.1;
   letter-spacing: -0.045em;
   margin-bottom: var(--space-6);
   color: var(--fg-primary);
 }
 
-@media (max-width: 768px) {
-  .title {
-    font-size: 3rem;
-    letter-spacing: -0.04em;
-  }
+.heroHighlight {
+  color: var(--fg-primary);
 }
 
 .subtitle {
   font-family: var(--font-sans);
-  font-size: 1.25rem;
+  font-size: clamp(1rem, 3vw, 1.25rem);
   font-weight: 400;
   color: var(--fg-secondary);
-  max-width: 640px;
+  max-width: min(640px, 90%);
   margin-bottom: var(--space-12);
-  line-height: 1.6;
+  line-height: 1.7;
   letter-spacing: -0.01em;
 }
 

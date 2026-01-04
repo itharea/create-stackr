@@ -1,0 +1,40 @@
+.button {
+    position: fixed;
+    bottom: var(--space-6);
+    right: var(--space-6);
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-canvas);
+    border: 1px solid var(--border-DEFAULT);
+    border-radius: var(--radius-full);
+    color: var(--fg-secondary);
+    cursor: pointer;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(10px);
+    transition: all var(--transition-base);
+    box-shadow: var(--shadow-md);
+    z-index: var(--z-sticky);
+}
+
+.button:hover {
+    background: var(--bg-surface-hover);
+    color: var(--fg-primary);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+@media (max-width: 1024px) {
+    .button {
+        bottom: calc(var(--space-6) + 56px);
+    }
+}

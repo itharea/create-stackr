@@ -60,7 +60,7 @@ export default function Home() {
               transition={{ duration: 0.5, delay: 0.1 }}
             >
               Ship Full-Stack Apps <br />
-              <span className="text-gradient">In Minutes, Not Months</span>
+              <span className={styles.heroHighlight}>In Minutes, Not Months</span>
             </motion.h1>
 
             <motion.p

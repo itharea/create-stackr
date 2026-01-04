@@ -14,7 +14,8 @@ const modules: { name: LogoName; lat: number; lng: number }[] = [
     { name: 'Stripe', lat: 20, lng: 280 },        // NORTH
 ];
 
-const GLOBE_RADIUS = 220;
+const BASE_GLOBE_RADIUS = 220;
+const MOBILE_BREAKPOINT = 640;
 const LOGO_SIZE = 10; // Smaller, subtler logos
 
 // Pole positions
@@ -50,7 +51,7 @@ function toCartesian(lat: number, lng: number, radius: number): Point3D {
     };
 }
 
-function project(point: Point3D, rotation: number, width: number, height: number): Point2D {
+function project(point: Point3D, rotation: number, width: number, height: number, radius: number): Point2D {
     const rad = rotation * (Math.PI / 180);
     const xRot = point.x * Math.cos(rad) - point.z * Math.sin(rad);
     const zRot = point.x * Math.sin(rad) + point.z * Math.cos(rad);
@@ -62,7 +63,7 @@ function project(point: Point3D, rotation: number, width: number, height: number
         x: width / 2 + xRot * scale,
         y: height / 2 - point.y * scale,
         scale: scale,
-        opacity: Math.max(0.1, (zRot + GLOBE_RADIUS) / (2 * GLOBE_RADIUS)),
+        opacity: Math.max(0.1, (zRot + radius) / (2 * radius)),
         zIndex: Math.floor(zRot),
     };
 }
@@ -90,6 +91,7 @@ function generateBeamPath(
     rotation: number,
     width: number,
     height: number,
+    radius: number,
     reverse: boolean = false
 ): { pathData: string; headPos: Point2D; tailPos: Point2D; visible: boolean } | null {
     const tailProgress = headProgress - BEAM_LENGTH;
@@ -109,8 +111,8 @@ function generateBeamPath(
         const t = visibleTail + (visibleHead - visibleTail) * (i / numPoints);
         const actualT = reverse ? 1 - t : t;
         const pos = interpolateTowardsPole(nodeLat, nodeLng, poleLat, actualT);
-        const p3d = toCartesian(pos.lat, pos.lng, GLOBE_RADIUS);
-        const p2d = project(p3d, rotation, width, height);
+        const p3d = toCartesian(pos.lat, pos.lng, radius);
+        const p2d = project(p3d, rotation, width, height, radius);
         points.push(p2d);
     }
 
@@ -175,33 +177,41 @@ export function ModulesVisual() {
         return () => cancelAnimationFrame(animationFrame);
     }, []);
 
+    // Calculate responsive globe radius - scales proportionally under 640px
+    const globeRadius = useMemo(() => {
+        if (dimensions.width === 0) return BASE_GLOBE_RADIUS;
+        if (dimensions.width >= MOBILE_BREAKPOINT) return BASE_GLOBE_RADIUS;
+        // Scale proportionally based on viewport width under 640px
+        return BASE_GLOBE_RADIUS * (dimensions.width / MOBILE_BREAKPOINT);
+    }, [dimensions.width]);
+
     const gridLines = useMemo(() => {
         const lines = [];
         for (let lng = 0; lng < 360; lng += 20) {
             const points = [];
             for (let lat = -90; lat <= 90; lat += 10) {
-                points.push(toCartesian(lat, lng, GLOBE_RADIUS));
+                points.push(toCartesian(lat, lng, globeRadius));
             }
             lines.push(points);
         }
         for (let lat = -80; lat <= 80; lat += 20) {
             const points = [];
             for (let lng = 0; lng <= 360; lng += 10) {
-                points.push(toCartesian(lat, lng, GLOBE_RADIUS));
+                points.push(toCartesian(lat, lng, globeRadius));
             }
             lines.push(points);
         }
         return lines;
-    }, []);
+    }, [globeRadius]);
 
     // Core is at 0,0,0
-    const corePos = project({ x: 0, y: 0, z: 0 }, rotation, dimensions.width, dimensions.height);
+    const corePos = project({ x: 0, y: 0, z: 0 }, rotation, dimensions.width, dimensions.height, globeRadius);
 
     // Project poles
-    const northPole3d = toCartesian(NORTH_POLE.lat, NORTH_POLE.lng, GLOBE_RADIUS);
-    const southPole3d = toCartesian(SOUTH_POLE.lat, SOUTH_POLE.lng, GLOBE_RADIUS);
-    const northPole2d = project(northPole3d, rotation, dimensions.width, dimensions.height);
-    const southPole2d = project(southPole3d, rotation, dimensions.width, dimensions.height);
+    const northPole3d = toCartesian(NORTH_POLE.lat, NORTH_POLE.lng, globeRadius);
+    const southPole3d = toCartesian(SOUTH_POLE.lat, SOUTH_POLE.lng, globeRadius);
+    const northPole2d = project(northPole3d, rotation, dimensions.width, dimensions.height, globeRadius);
+    const southPole2d = project(southPole3d, rotation, dimensions.width, dimensions.height, globeRadius);
 
     // Separate nodes by hemisphere
     const northNodes = modules.filter(m => m.lat > 0);
@@ -244,7 +254,7 @@ export function ModulesVisual() {
                 {/* Grid */}
                 {gridLines.map((line, i) => {
                     const pathData = line.map((pt, j) => {
-                        const p2d = project(pt, rotation, dimensions.width, dimensions.height);
+                        const p2d = project(pt, rotation, dimensions.width, dimensions.height, globeRadius);
                         return `${j === 0 ? 'M' : 'L'} ${p2d.x} ${p2d.y}`;
                     }).join(' ');
 
@@ -273,8 +283,8 @@ export function ModulesVisual() {
 
                 {/* North Pole Connections */}
                 {northNodes.map((module, nodeIndex) => {
-                    const pt3d = toCartesian(module.lat, module.lng, GLOBE_RADIUS);
-                    const pt2d = project(pt3d, rotation, dimensions.width, dimensions.height);
+                    const pt3d = toCartesian(module.lat, module.lng, globeRadius);
+                    const pt2d = project(pt3d, rotation, dimensions.width, dimensions.height, globeRadius);
 
                     // Generate path points along meridian to north pole
                     const pathPoints: Array<{ lat: number; lng: number }> = [];
@@ -284,8 +294,8 @@ export function ModulesVisual() {
                     }
 
                     const pathData = pathPoints.map((pt, j) => {
-                        const p3d = toCartesian(pt.lat, pt.lng, GLOBE_RADIUS);
-                        const p2d = project(p3d, rotation, dimensions.width, dimensions.height);
+                        const p3d = toCartesian(pt.lat, pt.lng, globeRadius);
+                        const p2d = project(p3d, rotation, dimensions.width, dimensions.height, globeRadius);
                         return `${j === 0 ? 'M' : 'L'} ${p2d.x} ${p2d.y}`;
                     }).join(' ');
 
@@ -310,7 +320,7 @@ export function ModulesVisual() {
                                     module.lat, module.lng, 90,
                                     headProgress, rotation,
                                     dimensions.width, dimensions.height,
-                                    false
+                                    globeRadius, false
                                 );
 
                                 if (!beam || !beam.visible) return null;
@@ -355,7 +365,7 @@ export function ModulesVisual() {
                                     module.lat, module.lng, 90,
                                     headProgress, rotation,
                                     dimensions.width, dimensions.height,
-                                    true
+                                    globeRadius, true
                                 );
 
                                 if (!beam || !beam.visible) return null;
@@ -396,8 +406,8 @@ export function ModulesVisual() {
 
                 {/* South Pole Connections */}
                 {southNodes.map((module, nodeIndex) => {
-                    const pt3d = toCartesian(module.lat, module.lng, GLOBE_RADIUS);
-                    const pt2d = project(pt3d, rotation, dimensions.width, dimensions.height);
+                    const pt3d = toCartesian(module.lat, module.lng, globeRadius);
+                    const pt2d = project(pt3d, rotation, dimensions.width, dimensions.height, globeRadius);
 
                     // Generate path points along meridian to south pole
                     const pathPoints: Array<{ lat: number; lng: number }> = [];
@@ -407,8 +417,8 @@ export function ModulesVisual() {
                     }
 
                     const pathData = pathPoints.map((pt, j) => {
-                        const p3d = toCartesian(pt.lat, pt.lng, GLOBE_RADIUS);
-                        const p2d = project(p3d, rotation, dimensions.width, dimensions.height);
+                        const p3d = toCartesian(pt.lat, pt.lng, globeRadius);
+                        const p2d = project(p3d, rotation, dimensions.width, dimensions.height, globeRadius);
                         return `${j === 0 ? 'M' : 'L'} ${p2d.x} ${p2d.y}`;
                     }).join(' ');
 
@@ -433,7 +443,7 @@ export function ModulesVisual() {
                                     module.lat, module.lng, -90,
                                     headProgress, rotation,
                                     dimensions.width, dimensions.height,
-                                    false
+                                    globeRadius, false
                                 );
 
                                 if (!beam || !beam.visible) return null;
@@ -478,7 +488,7 @@ export function ModulesVisual() {
                                     module.lat, module.lng, -90,
                                     headProgress, rotation,
                                     dimensions.width, dimensions.height,
-                                    true
+                                    globeRadius, true
                                 );
 
                                 if (!beam || !beam.visible) return null;
@@ -549,8 +559,8 @@ export function ModulesVisual() {
 
                 {/* Modules & Radiating Connections */}
                 {modules.map((module, i) => {
-                    const pt3d = toCartesian(module.lat, module.lng, GLOBE_RADIUS);
-                    const pt2d = project(pt3d, rotation, dimensions.width, dimensions.height);
+                    const pt3d = toCartesian(module.lat, module.lng, globeRadius);
+                    const pt2d = project(pt3d, rotation, dimensions.width, dimensions.height, globeRadius);
 
                     // Connection from Center Core to Surface Node
                     const connectionPath = `M ${corePos.x} ${corePos.y} L ${pt2d.x} ${pt2d.y}`;

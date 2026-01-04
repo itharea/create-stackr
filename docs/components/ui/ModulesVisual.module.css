@@ -24,3 +24,11 @@
     z-index: 1;
     overflow: visible;
 }
+
+/* Scale container height proportionally with viewport under 640px */
+@media (max-width: 640px) {
+    .container {
+        height: calc(100vw * 0.9375);  /* 600/640 = 0.9375 ratio */
+        min-height: 300px;
+    }
+}

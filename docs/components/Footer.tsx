@@ -24,7 +24,7 @@ export default function Footer() {
                     <div className={styles.left}>
                         <div className={styles.brand}>
                             <div className={styles.logoIcon} />
-                            <span className={styles.logoText}>create-stackr</span>
+                            <span className={styles.logoText}>stackr</span>
                         </div>
                         <span className={styles.separator} />
                         <p className={styles.tagline}>

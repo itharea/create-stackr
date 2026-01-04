@@ -61,3 +61,43 @@
 .content pre {
     margin: 0;
 }
+
+@media (max-width: 420px) {
+    .header {
+        padding: 11px 14px;
+    }
+
+    .buttons span {
+        width: 11px;
+        height: 11px;
+    }
+
+    .title {
+        font-size: 12px;
+    }
+
+    .content {
+        padding: 16px;
+        font-size: 12.5px;
+    }
+}
+
+@media (max-width: 360px) {
+    .header {
+        padding: 10px 12px;
+    }
+
+    .buttons span {
+        width: 10px;
+        height: 10px;
+    }
+
+    .title {
+        font-size: 11px;
+    }
+
+    .content {
+        padding: 12px;
+        font-size: 11px;
+    }
+}

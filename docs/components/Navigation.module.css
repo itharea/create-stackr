@@ -6,6 +6,19 @@
     display: flex;
     align-items: center;
     border-bottom: 1px solid var(--border-subtle);
+    background: rgba(255, 255, 255, 0.6);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+    isolation: isolate;
+}
+
+/* Ensure container takes full width within nav */
+.nav :global(.container) {
+    width: 100%;
+}
+
+:global([data-theme="dark"]) .nav {
+    background: rgba(0, 0, 0, 0.6);
 }
 
 .inner {
@@ -13,7 +26,7 @@
     justify-content: space-between;
     align-items: center;
     width: 100%;
-    gap: var(--space-8);
+    gap: var(--space-4);
 }
 
 .logo {
@@ -22,21 +35,24 @@
     letter-spacing: -0.02em;
     color: var(--fg-primary);
     transition: opacity var(--transition-fast);
+    flex-shrink: 0;
 }
 
 .logo:hover {
     opacity: 0.8;
 }
 
-.desktop {
+/* Left side: Logo + Nav Links */
+.left {
     display: flex;
     align-items: center;
-    gap: var(--space-8);
+    gap: var(--space-6);
 }
 
+/* Nav Links - Hidden on mobile */
 .links {
-    display: flex;
-    gap: var(--space-8);
+    display: none;
+    gap: var(--space-6);
     font-size: var(--text-sm);
     font-weight: 500;
     color: var(--fg-secondary);
@@ -44,25 +60,38 @@
 
 .links a {
     transition: color var(--transition-fast);
+    white-space: nowrap;
 }
 
 .links a:hover {
     color: var(--fg-primary);
 }
 
+.externalLink {
+    position: relative;
+    padding-right: 10px;
+}
+
+.externalLink svg {
+    position: absolute;
+    top: -1px;
+    right: -4px;
+    opacity: 0.5;
+}
+
+/* Actions - Hidden on mobile */
 .actions {
-    display: flex;
+    display: none;
     align-items: center;
-    gap: var(--space-4);
-    padding-left: var(--space-8);
-    border-left: 1px solid var(--border-subtle);
+    gap: var(--space-2);
 }
 
 .searchButton {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: var(--space-2);
-    padding: var(--space-2) var(--space-3);
+    padding: var(--space-2);
     background: var(--bg-surface);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
@@ -70,7 +99,8 @@
     font-size: var(--text-sm);
     cursor: pointer;
     transition: all var(--transition-fast);
-    width: 200px;
+    min-width: 44px;
+    height: 36px;
 }
 
 .searchButton:hover {
@@ -79,8 +109,11 @@
     color: var(--fg-primary);
 }
 
+.searchButton span {
+    display: none;
+}
+
 .kbd {
-    margin-left: auto;
     font-family: var(--font-mono);
     font-size: 0.75rem;
     padding: 0 var(--space-1);
@@ -105,43 +138,217 @@
     transition: color var(--transition-fast), background-color var(--transition-fast);
 }
 
-.iconButton:hover {
-    color: var(--fg-primary);
-    background: var(--bg-surface-hover);
+/* Hover only on desktop */
+@media (min-width: 768px) {
+    .iconButton:hover {
+        color: var(--fg-primary);
+        background: var(--bg-surface-hover);
+    }
 }
 
+/* Mobile Actions - Search + Hamburger */
+.mobileActions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+}
+
+/* Override icon color for mobile actions */
+.mobileActions .iconButton {
+    color: var(--fg-primary);
+}
+
+/* Mobile Menu Button with animated hamburger → X */
 .mobileMenuButton {
-    display: none;
-    padding: var(--space-2);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
     background: none;
     border: none;
     color: var(--fg-primary);
     cursor: pointer;
+    border-radius: var(--radius-md);
 }
 
-.mobileMenu {
-    display: none;
+/* Hamburger and X icon animation */
+.menuIcon,
+.closeIcon {
     position: absolute;
+    transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.menuIcon {
+    opacity: 1;
+    transform: rotate(0deg);
+}
+
+.menuIconHidden {
+    opacity: 0;
+    transform: rotate(90deg);
+}
+
+.closeIcon {
+    opacity: 1;
+    transform: rotate(0deg);
+}
+
+.closeIconHidden {
+    opacity: 0;
+    transform: rotate(-90deg);
+}
+
+/* ========================================
+   MOBILE MENU - Below Navbar Overlay
+   ======================================== */
+
+.mobileMenu {
+    position: fixed;
     top: var(--header-height);
     left: 0;
     right: 0;
+    bottom: 0;
+    z-index: var(--z-modal);
     background: var(--bg-canvas);
-    border-bottom: 1px solid var(--border-subtle);
-    padding: var(--space-4);
+    display: flex;
     flex-direction: column;
-    gap: var(--space-4);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity var(--transition-base), visibility var(--transition-base);
 }
 
-@media (max-width: 768px) {
-    .desktop {
+.mobileMenuOpen {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Mobile Navigation Links - Large touch targets */
+.mobileNav {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: var(--space-6) var(--space-4);
+}
+
+.mobileNav a {
+    display: block;
+    padding: var(--space-3) 0;
+    color: var(--fg-secondary);
+    font-size: var(--text-xl);
+    font-weight: 500;
+    transition: color var(--transition-fast);
+}
+
+.mobileNav a:hover {
+    color: var(--fg-primary);
+}
+
+.mobileNav .externalLink {
+    padding-right: 12px;
+}
+
+.mobileNav .externalLink svg {
+    top: 2px;
+    right: -4px;
+}
+
+/* Mobile Footer */
+.mobileFooter {
+    padding: var(--space-4);
+    border-top: 1px solid var(--border-subtle);
+    margin-top: auto;
+}
+
+/* ========================================
+   RESPONSIVE BREAKPOINTS (Mobile-First)
+   ======================================== */
+
+/* Tablet: 768px+ - Show nav links and actions */
+@media (min-width: 768px) {
+    .links {
+        display: flex;
+        gap: var(--space-4);
+    }
+
+    .actions {
+        display: flex;
+        gap: var(--space-2);
+    }
+
+    .mobileActions {
         display: none;
     }
 
-    .mobileMenuButton {
-        display: block;
+    .mobileMenu {
+        display: none;
     }
 
-    .mobileMenu {
-        display: flex;
+    .left {
+        gap: var(--space-4);
+    }
+
+    .searchButton {
+        width: 140px;
+        padding: var(--space-2) var(--space-3);
+        justify-content: flex-start;
+    }
+
+    .searchButton span {
+        display: inline;
+    }
+
+    .kbd {
+        margin-left: auto;
+    }
+}
+
+/* Desktop: 1024px+ - Full navigation with search text */
+@media (min-width: 1024px) {
+    .left {
+        gap: var(--space-6);
+    }
+
+    .links {
+        gap: var(--space-6);
+    }
+
+    .actions {
+        gap: var(--space-3);
+    }
+
+    .searchButton {
+        width: 160px;
+        padding: var(--space-2) var(--space-3);
+        justify-content: flex-start;
+    }
+
+    .searchButton span {
+        display: inline;
+    }
+
+    .kbd {
+        margin-left: auto;
+    }
+}
+
+/* Desktop Wide: 1280px+ - Spacious layout */
+@media (min-width: 1280px) {
+    .left {
+        gap: var(--space-8);
+    }
+
+    .links {
+        gap: var(--space-8);
+    }
+
+    .actions {
+        gap: var(--space-4);
+    }
+
+    .searchButton {
+        width: 200px;
     }
 }

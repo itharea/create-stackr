@@ -6,6 +6,7 @@ import { SpeedInsights } from '@vercel/speed-insights/next';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import CommandPalette from '@/components/CommandPalette';
+import BackToTop from '@/components/BackToTop';
 import { BFCacheHandler } from '@/components/BFCacheHandler';
 import './globals.css';
 
@@ -91,6 +92,7 @@ export default function RootLayout({
             <CommandPalette />
             {children}
             <Footer />
+            <BackToTop />
           </BFCacheHandler>
           <Analytics />
           <SpeedInsights />

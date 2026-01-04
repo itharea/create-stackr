@@ -51,14 +51,36 @@
 .code {
     padding: var(--space-4);
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
     font-size: 0.9em;
     font-family: var(--font-mono);
+}
+
+.code::-webkit-scrollbar {
+    height: 6px;
+}
+
+.code::-webkit-scrollbar-track {
+    background: var(--bg-surface);
+    border-radius: var(--radius-full);
+}
+
+.code::-webkit-scrollbar-thumb {
+    background: var(--border-DEFAULT);
+    border-radius: var(--radius-full);
 }
 
 .code pre {
     background-color: transparent !important;
     margin: 0;
     padding: 0;
+}
+
+@media (max-width: 768px) {
+    .code {
+        font-size: 0.8125rem;
+    }
 }
 
 .copyButton {
