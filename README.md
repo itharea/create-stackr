@@ -629,6 +629,16 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## Security
 
+Generated applications include security headers by default:
+
+- **X-Content-Type-Options**: Prevents MIME type sniffing
+- **X-Frame-Options**: Prevents clickjacking attacks
+- **Referrer-Policy**: Controls referrer information sent with requests
+- **Permissions-Policy**: Restricts access to browser features
+- **Strict-Transport-Security**: Enforces HTTPS connections (HSTS)
+
+To customize security headers, edit `next.config.ts` in your web application.
+
 See [SECURITY.md](SECURITY.md) for vulnerability reporting.
 
 ## License
