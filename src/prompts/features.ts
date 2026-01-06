@@ -13,35 +13,50 @@ export interface AuthenticationConfig {
   twoFactor: boolean;
 }
 
-export async function promptFeatures(): Promise<any> {
+export async function promptFeatures(platforms: string[] = ['mobile', 'web']): Promise<any> {
+  const hasMobile = platforms.includes('mobile');
+
+  // Build choices based on platform
+  const choices = [];
+
+  // Only show onboarding for mobile
+  if (hasMobile) {
+    choices.push({
+      name: 'Onboarding Flow - Multi-step user onboarding (mobile only)',
+      value: 'onboarding',
+      checked: true,
+    });
+  }
+
+  // Authentication always available
+  choices.push({
+    name: 'Authentication - User authentication with BetterAuth',
+    value: 'authentication',
+    checked: true,
+  });
+
+  // Only show paywall for mobile
+  if (hasMobile) {
+    choices.push({
+      name: 'Subscription Paywall - RevenueCat integration (mobile only)',
+      value: 'paywall',
+      checked: false,
+    });
+  }
+
+  choices.push({
+    name: 'Session Management - Anonymous device session tracking',
+    value: 'sessionManagement',
+    checked: true,
+  });
+
   // First, ask about basic features
   const basicFeatures = await inquirer.prompt([
     {
       type: 'checkbox',
       name: 'features',
       message: 'Select features to include:',
-      choices: [
-        {
-          name: 'Onboarding Flow - Multi-step user onboarding',
-          value: 'onboarding',
-          checked: true,
-        },
-        {
-          name: 'Authentication - User authentication with BetterAuth',
-          value: 'authentication',
-          checked: true,
-        },
-        {
-          name: 'Subscription Paywall - RevenueCat integration',
-          value: 'paywall',
-          checked: false,
-        },
-        {
-          name: 'Session Management - Anonymous device session tracking',
-          value: 'sessionManagement',
-          checked: true,
-        },
-      ],
+      choices,
     },
   ]);
 
@@ -102,13 +117,13 @@ export async function promptFeatures(): Promise<any> {
 
   return {
     onboarding: {
-      enabled: basicFeatures.features.includes('onboarding'),
+      enabled: hasMobile ? basicFeatures.features.includes('onboarding') : false,
       pages: 3, // Will be configured later if enabled
       skipButton: false,
       showPaywall: false,
     },
     authentication: authConfig,
-    paywall: basicFeatures.features.includes('paywall'),
+    paywall: hasMobile ? basicFeatures.features.includes('paywall') : false,
     sessionManagement: basicFeatures.features.includes('sessionManagement'),
   };
 }

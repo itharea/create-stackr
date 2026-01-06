@@ -68,17 +68,21 @@ async function collectCustomConfiguration(): Promise<
   // Platform selection FIRST (foundational choice)
   const platforms = await promptPlatforms();
 
+  const hasMobile = platforms.includes('mobile');
+
   // ORM selection (foundational choice)
   const orm = await promptORM();
 
-  // Collect features
-  const features = await promptFeatures();
+  // Collect features (with platform awareness)
+  const features = await promptFeatures(platforms);
 
-  // Collect SDK integrations
-  const integrations = await promptSDKs();
+  // Collect SDK integrations only for mobile
+  const integrations = hasMobile
+    ? await promptSDKs()
+    : getDefaultIntegrations();
 
-  // If onboarding enabled, collect onboarding config
-  if (features.onboarding.enabled) {
+  // If onboarding enabled AND mobile platform, collect onboarding config
+  if (features.onboarding.enabled && hasMobile) {
     const onboardingConfig = await promptOnboarding(integrations.revenueCat.enabled);
     features.onboarding = { ...features.onboarding, ...onboardingConfig };
   }
@@ -100,6 +104,31 @@ async function collectCustomConfiguration(): Promise<
     },
     preset: 'custom',
     customized: false,
+  };
+}
+
+/**
+ * Returns default (disabled) integrations for web-only projects.
+ */
+function getDefaultIntegrations() {
+  return {
+    revenueCat: {
+      enabled: false,
+      iosKey: '',
+      androidKey: '',
+    },
+    adjust: {
+      enabled: false,
+      appToken: '',
+      environment: 'sandbox' as const,
+    },
+    scate: {
+      enabled: false,
+      apiKey: '',
+    },
+    att: {
+      enabled: false,
+    },
   };
 }
 
