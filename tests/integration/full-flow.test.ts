@@ -121,8 +121,9 @@ describe('Integration Tests - Prompt Flows', () => {
       inquirer.prompt
         .mockResolvedValueOnce({ preset: 'Minimal' }) // Select preset
         .mockResolvedValueOnce({ customize: true }) // Customize
+        .mockResolvedValueOnce({ platformsToInclude: ['mobile', 'web'] }) // Platform selection
         .mockResolvedValueOnce({
-          // Customization answers
+          // Customization answers (mobile-only features + OAuth)
           onboarding: true,
           onboardingPages: 4,
           paywall: true,

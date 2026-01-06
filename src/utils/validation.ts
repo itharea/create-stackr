@@ -80,7 +80,56 @@ export function validateConfiguration(config: ProjectConfig): ValidationResult {
     };
   }
 
-  // Validate paywall requires RevenueCat
+  // Validate mobile-only features on web-only config
+  // IMPORTANT: Check platform constraints BEFORE dependency constraints
+  // so users see the more fundamental error first
+  const hasMobile = config.platforms.includes('mobile');
+
+  if (!hasMobile) {
+    if (config.features.onboarding.enabled) {
+      return {
+        valid: false,
+        error: 'Onboarding feature requires mobile platform',
+      };
+    }
+
+    if (config.features.paywall) {
+      return {
+        valid: false,
+        error: 'Paywall feature requires mobile platform',
+      };
+    }
+
+    if (config.integrations.revenueCat.enabled) {
+      return {
+        valid: false,
+        error: 'RevenueCat integration requires mobile platform',
+      };
+    }
+
+    if (config.integrations.adjust.enabled) {
+      return {
+        valid: false,
+        error: 'Adjust integration requires mobile platform',
+      };
+    }
+
+    if (config.integrations.scate.enabled) {
+      return {
+        valid: false,
+        error: 'Scate integration requires mobile platform',
+      };
+    }
+
+    if (config.integrations.att.enabled) {
+      return {
+        valid: false,
+        error: 'ATT integration requires mobile platform',
+      };
+    }
+  }
+
+  // Validate paywall requires RevenueCat (only relevant when mobile platform is included)
   if (config.features.paywall && !config.integrations.revenueCat.enabled) {
     return {
       valid: false,

@@ -37,6 +37,7 @@ describe('Preset Edge Cases', () => {
 
   describe('customizePreset validation', () => {
     const mockConfig: Omit<ProjectConfig, 'projectName' | 'packageManager' | 'appScheme'> = {
+      platforms: ['mobile', 'web'],
       features: {
         onboarding: { enabled: true, pages: 3, skipButton: true, showPaywall: false },
         authentication: {
@@ -62,6 +63,7 @@ describe('Preset Edge Cases', () => {
       },
       backend: {
         database: 'postgresql',
+        orm: 'prisma',
         eventQueue: false,
         docker: true,
       },
@@ -73,6 +75,7 @@ describe('Preset Edge Cases', () => {
       // Mock user choosing to customize
       inquirer.prompt
         .mockResolvedValueOnce({ customize: true })
+        .mockResolvedValueOnce({ platformsToInclude: ['mobile', 'web'] }) // Platform selection
         .mockResolvedValueOnce({
           onboarding: true,
           onboardingPages: 0, // Invalid: too low
@@ -90,9 +93,9 @@ describe('Preset Edge Cases', () => {
 
       // Get the validate function from the onboardingPages question
       const promptCalls = inquirer.prompt.mock.calls;
-      const secondCall = promptCalls[1];
-      if (secondCall && secondCall[0]) {
-        const onboardingPagesQuestion = secondCall[0].find(
+      const thirdCall = promptCalls[2]; // Now the third call (after customize and platforms)
+      if (thirdCall && thirdCall[0]) {
+        const onboardingPagesQuestion = thirdCall[0].find(
           (q: any) => q.name === 'onboardingPages'
         );
         if (onboardingPagesQuestion && onboardingPagesQuestion.validate) {
@@ -107,6 +110,7 @@ describe('Preset Edge Cases', () => {
     it('should validate onboarding pages range (too high)', async () => {
       inquirer.prompt
         .mockResolvedValueOnce({ customize: true })
+        .mockResolvedValueOnce({ platformsToInclude: ['mobile', 'web'] }) // Platform selection
         .mockResolvedValueOnce({
           onboarding: true,
           onboardingPages: 6, // Invalid: too high
@@ -120,9 +124,9 @@ describe('Preset Edge Cases', () => {
       await new Promise(resolve => setTimeout(resolve, 10));
 
       const promptCalls = inquirer.prompt.mock.calls;
-      const secondCall = promptCalls[1];
-      if (secondCall && secondCall[0]) {
-        const onboardingPagesQuestion = secondCall[0].find(
+      const thirdCall = promptCalls[2]; // Now the third call (after customize and platforms)
+      if (thirdCall && thirdCall[0]) {
+        const onboardingPagesQuestion = thirdCall[0].find(
           (q: any) => q.name === 'onboardingPages'
         );
         if (onboardingPagesQuestion && onboardingPagesQuestion.validate) {
@@ -137,6 +141,7 @@ describe('Preset Edge Cases', () => {
     it('should accept valid onboarding pages', async () => {
       inquirer.prompt
         .mockResolvedValueOnce({ customize: true })
+        .mockResolvedValueOnce({ platformsToInclude: ['mobile', 'web'] }) // Platform selection
         .mockResolvedValueOnce({
           onboarding: true,
           onboardingPages: 3,
@@ -150,9 +155,9 @@ describe('Preset Edge Cases', () => {
       await new Promise(resolve => setTimeout(resolve, 10));
 
       const promptCalls = inquirer.prompt.mock.calls;
-      const secondCall = promptCalls[1];
-      if (secondCall && secondCall[0]) {
-        const onboardingPagesQuestion = secondCall[0].find(
+      const thirdCall = promptCalls[2]; // Now the third call (after customize and platforms)
+      if (thirdCall && thirdCall[0]) {
+        const onboardingPagesQuestion = thirdCall[0].find(
           (q: any) => q.name === 'onboardingPages'
         );
         if (onboardingPagesQuestion && onboardingPagesQuestion.validate) {

@@ -64,15 +64,47 @@ export async function customizePreset(
   // Show current configuration
   displayPresetSummary(config);
 
-  // @ts-expect-error - inquirer types are too strict for our use case
-  const answers: any = await inquirer.prompt([
+  // First, ask about platforms
+  // @ts-expect-error - inquirer types are too strict
+  const { platformsToInclude } = await inquirer.prompt([
     {
+      type: 'checkbox',
+      name: 'platformsToInclude',
+      message: 'Which platforms do you want to include?',
+      choices: [
+        {
+          name: 'Mobile (Expo + React Native)',
+          value: 'mobile',
+          checked: config.platforms.includes('mobile'),
+        },
+        {
+          name: 'Web (Next.js)',
+          value: 'web',
+          checked: config.platforms.includes('web'),
+        },
+      ],
+      validate: (input: string[]) => {
+        if (input.length === 0) {
+          return 'Please select at least one platform';
+        }
+        return true;
+      },
+    },
+  ]);
+
+  const hasMobile = platformsToInclude.includes('mobile');
+
+  const questions: any[] = [];
+
+  // Only show onboarding for mobile
+  if (hasMobile) {
+    questions.push({
       type: 'confirm',
       name: 'onboarding',
-      message: 'Include onboarding flow?',
+      message: 'Include onboarding flow? (mobile only)',
       default: config.features.onboarding.enabled,
-    },
-    {
+    });
+    questions.push({
       type: 'number',
       name: 'onboardingPages',
       message: 'How many onboarding pages? (1-5)',
@@ -84,54 +116,58 @@ export async function customizePreset(
         }
         return true;
       },
-    },
-    {
+    });
+    questions.push({
       type: 'confirm',
       name: 'paywall',
-      message: 'Include subscription paywall?',
+      message: 'Include subscription paywall? (mobile only)',
       default: config.features.paywall,
-    },
-    {
+    });
+    questions.push({
       type: 'confirm',
       name: 'revenueCat',
       message: 'Include RevenueCat (subscriptions)?',
       default: config.integrations.revenueCat.enabled,
       when: (answers: any) => answers.paywall,
-    },
-    {
+    });
+    questions.push({
       type: 'confirm',
       name: 'adjust',
       message: 'Include Adjust (attribution)?',
       default: config.integrations.adjust.enabled,
-    },
-    {
+    });
+    questions.push({
       type: 'confirm',
       name: 'scate',
       message: 'Include Scate (engagement)?',
       default: config.integrations.scate.enabled,
-    },
-    {
-      type: 'checkbox',
-      name: 'oauthProviders',
-      message: 'Select OAuth providers to enable:',
-      choices: [
-        { name: 'Google', value: 'google', checked: config.features.authentication.providers.google },
-        { name: 'Apple', value: 'apple', checked: config.features.authentication.providers.apple },
-        { name: 'GitHub', value: 'github', checked: config.features.authentication.providers.github },
-      ],
-    },
-  ]);
+    });
+  }
 
-  // Update config with answers
+  // OAuth providers for both platforms
+  questions.push({
+    type: 'checkbox',
+    name: 'oauthProviders',
+    message: 'Select OAuth providers to enable:',
+    choices: [
+      { name: 'Google', value: 'google', checked: config.features.authentication.providers.google },
+      { name: 'Apple', value: 'apple', checked: config.features.authentication.providers.apple },
+      { name: 'GitHub', value: 'github', checked: config.features.authentication.providers.github },
+    ],
+  });
+
+  const answers: any = await inquirer.prompt(questions);
+
   return {
     ...config,
+    platforms: platformsToInclude,
     features: {
       ...config.features,
       onboarding: {
-        enabled: answers.onboarding,
+        enabled: hasMobile ? (answers.onboarding ?? false) : false,
         pages: answers.onboardingPages || 3,
         skipButton: config.features.onboarding.skipButton,
-        showPaywall: answers.paywall && answers.revenueCat,
+        showPaywall: hasMobile && answers.paywall && answers.revenueCat,
       },
       authentication: {
         ...config.features.authentication,
@@ -142,25 +178,25 @@ export async function customizePreset(
           github: answers.oauthProviders?.includes('github') ?? config.features.authentication.providers.github,
         },
       },
-      paywall: answers.paywall,
+      paywall: hasMobile ? (answers.paywall ?? false) : false,
     },
     integrations: {
       ...config.integrations,
       revenueCat: {
         ...config.integrations.revenueCat,
-        enabled: answers.revenueCat || false,
+        enabled: hasMobile ? (answers.revenueCat ?? false) : false,
       },
       adjust: {
         ...config.integrations.adjust,
-        enabled: answers.adjust,
+        enabled: hasMobile ? (answers.adjust ?? false) : false,
       },
       scate: {
         ...config.integrations.scate,
-        enabled: answers.scate,
+        enabled: hasMobile ? (answers.scate ?? false) : false,
       },
       att: {
         ...config.integrations.att,
-        enabled: answers.adjust, // Auto-enable ATT with Adjust
+        enabled: hasMobile && answers.adjust, // Auto-enable ATT with Adjust
       },
     },
     customized: true,
@@ -170,7 +206,12 @@ export async function customizePreset(
 function displayPresetSummary(
   config: Omit<ProjectConfig, 'projectName' | 'packageManager' | 'appScheme'>
 ): void {
+  const platformDisplay = config.platforms.length === 2
+    ? 'mobile + web'
+    : config.platforms[0];
+
   console.log(chalk.gray('Current configuration:'));
+  console.log(chalk.gray(`  • Platforms: ${platformDisplay}`));
   console.log(
     chalk.gray(
       `  • Onboarding: ${config.features.onboarding.enabled ? 'Yes' : 'No'}`

@@ -159,4 +159,95 @@ describe('validateConfiguration', () => {
     config.integrations.revenueCat.enabled = true;
     expect(validateConfiguration(config).valid).toBe(true);
   });
+
+  describe('Mobile-only feature validation', () => {
+    it('should reject paywall on web-only project', () => {
+      const config = createValidConfig();
+      config.platforms = ['web'];
+      config.features.paywall = true;
+      // Even with RevenueCat enabled, platform check fails first
+      config.integrations.revenueCat.enabled = true;
+
+      const result = validateConfiguration(config);
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('mobile platform');
+    });
+
+    it('should reject RevenueCat on web-only project', () => {
+      const config = createValidConfig();
+      config.platforms = ['web'];
+      config.integrations.revenueCat.enabled = true;
+
+      const result = validateConfiguration(config);
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('mobile platform');
+    });
+
+    it('should reject Adjust on web-only project', () => {
+      const config = createValidConfig();
+      config.platforms = ['web'];
+      config.integrations.adjust.enabled = true;
+
+      const result = validateConfiguration(config);
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('mobile platform');
+    });
+
+    it('should reject Scate on web-only project', () => {
+      const config = createValidConfig();
+      config.platforms = ['web'];
+      config.integrations.scate.enabled = true;
+
+      const result = validateConfiguration(config);
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('mobile platform');
+    });
+
+    it('should reject ATT on web-only project', () => {
+      const config = createValidConfig();
+      config.platforms = ['web'];
+      config.integrations.att.enabled = true;
+
+      const result = validateConfiguration(config);
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('mobile platform');
+    });
+
+    it('should reject onboarding on web-only project', () => {
+      const config = createValidConfig();
+      config.platforms = ['web'];
+      config.features.onboarding.enabled = true;
+      config.features.onboarding.pages = 3;
+
+      const result = validateConfiguration(config);
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('mobile platform');
+    });
+
+    it('should accept mobile-only features on mobile project', () => {
+      const config = createValidConfig();
+      config.platforms = ['mobile'];
+      config.features.paywall = true;
+      config.features.onboarding.enabled = true;
+      config.features.onboarding.pages = 3;
+      config.integrations.revenueCat.enabled = true;
+      config.integrations.adjust.enabled = true;
+      config.integrations.att.enabled = true;
+
+      const result = validateConfiguration(config);
+      expect(result.valid).toBe(true);
+    });
+
+    it('should accept mobile-only features on mobile+web project', () => {
+      const config = createValidConfig();
+      config.platforms = ['mobile', 'web'];
+      config.features.paywall = true;
+      config.features.onboarding.enabled = true;
+      config.features.onboarding.pages = 3;
+      config.integrations.revenueCat.enabled = true;
+
+      const result = validateConfiguration(config);
+      expect(result.valid).toBe(true);
+    });
+  });
 });
