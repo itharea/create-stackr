@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/providers/theme-provider";
 <% if (features.authentication.enabled) { %>
 import { AuthHydrator } from "@/components/auth/auth-hydrator";
 import { getSession } from "@/lib/auth/actions";
+import { Toaster } from "sonner";
 <% } %>
 <% if (features.sessionManagement) { %>
 import { DeviceSessionSetup } from "@/components/providers/device-session-setup";
@@ -42,6 +43,7 @@ export default async function RootLayout({
         <ThemeProvider>
 <% if (features.authentication.enabled) { %>
           <AuthHydrator session={session} />
+          <Toaster position="top-center" richColors />
 <% } %>
 <% if (features.sessionManagement) { %>
           <DeviceSessionSetup />

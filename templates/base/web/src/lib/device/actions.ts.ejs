@@ -7,16 +7,8 @@ import {
 } from '../auth/cookies';
 import { AUTH_CONFIG } from '../auth/config';
 
-export interface DeviceSession {
-  id: string;
-  deviceId: string;
-  sessionToken: string;
-  createdAt: string;
-  lastActiveAt: string;
-  migrated: boolean;
-  migratedToUserId: string | null;
-  preferredCurrency: string;
-}
+export type { DeviceSession } from './types';
+import type { DeviceSession } from './types';
 
 /**
  * Create a new device session

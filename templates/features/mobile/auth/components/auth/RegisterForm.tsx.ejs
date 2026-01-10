@@ -125,6 +125,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
     });
 
     if (result.success) {
+      // Navigation handled by parent watching isAuthenticated state
       onSuccess?.();
     } else {
       // Show server error via Alert

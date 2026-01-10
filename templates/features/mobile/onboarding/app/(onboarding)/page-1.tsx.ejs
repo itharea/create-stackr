@@ -9,6 +9,8 @@ export default function OnboardingPage1() {
     <% if (features.onboarding.pages === 1) { %>
       <% if (features.paywall) { %>
     router.replace('/paywall');
+      <% } else if (features.authentication.enabled) { %>
+    router.replace('/(public)');
       <% } else { %>
     router.replace('/(tabs)');
       <% } %>

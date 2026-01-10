@@ -1,0 +1,315 @@
+import { useState, useRef, useEffect } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  Pressable,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+} from "react-native";
+import { useLocalSearchParams, router } from "expo-router";
+import { useAppTheme, AppTheme } from "@/context/ThemeContext";
+import { emailOtp } from "@/lib/auth-client";
+import { useAuth } from "../src/hooks";
+
+export default function VerifyEmailScreen() {
+  const { email } = useLocalSearchParams<{ email: string }>();
+  const theme = useAppTheme();
+  const { colors } = theme;
+  const { refetch, signOut } = useAuth();
+
+  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [resendDisabled, setResendDisabled] = useState(false);
+  const [resendCountdown, setResendCountdown] = useState(0);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const inputRefs = useRef<(TextInput | null)[]>([]);
+
+  const handleChange = (index: number, value: string) => {
+    if (!/^\d*$/.test(value)) return;
+
+    const newOtp = [...otp];
+    newOtp[index] = value.slice(-1);
+    setOtp(newOtp);
+
+    if (value && index < 5) {
+      inputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleKeyPress = (index: number, key: string) => {
+    if (key === "Backspace" && !otp[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  // Auto-verify when complete
+  useEffect(() => {
+    const code = otp.join("");
+    if (code.length === 6 && email && !isVerifying) {
+      handleVerify(code);
+    }
+  }, [otp, email, isVerifying]);
+
+  // Countdown timer with proper cleanup
+  useEffect(() => {
+    if (resendCountdown <= 0) return;
+
+    const timer = setTimeout(() => {
+      setResendCountdown((prev) => {
+        if (prev <= 1) {
+          setResendDisabled(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [resendCountdown]);
+
+  const handleVerify = async (code: string) => {
+    if (!email) return;
+    setIsVerifying(true);
+    setError(null);
+
+    try {
+      const { error: verifyError } = await emailOtp.verifyEmail({
+        email,
+        otp: code,
+      });
+
+      if (verifyError) {
+        setError(verifyError.message || "Invalid code");
+        setOtp(["", "", "", "", "", ""]);
+        inputRefs.current[0]?.focus();
+        setIsVerifying(false);
+        return;
+      }
+
+      // Success - refetch session to update emailVerified status, then navigate
+      await refetch();
+      router.replace("/(tabs)");
+    } catch (err) {
+      setError("An error occurred");
+      setOtp(["", "", "", "", "", ""]);
+      inputRefs.current[0]?.focus();
+      setIsVerifying(false);
+    }
+  };
+
+  const handleResend = async () => {
+    if (!email || resendDisabled) return;
+
+    setResendDisabled(true);
+    setResendCountdown(60);
+    setError(null);
+
+    try {
+      const { error: sendError } = await emailOtp.sendVerificationOtp({
+        email,
+        type: "email-verification",
+      });
+
+      if (sendError) {
+        Alert.alert("Error", sendError.message || "Failed to resend code");
+      }
+    } catch (err) {
+      Alert.alert("Error", "Failed to resend code");
+    }
+  };
+
+  const handleBackToHome = async () => {
+    setIsLoggingOut(true);
+    try {
+      await signOut();
+      // Root layout will handle navigation when auth state changes
+    } catch (err) {
+      Alert.alert("Error", "Failed to sign out");
+      setIsLoggingOut(false);
+    }
+    // Don't reset isLoggingOut on success - component will unmount
+  };
+
+  if (!email) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.content}>
+          <Text style={[styles.title, { color: colors.text }]}>
+            Verify your email
+          </Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+            No email address provided.
+          </Text>
+          <Pressable
+            style={[styles.backButton, { borderColor: colors.border }]}
+            onPress={handleBackToHome}
+            disabled={isLoggingOut}
+          >
+            <Text style={[styles.backButtonText, { color: colors.text }]}>
+              {isLoggingOut ? "Signing out..." : "Back to home"}
+            </Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.keyboardView}
+      >
+        <View style={styles.content}>
+          <Text style={[styles.title, { color: colors.text }]}>
+            Enter verification code
+          </Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+            We sent a 6-digit code to{"\n"}
+            <Text style={{ fontWeight: "600" }}>{email}</Text>
+          </Text>
+
+          <View style={styles.otpContainer}>
+            {otp.map((digit, index) => (
+              <TextInput
+                key={index}
+                ref={(el) => (inputRefs.current[index] = el)}
+                style={[
+                  styles.otpInput,
+                  {
+                    borderColor: error ? "#dc2626" : colors.border,
+                    color: colors.text,
+                    backgroundColor: colors.background,
+                  },
+                ]}
+                value={digit}
+                onChangeText={(value) => handleChange(index, value)}
+                onKeyPress={({ nativeEvent }) =>
+                  handleKeyPress(index, nativeEvent.key)
+                }
+                keyboardType="number-pad"
+                maxLength={1}
+                editable={!isVerifying}
+                autoFocus={index === 0}
+                selectTextOnFocus
+              />
+            ))}
+          </View>
+
+          {error && <Text style={styles.error}>{error}</Text>}
+
+          {isVerifying && (
+            <Text style={[styles.verifying, { color: colors.textSecondary }]}>
+              Verifying...
+            </Text>
+          )}
+
+          <Pressable
+            onPress={handleResend}
+            disabled={resendDisabled}
+            style={styles.resendButton}
+          >
+            <Text
+              style={[
+                styles.resend,
+                {
+                  color: resendDisabled ? colors.textSecondary : colors.primary,
+                },
+              ]}
+            >
+              {resendDisabled
+                ? `Resend code in ${resendCountdown}s`
+                : "Didn't receive the code? Resend"}
+            </Text>
+          </Pressable>
+
+          <Pressable
+            style={[styles.backButton, { borderColor: colors.border }]}
+            onPress={handleBackToHome}
+            disabled={isLoggingOut}
+          >
+            <Text style={[styles.backButtonText, { color: colors.text }]}>
+              {isLoggingOut ? "Signing out..." : "Back to home"}
+            </Text>
+          </Pressable>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  content: {
+    flex: 1,
+    padding: 24,
+    justifyContent: "center",
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: 32,
+    lineHeight: 24,
+  },
+  otpContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 8,
+    marginBottom: 24,
+  },
+  otpInput: {
+    width: 48,
+    height: 56,
+    borderWidth: 1,
+    borderRadius: 8,
+    fontSize: 24,
+    textAlign: "center",
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+  },
+  error: {
+    color: "#dc2626",
+    textAlign: "center",
+    marginBottom: 16,
+    fontSize: 14,
+  },
+  verifying: {
+    textAlign: "center",
+    marginBottom: 16,
+    fontSize: 14,
+  },
+  resendButton: {
+    paddingVertical: 12,
+    marginBottom: 16,
+  },
+  resend: {
+    textAlign: "center",
+    fontSize: 14,
+  },
+  backButton: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  backButtonText: {
+    textAlign: "center",
+    fontSize: 16,
+    fontWeight: "500",
+  },
+});

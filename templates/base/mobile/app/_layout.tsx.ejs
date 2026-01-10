@@ -1,17 +1,24 @@
-import { Stack, router } from 'expo-router';
-import { useEffect<% if (features.sessionManagement) { %>, useState<% } %> } from 'react';
+import { Stack, router<% if (features.authentication.enabled) { %>, useSegments<% } %> } from 'expo-router';
+import { useEffect, useRef<% if (!features.sessionManagement) { %>, useState<% } %> } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import Constants from 'expo-constants';
 import { ThemeProvider } from '@/context/ThemeContext';
+import { Toast } from '@/components/ui/Toast';
 <% if (features.onboarding.enabled) { %>import AsyncStorage from '@react-native-async-storage/async-storage';
 <% } %><% if (integrations.revenueCat.enabled || integrations.adjust.enabled || integrations.scate.enabled) { %>import { initializeSDKs } from '@/services/sdkInitializer';
 <% } %><% if (features.sessionManagement) { %>import { useSessionActions, useSession } from '../src/store/deviceSession.store';
+<% } %><% if (features.authentication.enabled) { %>import { useAuth } from '../src/hooks';
 <% } %>import { logger } from '../src/utils/logger';
 
 export default function RootLayout() {
-<% if (features.sessionManagement) { %>  const { initializeSession } = useSessionActions();
+<% if (features.sessionManagement) { %>  const { initializeSession, isSessionValid } = useSessionActions();
   const { isSessionChecked } = useSession();
 <% } else { %>  const [isReady, setIsReady] = useState(false);
+<% } %><% if (features.authentication.enabled) { %>  const { isAuthenticated, isPending: isAuthPending<% if (features.authentication.emailVerification) { %>, user<% } %> } = useAuth();
+  const segments = useSegments();
 <% } %>
+  const appState = useRef(AppState.currentState);
+
   // Get feature flags from app.json
   const onboardingEnabled = Constants.expoConfig?.extra?.features?.onboarding?.enabled ?? false;
 
@@ -44,7 +51,12 @@ export default function RootLayout() {
         logger.info('RootLayout: Initializing session');
         await initializeSession();
 <% } %>
-        router.replace('/(tabs)');
+<% if (features.authentication.enabled) { %>        // Route based on authentication state
+        // Note: The actual routing will happen in the useEffect below once auth state is known
+        // For now, just mark initialization complete
+        logger.info('RootLayout: Waiting for auth state...');
+<% } else { %>        router.replace('/(tabs)');
+<% } %>
       } catch (error) {
         logger.error('RootLayout: Failed to initialize app', { error });
         // Fallback to tabs on error
@@ -57,15 +69,86 @@ export default function RootLayout() {
     initializeApp();
   }, [<% if (features.sessionManagement) { %>isSessionChecked, initializeSession, <% } %>onboardingEnabled]);
 
+<% if (features.sessionManagement) { %>
+  // Revalidate session when app comes to foreground
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      // App came to foreground from background/inactive
+      if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+        logger.debug('RootLayout: App came to foreground, revalidating session');
+        isSessionValid();
+      }
+      appState.current = nextAppState;
+    });
+
+    return () => subscription.remove();
+  }, [isSessionValid]);
+<% } %>
+<% if (features.authentication.enabled) { %>
+  // Route based on authentication state<% if (features.authentication.emailVerification) { %> and email verification<% } %>
+  useEffect(() => {
+    // Wait for auth state to be determined
+    if (isAuthPending) {
+      return;
+    }
+
+    // Get current route group/screen
+    const currentRoute = segments[0];
+    const inAuthGroup = currentRoute === '(auth)';
+    const inPublicGroup = currentRoute === '(public)';
+    const inTabsGroup = currentRoute === '(tabs)';
+<% if (features.onboarding.enabled) { %>    const inOnboardingGroup = currentRoute === '(onboarding)';
+<% } %><% if (features.authentication.emailVerification) { %>    const onVerifyEmail = currentRoute === 'verify-email';
+<% } %>
+    // Don't interfere with<% if (features.onboarding.enabled) { %> onboarding or<% } %> auth modal flows
+    if (<% if (features.onboarding.enabled) { %>inOnboardingGroup || <% } %>inAuthGroup) {
+      return;
+    }
+
+    logger.info('RootLayout: Auth state determined', {
+      isAuthenticated,
+<% if (features.authentication.emailVerification) { %>      emailVerified: user?.emailVerified,
+<% } %>      currentRoute
+    });
+
+    if (isAuthenticated) {
+<% if (features.authentication.emailVerification) { %>      // Check if email verification is required
+      if (user && user.emailVerified === false) {
+        // Unverified - navigate to full-screen verify-email
+        if (!onVerifyEmail) {
+          router.replace(`/verify-email?email=${encodeURIComponent(user.email)}`);
+        }
+      } else {
+        // Verified - navigate to tabs
+        if (!inTabsGroup) {
+          router.replace('/(tabs)');
+        }
+      }
+<% } else { %>      // Only navigate if not already in tabs
+      if (!inTabsGroup) {
+        router.replace('/(tabs)');
+      }
+<% } %>    } else {
+      // Not authenticated - navigate to public
+      if (!inPublicGroup) {
+        router.replace('/(public)');
+      }
+    }
+  }, [isAuthenticated, isAuthPending, <% if (features.authentication.emailVerification) { %>user, <% } %>segments]);
+<% } %>
+
   return (
     <ThemeProvider>
       <Stack screenOptions={{ headerShown: false }}>
 <% if (features.onboarding.enabled) { %>        <Stack.Screen name="(onboarding)" />
-<% } %><% if (features.authentication.enabled) { %>        <Stack.Screen name="(auth)" />
-<% } %><% if (features.paywall) { %>        <Stack.Screen name="paywall" options={{ presentation: 'modal' }} />
+<% } %><% if (features.authentication.enabled) { %>        <Stack.Screen name="(public)" />
+        <Stack.Screen name="(auth)" options={{ presentation: 'modal' }} />
+<% if (features.authentication.emailVerification) { %>        <Stack.Screen name="verify-email" />
+<% } %><% } %><% if (features.paywall) { %>        <Stack.Screen name="paywall" options={{ presentation: 'modal' }} />
 <% } %>        <Stack.Screen name="(tabs)" />
         <Stack.Screen name="+not-found" />
       </Stack>
+      <Toast />
     </ThemeProvider>
   );
 }

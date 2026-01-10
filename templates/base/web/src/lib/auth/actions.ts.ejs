@@ -39,6 +39,9 @@ interface SignInResult {
   success: boolean;
   error?: string;
   session?: AuthSession;
+<% if (features.authentication.emailVerification) { %>
+  needsEmailVerification?: boolean;
+<% } %>
 }
 
 interface SignUpResult {
@@ -108,6 +111,17 @@ export async function signIn(email: string, password: string): Promise<SignInRes
     // Get session data
     const session = await getSession();
 
+<% if (features.authentication.emailVerification) { %>
+    // Check if email verification is needed
+    if (session?.user?.emailVerified === false) {
+      return {
+        success: true,
+        session: session,
+        needsEmailVerification: true,
+      };
+    }
+<% } %>
+
     return { success: true, session: session || undefined };
   } catch (error) {
     console.error('Sign in error:', error);
@@ -142,12 +156,19 @@ export async function signUp(
 <% if (features.authentication.emailVerification) { %>
     const data = await response.json();
 
-    // Check if email verification is required
-    if (data.emailVerificationRequired) {
+    // Extract and set session token (user IS logged in even if email not verified)
+    const sessionToken = extractSessionToken(response);
+    if (sessionToken) {
+      await setSessionCookie(sessionToken);
+    }
+
+    // Check if email verification is needed by checking user's emailVerified status
+    if (data.user?.emailVerified === false) {
       return { success: true, needsEmailVerification: true };
     }
-<% } %>
 
+    return { success: true };
+<% } else { %>
     // Extract and set session token
     const sessionToken = extractSessionToken(response);
 
@@ -156,6 +177,7 @@ export async function signUp(
     }
 
     return { success: true };
+<% } %>
   } catch (error) {
     console.error('Sign up error:', error);
     return { success: false, error: 'An error occurred during sign up' };
@@ -275,25 +297,55 @@ export async function resetPassword(
 
 <% if (features.authentication.emailVerification) { %>
 /**
- * Verify email with token
+ * Send verification OTP to email
  */
-export async function verifyEmail(token: string): Promise<{ success: boolean; error?: string }> {
+export async function sendVerificationOtp(email: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const response = await fetch(`${AUTH_CONFIG.backendUrl}/api/auth/verify-email`, {
+    const response = await fetch(`${AUTH_CONFIG.backendUrl}/api/auth/email-otp/send-verification-otp`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token }),
+      body: JSON.stringify({ email, type: 'email-verification' }),
       cache: 'no-store',
     });
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      return { success: false, error: error.message || 'Failed to verify email' };
+      return { success: false, error: error.message || 'Failed to send verification code' };
     }
 
     return { success: true };
   } catch (error) {
-    console.error('Email verification error:', error);
+    console.error('Send OTP error:', error);
+    return { success: false, error: 'An error occurred' };
+  }
+}
+
+/**
+ * Verify email with OTP code
+ */
+export async function verifyEmailOtp(email: string, otp: string): Promise<{
+  success: boolean;
+  error?: string;
+  session?: AuthSession;
+}> {
+  try {
+    const response = await fetch(`${AUTH_CONFIG.backendUrl}/api/auth/email-otp/verify-email`, {
+      method: 'POST',
+      headers: await buildAuthHeaders(),  // Include existing session cookie
+      body: JSON.stringify({ email, otp }),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      return { success: false, error: error.message || 'Invalid verification code' };
+    }
+
+    // Get the updated session (emailVerified is now true)
+    const session = await getSession();
+    return { success: true, session: session || undefined };
+  } catch (error) {
+    console.error('Verify OTP error:', error);
     return { success: false, error: 'An error occurred' };
   }
 }

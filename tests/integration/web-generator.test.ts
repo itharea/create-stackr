@@ -183,6 +183,141 @@ describe('Integration: Web Template Generation', () => {
       expect(packageJson.scripts.build).toBe('next build');
       expect(packageJson.scripts.start).toBe('next start');
     });
+
+    it('should include sonner dependency when authentication enabled', async () => {
+      const config: ProjectConfig = {
+        projectName: 'web-sonner-test',
+        packageManager: 'npm',
+        appScheme: 'websonnertest',
+        platforms: ['web'],
+        features: {
+          onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
+          authentication: {
+            enabled: true,
+            providers: { emailPassword: true, google: false, apple: false, github: false },
+            emailVerification: false,
+            passwordReset: true,
+            twoFactor: false,
+          },
+          paywall: false,
+          sessionManagement: false,
+        },
+        integrations: {
+          revenueCat: { enabled: false, iosKey: '', androidKey: '' },
+          adjust: { enabled: false, appToken: '', environment: 'sandbox' },
+          scate: { enabled: false, apiKey: '' },
+          att: { enabled: false },
+        },
+        backend: {
+          database: 'postgresql',
+          orm: 'prisma',
+          eventQueue: false,
+          docker: true,
+        },
+        preset: 'minimal',
+        customized: false,
+      };
+
+      const generator = new ProjectGenerator(config);
+      const projectDir = path.join(tempDir, 'web-sonner-test');
+      await generator.generate(projectDir);
+
+      const packageJson = await fs.readJSON(path.join(projectDir, 'web/package.json'));
+
+      // Verify sonner is included when authentication is enabled
+      expect(packageJson.dependencies.sonner).toBeDefined();
+    });
+
+    it('should include input-otp dependency when emailVerification enabled', async () => {
+      const config: ProjectConfig = {
+        projectName: 'web-otp-test',
+        packageManager: 'npm',
+        appScheme: 'webotptest',
+        platforms: ['web'],
+        features: {
+          onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
+          authentication: {
+            enabled: true,
+            providers: { emailPassword: true, google: false, apple: false, github: false },
+            emailVerification: true,
+            passwordReset: true,
+            twoFactor: false,
+          },
+          paywall: false,
+          sessionManagement: false,
+        },
+        integrations: {
+          revenueCat: { enabled: false, iosKey: '', androidKey: '' },
+          adjust: { enabled: false, appToken: '', environment: 'sandbox' },
+          scate: { enabled: false, apiKey: '' },
+          att: { enabled: false },
+        },
+        backend: {
+          database: 'postgresql',
+          orm: 'prisma',
+          eventQueue: false,
+          docker: true,
+        },
+        preset: 'minimal',
+        customized: false,
+      };
+
+      const generator = new ProjectGenerator(config);
+      const projectDir = path.join(tempDir, 'web-otp-test');
+      await generator.generate(projectDir);
+
+      const packageJson = await fs.readJSON(path.join(projectDir, 'web/package.json'));
+
+      // Verify input-otp is included when emailVerification is enabled
+      expect(packageJson.dependencies['input-otp']).toBeDefined();
+
+      // Verify input-otp component is generated
+      expect(await fs.pathExists(path.join(projectDir, 'web/src/components/ui/input-otp.tsx'))).toBe(true);
+    });
+
+    it('should exclude input-otp when emailVerification disabled', async () => {
+      const config: ProjectConfig = {
+        projectName: 'web-no-otp-test',
+        packageManager: 'npm',
+        appScheme: 'webnootptest',
+        platforms: ['web'],
+        features: {
+          onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
+          authentication: {
+            enabled: true,
+            providers: { emailPassword: true, google: false, apple: false, github: false },
+            emailVerification: false,
+            passwordReset: true,
+            twoFactor: false,
+          },
+          paywall: false,
+          sessionManagement: false,
+        },
+        integrations: {
+          revenueCat: { enabled: false, iosKey: '', androidKey: '' },
+          adjust: { enabled: false, appToken: '', environment: 'sandbox' },
+          scate: { enabled: false, apiKey: '' },
+          att: { enabled: false },
+        },
+        backend: {
+          database: 'postgresql',
+          orm: 'prisma',
+          eventQueue: false,
+          docker: true,
+        },
+        preset: 'minimal',
+        customized: false,
+      };
+
+      const generator = new ProjectGenerator(config);
+      const projectDir = path.join(tempDir, 'web-no-otp-test');
+      await generator.generate(projectDir);
+
+      const packageJson = await fs.readJSON(path.join(projectDir, 'web/package.json'));
+
+      // Verify input-otp is NOT included when emailVerification is disabled
+      expect(packageJson.dependencies['input-otp']).toBeUndefined();
+    });
   });
 
   describe('web auth templates', () => {

@@ -1,0 +1,43 @@
+import { Tabs } from 'expo-router';
+import React from 'react';
+<% if (features.authentication.enabled) { %>
+import { ProtectedScreen } from '../../src/components/auth';
+<% } %>
+
+export default function TabLayout() {
+<% if (features.authentication.enabled) { %>
+  return (
+    <ProtectedScreen>
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarStyle: { display: 'none' },
+        }}
+      >
+        <Tabs.Screen
+          name="index"
+          options={{
+            title: 'Home',
+          }}
+        />
+      </Tabs>
+    </ProtectedScreen>
+  );
+<% } else { %>
+  return (
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle: { display: 'none' },
+      }}
+    >
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Home',
+        }}
+      />
+    </Tabs>
+  );
+<% } %>
+}

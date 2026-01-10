@@ -28,10 +28,20 @@ export function LoginForm({ redirectTo = "/dashboard" }: LoginFormProps) {
 
     try {
       const result = await signIn(email, password);
+
+<% if (features.authentication.emailVerification) { %>
+      // Check if email verification is needed (can happen on success)
+      if (result.needsEmailVerification) {
+        router.push(`/verify-email?email=${encodeURIComponent(email)}`);
+        return;
+      }
+<% } %>
+
       if (!result.success) {
         setError(result.error || "Failed to sign in");
         return;
       }
+
       if (result.session) setSession(result.session);
       router.push(redirectTo);
       router.refresh();

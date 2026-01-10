@@ -22,7 +22,9 @@
     "@radix-ui/react-label": "^2.1.8",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "tailwind-merge": "^3.4.0"<% if (features.authentication.enabled || features.sessionManagement) { %>,
+    "tailwind-merge": "^3.4.0"<% if (features.authentication.enabled) { %>,
+    "sonner": "^1.7.1"<% } %><% if (features.authentication.emailVerification) { %>,
+    "input-otp": "^1.4.2"<% } %><% if (features.authentication.enabled || features.sessionManagement) { %>,
     "zustand": "^5.0.2"<% } %>
   },
   "devDependencies": {
