@@ -1,11 +1,12 @@
-import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/actions";
 import { DashboardClient } from "./dashboard-client";
 
 export default async function DashboardPage() {
   const session = await getSession();
+
+  // If no session, ProtectedRoute in layout handles the redirect
   if (!session) {
-    redirect("/login?redirect=/dashboard");
+    return null;
   }
 
   return (

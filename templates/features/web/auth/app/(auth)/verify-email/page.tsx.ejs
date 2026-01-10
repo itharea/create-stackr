@@ -4,194 +4,159 @@ import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { verifyEmail } from "@/lib/auth/actions";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+  InputOTPSeparator,
+} from "@/components/ui/input-otp";
+import { verifyEmailOtp, sendVerificationOtp } from "@/lib/auth/actions";
+import { useAuthStore } from "@/store/auth.store";
 
 export default function VerifyEmailPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const token = searchParams.get("token");
   const email = searchParams.get("email");
 
-  const [status, setStatus] = useState<"idle" | "verifying" | "success" | "error">(
-    token ? "verifying" : "idle"
-  );
+  const [otp, setOtp] = useState("");
+  const [status, setStatus] = useState<"idle" | "verifying" | "success" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [resendDisabled, setResendDisabled] = useState(false);
+  const [resendCountdown, setResendCountdown] = useState(0);
 
+  // Auto-verify when all 6 digits entered
   useEffect(() => {
-    if (token && status === "verifying") {
-      handleVerify(token);
+    if (otp.length === 6 && email && status === "idle") {
+      handleVerify(otp);
     }
-  }, [token, status]);
+  }, [otp, email, status]);
 
-  const handleVerify = async (verificationToken: string) => {
-    try {
-      const result = await verifyEmail(verificationToken);
+  // Countdown timer with proper cleanup
+  useEffect(() => {
+    if (resendCountdown <= 0) return;
 
-      if (!result.success) {
-        setStatus("error");
-        setError(result.error || "Failed to verify email");
-        return;
-      }
+    const timer = setTimeout(() => {
+      setResendCountdown((prev) => {
+        if (prev <= 1) {
+          setResendDisabled(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
-      setStatus("success");
-      // Redirect to login after 3 seconds
-      setTimeout(() => {
-        router.push("/login?message=Email+verified+successfully");
-      }, 3000);
-    } catch (err) {
+    return () => clearTimeout(timer);
+  }, [resendCountdown]);
+
+  const handleVerify = async (code: string) => {
+    if (!email) return;
+    setStatus("verifying");
+    setError(null);
+
+    const result = await verifyEmailOtp(email, code);
+
+    if (!result.success) {
       setStatus("error");
-      setError("An unexpected error occurred");
-      console.error("Email verification error:", err);
+      setError(result.error || "Invalid code");
+      setOtp("");
+      return;
+    }
+
+    if (result.session) {
+      setStatus("success");
+      useAuthStore.getState().setSession(result.session);
+      router.push("/dashboard");
+    } else {
+      setStatus("error");
+      setError("Verification succeeded but sign-in failed. Please sign in manually.");
     }
   };
 
-  // Waiting for user to check their email
-  if (status === "idle" && email) {
+  const handleResend = async () => {
+    if (!email || resendDisabled) return;
+
+    setResendDisabled(true);
+    setResendCountdown(60);
+    setError(null);
+
+    const result = await sendVerificationOtp(email);
+    if (!result.success) {
+      setError(result.error || "Failed to resend code");
+    }
+  };
+
+  if (!email) {
     return (
-      <div className="space-y-6">
-        <div className="space-y-2 text-center">
-          <div className="mx-auto w-12 h-12 bg-blue-100 dark:bg-blue-950/20 rounded-full flex items-center justify-center">
-            <svg
-              className="w-6 h-6 text-blue-600 dark:text-blue-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-              />
-            </svg>
-          </div>
-          <h2 className="text-2xl font-bold">Check your email</h2>
-          <p className="text-muted-foreground">
-            We&apos;ve sent a verification link to <strong>{email}</strong>
-          </p>
-        </div>
-
-        <div className="text-sm text-muted-foreground text-center space-y-2">
-          <p>Click the link in the email to verify your account.</p>
-          <p>
-            Didn&apos;t receive the email? Check your spam folder.
-          </p>
-        </div>
-
+      <div className="space-y-6 text-center">
+        <h2 className="text-2xl font-bold">Verify your email</h2>
+        <p className="text-muted-foreground">No email address provided.</p>
         <Link href="/login">
-          <Button variant="outline" className="w-full">
-            Back to sign in
-          </Button>
+          <Button variant="outline" className="w-full">Back to sign in</Button>
         </Link>
       </div>
     );
   }
 
-  // Verifying token
-  if (status === "verifying") {
-    return (
-      <div className="space-y-6">
-        <div className="space-y-2 text-center">
-          <div className="mx-auto w-12 h-12 flex items-center justify-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          </div>
-          <h2 className="text-2xl font-bold">Verifying your email</h2>
-          <p className="text-muted-foreground">
-            Please wait while we verify your email address...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // Verification successful
-  if (status === "success") {
-    return (
-      <div className="space-y-6">
-        <div className="space-y-2 text-center">
-          <div className="mx-auto w-12 h-12 bg-green-100 dark:bg-green-950/20 rounded-full flex items-center justify-center">
-            <svg
-              className="w-6 h-6 text-green-600 dark:text-green-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M5 13l4 4L19 7"
-              />
-            </svg>
-          </div>
-          <h2 className="text-2xl font-bold">Email verified!</h2>
-          <p className="text-muted-foreground">
-            Your email has been verified. Redirecting you to sign in...
-          </p>
-        </div>
-
-        <Link href="/login">
-          <Button className="w-full">Continue to sign in</Button>
-        </Link>
-      </div>
-    );
-  }
-
-  // Verification error
-  if (status === "error") {
-    return (
-      <div className="space-y-6">
-        <div className="space-y-2 text-center">
-          <div className="mx-auto w-12 h-12 bg-red-100 dark:bg-red-950/20 rounded-full flex items-center justify-center">
-            <svg
-              className="w-6 h-6 text-red-600 dark:text-red-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </div>
-          <h2 className="text-2xl font-bold">Verification failed</h2>
-          <p className="text-muted-foreground">
-            {error || "Unable to verify your email address"}
-          </p>
-        </div>
-
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground text-center">
-            The verification link may have expired or already been used.
-          </p>
-
-          <Link href="/login">
-            <Button variant="outline" className="w-full">
-              Back to sign in
-            </Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  // No token or email - generic page
   return (
     <div className="space-y-6">
       <div className="space-y-2 text-center">
-        <h2 className="text-2xl font-bold">Verify your email</h2>
+        <h2 className="text-2xl font-bold">Enter verification code</h2>
         <p className="text-muted-foreground">
-          Please check your email for a verification link.
+          We sent a 6-digit code to <strong>{email}</strong>
         </p>
       </div>
 
+      {/* OTP Input using shadcn InputOTP */}
+      <div className="flex justify-center">
+        <InputOTP
+          maxLength={6}
+          value={otp}
+          onChange={setOtp}
+          disabled={status === "verifying"}
+        >
+          <InputOTPGroup>
+            <InputOTPSlot index={0} />
+            <InputOTPSlot index={1} />
+            <InputOTPSlot index={2} />
+          </InputOTPGroup>
+          <InputOTPSeparator />
+          <InputOTPGroup>
+            <InputOTPSlot index={3} />
+            <InputOTPSlot index={4} />
+            <InputOTPSlot index={5} />
+          </InputOTPGroup>
+        </InputOTP>
+      </div>
+
+      {error && (
+        <p className="text-sm text-red-500 text-center">{error}</p>
+      )}
+
+      {status === "verifying" && (
+        <div className="flex justify-center">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </div>
+      )}
+
+      {status === "success" && (
+        <div className="text-center">
+          <p className="text-sm text-green-600">Email verified! Redirecting...</p>
+        </div>
+      )}
+
+      <div className="text-center text-sm text-muted-foreground">
+        Didn&apos;t receive the code?{" "}
+        <button
+          onClick={handleResend}
+          disabled={resendDisabled}
+          className="text-primary hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {resendDisabled ? `Resend in ${resendCountdown}s` : "Resend"}
+        </button>
+      </div>
+
       <Link href="/login">
-        <Button variant="outline" className="w-full">
-          Back to sign in
-        </Button>
+        <Button variant="outline" className="w-full">Back to sign in</Button>
       </Link>
     </div>
   );

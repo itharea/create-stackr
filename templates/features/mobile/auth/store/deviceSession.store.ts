@@ -1,8 +1,10 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { deviceSessionService, DeviceSession, DeviceSessionMigrationEligibilityResponse } from '../services/deviceSession';
+import { deviceSessionService, DeviceSessionMigrationEligibilityResponse } from '../services/deviceSession';
+import type { DeviceSession } from '../types/deviceSession';
 import { logger } from '../utils/logger';
+import { useUIStore } from '@/store/ui.store';
 
 export interface MigrateSessionData {
   name: string;
@@ -158,17 +160,24 @@ export const useSessionStore = create<SessionState>()(
     isSessionValid: async () => {
       try {
         logger.debug('SessionStore: Checking session validity...');
-        
+
         const isValid = await deviceSessionService.isDeviceSessionValid();
-        
+
         if (!isValid && get().session) {
           // Session became invalid, clear it
           logger.warn('SessionStore: Session is no longer valid, clearing');
           set({ session: null, sessionToken: null, error: 'Session expired' });
+
+          // Show toast notification
+          useUIStore.getState().showNotification({
+            type: 'error',
+            title: 'Session Expired',
+            message: 'Your session has expired. Please sign in again.',
+          });
         }
-        
+
         return isValid;
-        
+
       } catch (error) {
         logger.error('SessionStore: Error checking session validity', { error });
         return false;

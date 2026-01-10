@@ -18,7 +18,8 @@ export {
   resetPassword,
   buildAuthHeaders,
 <% if (features.authentication.emailVerification) { %>
-  verifyEmail,
+  verifyEmailOtp,
+  sendVerificationOtp,
 <% } %>
   type User,
   type Session,

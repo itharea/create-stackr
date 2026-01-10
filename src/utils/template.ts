@@ -212,7 +212,7 @@ export function getDestinationPath(
 
     if (restOfPath.startsWith('app/') || restOfPath === 'app') {
       relativePath = `mobile/${restOfPath}`;
-    } else if (['services', 'store', 'hooks', 'components'].some(dir => restOfPath.startsWith(dir + '/') || restOfPath === dir)) {
+    } else if (['services', 'store', 'hooks', 'components', 'types'].some(dir => restOfPath.startsWith(dir + '/') || restOfPath === dir)) {
       relativePath = `mobile/src/${restOfPath}`;
     } else {
       relativePath = `mobile/${restOfPath}`;

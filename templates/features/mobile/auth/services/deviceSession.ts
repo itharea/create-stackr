@@ -6,16 +6,8 @@ import { Platform } from 'react-native';
 import * as Application from 'expo-application';
 import * as SecureStore from 'expo-secure-store';
 
-export interface DeviceSession {
-  id: string;
-  deviceId: string;
-  sessionToken: string;
-  createdAt: string;
-  lastActiveAt: string;
-  migrated: boolean;
-  migratedToUserId?: string;
-  preferredCurrency: string;
-}
+export type { DeviceSession } from '../types/deviceSession';
+import type { DeviceSession } from '../types/deviceSession';
 
 export interface CreateDeviceSessionResponse {
   session: DeviceSession;

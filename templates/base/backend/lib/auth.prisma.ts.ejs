@@ -1,8 +1,8 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { expo } from "@better-auth/expo";
-<% if (features.authentication.twoFactor) { %>
-import { twoFactor } from "better-auth/plugins";
+<% if (features.authentication.twoFactor || features.authentication.emailVerification) { %>
+import { <% if (features.authentication.twoFactor) { %>twoFactor, <% } %><% if (features.authentication.emailVerification) { %>emailOTP<% } %> } from "better-auth/plugins";
 <% } %>
 import { db } from "../utils/db";
 <% if (features.authentication.emailVerification || features.authentication.passwordReset) { %>
@@ -16,7 +16,7 @@ export const auth = betterAuth({
   basePath: "/api/auth", // BetterAuth endpoints will be at /api/auth/*
   emailAndPassword: {
     enabled: true,
-    requireEmailVerification: <%= features.authentication.emailVerification %>,
+    requireEmailVerification: false,  // Allow sign-in, control access on frontend via ProtectedRoute
 <% if (features.authentication.passwordReset) { %>
     sendResetPassword: async ({ user, url }) => {
       await sendEmail({
@@ -32,21 +32,6 @@ export const auth = betterAuth({
     },
 <% } %>
   },
-<% if (features.authentication.emailVerification) { %>
-  emailVerification: {
-    sendVerificationEmail: async ({ user, url }) => {
-      await sendEmail({
-        to: user.email,
-        subject: "Verify your email address",
-        html: `
-          <h1>Verify your email</h1>
-          <p>Click the link below to verify your email address:</p>
-          <a href="${url}">Verify Email</a>
-        `,
-      });
-    },
-  },
-<% } %>
 <% if (features.authentication.providers.google || features.authentication.providers.apple || features.authentication.providers.github) { %>
   socialProviders: {
 <% if (features.authentication.providers.google) { %>
@@ -74,6 +59,27 @@ export const auth = betterAuth({
     expo(), // Required for React Native/Expo OAuth deep link handling
 <% if (features.authentication.twoFactor) { %>
     twoFactor(),
+<% } %>
+<% if (features.authentication.emailVerification) { %>
+    emailOTP({
+      otpLength: 6,
+      expiresIn: 300, // 5 minutes
+      sendVerificationOnSignUp: true,
+      async sendVerificationOTP({ email, otp, type }) {
+        if (type === 'email-verification') {
+          await sendEmail({
+            to: email,
+            subject: "Your verification code",
+            html: `
+              <h1>Verify your email</h1>
+              <p>Your verification code is:</p>
+              <h2 style="font-size: 32px; letter-spacing: 8px; font-family: monospace;">${otp}</h2>
+              <p>This code expires in 5 minutes.</p>
+            `,
+          });
+        }
+      },
+    }),
 <% } %>
   ],
   session: {

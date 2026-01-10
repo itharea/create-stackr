@@ -1,12 +1,13 @@
-import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/actions";
 import { listSessions } from "@/lib/auth/sessions";
 import { SessionsClient } from "./sessions-client";
 
 export default async function SessionsPage() {
   const authSession = await getSession();
+
+  // If no session, ProtectedRoute in layout handles the redirect
   if (!authSession) {
-    redirect("/login?redirect=/settings/sessions");
+    return null;
   }
 
   const { sessions } = await listSessions();

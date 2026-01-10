@@ -134,6 +134,11 @@ describe('Template Utils', () => {
       expect(result).toBe('/target/mobile/src/services/auth.ts');
     });
 
+    it('should map features types to mobile/src/types', () => {
+      const result = getDestinationPath('features/mobile/auth/types/deviceSession.ts', '/target');
+      expect(result).toBe('/target/mobile/src/types/deviceSession.ts');
+    });
+
     it('should map integrations to mobile/src', () => {
       const result = getDestinationPath('integrations/mobile/revenuecat/services/revenuecatService.ts', '/target');
       expect(result).toBe('/target/mobile/src/services/revenuecatService.ts');

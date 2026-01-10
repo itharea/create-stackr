@@ -11,33 +11,26 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { router } from 'expo-router';
-import Constants from 'expo-constants';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useAuth } from '../../src/hooks';
-import { useSessionActions } from '../../src/store/deviceSession.store';
-import { Button, Input } from '../../src/components/ui';
-import { IconSymbol } from '../../src/components/ui/IconSymbol';
-import { formatDisplayName } from '../../src/utils/formatters';
+import { useAuth } from '@/hooks';
+import { Button, Input } from '@/components/ui';
+import { IconSymbol } from '@/components/ui/IconSymbol';
+import { formatDisplayName } from '@/utils/formatters';
 import { useAppTheme, AppTheme } from '@/context/ThemeContext';
 
 export default function HomeScreen() {
   const theme = useAppTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const { user, signOut, deleteAccount, isLoading, isAuthenticated } = useAuth();
-  const { deleteSession, initializeSession } = useSessionActions();
+  const { user, signOut, deleteAccount, isLoading } = useAuth();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
-  const [showDeleteSessionModal, setShowDeleteSessionModal] = useState(false);
-  const [deleteSessionConfirmText, setDeleteSessionConfirmText] = useState('');
-  const [isDeletingSession, setIsDeletingSession] = useState(false);
 
   // Gradient colors based on theme
   const gradientColors = theme.mode === 'dark'
     ? [theme.colors.card, 'transparent'] as const
-    : ['#ffffff', '#f8fafc'] as const; // Subtle fade for light mode
+    : ['#ffffff', '#f8fafc'] as const;
 
   const handleLogout = async () => {
     const result = await signOut();
@@ -61,32 +54,6 @@ export default function HomeScreen() {
       setDeleteConfirmText('');
     } else {
       Alert.alert('Error', result.error || 'Failed to delete account. Please try again.');
-    }
-  };
-
-  const handleDeleteSession = async () => {
-    if (deleteSessionConfirmText !== 'DELETE') {
-      return;
-    }
-
-    setIsDeletingSession(true);
-    try {
-      await deleteSession();
-      const onboardingEnabled = Constants.expoConfig?.extra?.features?.onboarding?.enabled ?? false;
-      setShowDeleteSessionModal(false);
-      setDeleteSessionConfirmText('');
-
-      if (!onboardingEnabled) {
-        await initializeSession();
-      } else {
-        router.replace('/(onboarding)/page-1');
-      }
-    } catch (error) {
-      console.error('Failed to delete/recreate session:', error);
-      setShowDeleteSessionModal(false);
-      setDeleteSessionConfirmText('');
-    } finally {
-      setIsDeletingSession(false);
     }
   };
 
@@ -149,49 +116,21 @@ export default function HomeScreen() {
           </LinearGradient>
 
           <View style={styles.actions}>
-            {isAuthenticated ? (
-              <>
-                <Button
-                  title="Logout"
-                  variant="outline"
-                  onPress={handleLogout}
-                  loading={isLoading}
-                  style={styles.logoutButton}
-                />
+            <Button
+              title="Logout"
+              variant="outline"
+              onPress={handleLogout}
+              loading={isLoading}
+              style={styles.logoutButton}
+            />
 
-                <Button
-                  title="Delete Account"
-                  variant="outline"
-                  onPress={() => setShowDeleteModal(true)}
-                  style={styles.deleteButton}
-                  textStyle={styles.deleteButtonText}
-                />
-              </>
-            ) : (
-              <>
-                <Button
-                  title="Sign In"
-                  variant="primary"
-                  onPress={() => router.push('/(auth)/login')}
-                  style={styles.signInButton}
-                />
-
-                <Button
-                  title="Create Account"
-                  variant="outline"
-                  onPress={() => router.push('/(auth)/register')}
-                  style={styles.createAccountButton}
-                />
-
-                <Button
-                  title="Delete Session"
-                  variant="outline"
-                  onPress={() => setShowDeleteSessionModal(true)}
-                  style={styles.deleteSessionButton}
-                  textStyle={styles.deleteSessionButtonText}
-                />
-              </>
-            )}
+            <Button
+              title="Delete Account"
+              variant="outline"
+              onPress={() => setShowDeleteModal(true)}
+              style={styles.deleteButton}
+              textStyle={styles.deleteButtonText}
+            />
           </View>
         </View>
       </ScrollView>
@@ -265,69 +204,6 @@ export default function HomeScreen() {
           </Pressable>
         </KeyboardAvoidingView>
       </Modal>
-
-      {/* Delete Session Confirmation Modal */}
-      <Modal
-        visible={showDeleteSessionModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowDeleteSessionModal(false)}
-        statusBarTranslucent
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardAvoidingModal}
-        >
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => setShowDeleteSessionModal(false)}
-          >
-            <Pressable
-              style={styles.modalContent}
-              onPress={(e) => e.stopPropagation()}
-            >
-              <Text style={styles.modalTitle}>Delete Session</Text>
-
-              <View style={styles.warningContainer}>
-                <Text style={styles.warningTitle}>Warning</Text>
-                <Text style={styles.warningText}>
-                  This will delete your anonymous session and all local data. You'll need to go through onboarding again.
-                </Text>
-              </View>
-
-              <Input
-                label="Type DELETE to confirm"
-                value={deleteSessionConfirmText}
-                onChangeText={setDeleteSessionConfirmText}
-                placeholder="DELETE"
-                autoCapitalize="characters"
-                containerStyle={styles.confirmInput}
-              />
-
-              <View style={styles.modalActions}>
-                <Button
-                  title="Cancel"
-                  variant="outline"
-                  onPress={() => {
-                    setShowDeleteSessionModal(false);
-                    setDeleteSessionConfirmText('');
-                  }}
-                  style={styles.modalButton}
-                />
-
-                <Button
-                  title={isDeletingSession ? "Deleting..." : "Delete"}
-                  variant="primary"
-                  onPress={handleDeleteSession}
-                  disabled={deleteSessionConfirmText !== 'DELETE'}
-                  loading={isDeletingSession}
-                  style={StyleSheet.flatten([styles.modalButton, styles.deleteConfirmButton])}
-                />
-              </View>
-            </Pressable>
-          </Pressable>
-        </KeyboardAvoidingView>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -357,7 +233,6 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
   },
 
   userInfo: {
-    // Removed solid background
     borderRadius: theme.borderRadius.xl,
     padding: theme.spacing[5],
     marginBottom: theme.spacing[6],
@@ -385,7 +260,6 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
   },
 
   section: {
-    // Removed solid background
     borderRadius: theme.borderRadius.xl,
     padding: theme.spacing[6],
     marginBottom: theme.spacing[6],
@@ -450,23 +324,6 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
     color: theme.colors.error,
   },
 
-  signInButton: {
-    marginTop: theme.spacing[4],
-  },
-
-  createAccountButton: {
-    marginTop: theme.spacing[3],
-  },
-
-  deleteSessionButton: {
-    marginTop: theme.spacing[3],
-    borderColor: theme.colors.error,
-  },
-
-  deleteSessionButtonText: {
-    color: theme.colors.error,
-  },
-
   // Modal styles
   keyboardAvoidingModal: {
     flex: 1,
@@ -501,13 +358,13 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
   },
 
   warningContainer: {
-    backgroundColor: 'transparent', // No more solid gray block
+    backgroundColor: 'transparent',
     borderRadius: theme.borderRadius.lg,
     padding: theme.spacing[4],
     marginBottom: theme.spacing[5],
     borderWidth: 1,
-    borderColor: theme.colors.warning, // Outline instead
-    borderStyle: 'dashed', // Optional stylish touch
+    borderColor: theme.colors.warning,
+    borderStyle: 'dashed',
   },
 
   warningTitle: {
@@ -560,6 +417,6 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
 
   deleteConfirmButton: {
     backgroundColor: theme.colors.error,
-    borderWidth: 0, // Solid button
+    borderWidth: 0,
   },
 });

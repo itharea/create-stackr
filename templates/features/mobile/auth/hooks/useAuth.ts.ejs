@@ -64,7 +64,14 @@ export const useAuth = () => {
       if (result.error) {
         throw new Error(result.error.message || 'Sign up failed');
       }
+<% if (features.authentication.emailVerification) { %>
+      // Check if email verification is required
+      // When emailOTP plugin is enabled with sendVerificationOnSignUp,
+      // the user needs to verify their email before being signed in
+      return { success: true, needsEmailVerification: true, email: data.email };
+<% } else { %>
       return { success: true };
+<% } %>
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Sign up failed';
       setError(message);

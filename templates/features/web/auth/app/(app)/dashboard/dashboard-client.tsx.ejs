@@ -20,7 +20,7 @@ export function DashboardClient({ user }: DashboardClientProps) {
     setIsSigningOut(true);
     try {
       await signOut();
-      router.push("/login");
+      // ProtectedRoute handles redirect to /login
       router.refresh();
     } catch (error) {
       console.error("Sign out error:", error);

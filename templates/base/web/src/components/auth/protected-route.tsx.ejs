@@ -4,7 +4,8 @@ import { useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/hooks/use-session";
 import { getSession } from "@/lib/auth/actions";
-import { useAuthActions } from "@/store/auth.store";
+import { toast } from "sonner";
+import { useAuthActions, useAuthStore } from "@/store/auth.store";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -41,8 +42,9 @@ export function ProtectedRoute({
   redirectTo = "/login",
   loadingComponent,
 }: ProtectedRouteProps) {
-  const { isAuthenticated, isLoading } = useSession();
+  const { isAuthenticated, isLoading, user } = useSession();
   const { handleAuthError } = useAuthActions();
+  const authError = useAuthStore((state) => state.error);
   const router = useRouter();
 
   // Revalidate session when window regains focus
@@ -66,12 +68,28 @@ export function ProtectedRoute({
   // Redirect when not authenticated
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
+      // Show toast if this was a session expiration
+      if (authError === "Session expired") {
+        toast.error("Session Expired", {
+          description: "Your session has expired. Please sign in again.",
+        });
+      }
+
       // Include current path as redirect parameter
       const currentPath = window.location.pathname;
       const loginUrl = `${redirectTo}?redirect=${encodeURIComponent(currentPath)}`;
       router.push(loginUrl);
     }
-  }, [isAuthenticated, isLoading, redirectTo, router]);
+  }, [isAuthenticated, isLoading, redirectTo, router, authError]);
+
+<% if (features.authentication.emailVerification) { %>
+  // Redirect when email is not verified
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && user && user.emailVerified === false) {
+      router.push(`/verify-email?email=${encodeURIComponent(user.email)}`);
+    }
+  }, [isAuthenticated, isLoading, user, router]);
+<% } %>
 
   // Show loading state
   if (isLoading) {
@@ -88,6 +106,13 @@ export function ProtectedRoute({
   if (!isAuthenticated) {
     return null;
   }
+
+<% if (features.authentication.emailVerification) { %>
+  // Don't render content if email is not verified
+  if (user && user.emailVerified === false) {
+    return null;
+  }
+<% } %>
 
   return <>{children}</>;
 }

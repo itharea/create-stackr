@@ -12,16 +12,17 @@ export default function RegisterScreen() {
 
   const { isAuthenticated } = useAuth();
 
-  // Watch for auth state changes (handles both native and browser OAuth)
+  // Watch for auth state changes - close modal when authenticated
+  // Root layout handles routing based on email verification status
   useEffect(() => {
     if (isAuthenticated) {
-      router.replace('/(tabs)');
+      // Close the auth modal - root layout will handle navigation
+      router.back();
     }
   }, [isAuthenticated]);
 
   const handleRegisterSuccess = () => {
-    // Navigate to the main app (for email/password registration)
-    router.replace('/(tabs)');
+    // Navigation handled by useEffect watching isAuthenticated
   };
 
   const handleSwitchToLogin = () => {
