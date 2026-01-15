@@ -99,6 +99,11 @@ describe('Template Utils', () => {
       expect(shouldIncludeFile('base/backend/controllers/event-queue/index.ts', config)).toBe(true);
       expect(shouldIncludeFile('base/backend/controllers/event-queue/workers/user.ts', config)).toBe(true);
     });
+
+    it('should always exclude .gitkeep files', () => {
+      expect(shouldIncludeFile('base/mobile/src/.gitkeep', mockConfig)).toBe(false);
+      expect(shouldIncludeFile('features/mobile/auth/.gitkeep', mockConfig)).toBe(false);
+    });
   });
 
   describe('isTemplate', () => {
@@ -152,6 +157,22 @@ describe('Template Utils', () => {
     it('should remove .ejs extension', () => {
       const result = getDestinationPath('base/mobile/app.json.ejs', '/target');
       expect(result).toBe('/target/mobile/app.json');
+    });
+
+    it('should handle deeply nested paths', () => {
+      const result = getDestinationPath(
+        'base/mobile/src/components/ui/forms/input/index.tsx',
+        '/target'
+      );
+      expect(result).toBe('/target/mobile/src/components/ui/forms/input/index.tsx');
+    });
+
+    it('should handle paths with dots in directory names', () => {
+      const result = getDestinationPath(
+        'base/web/.next/cache/webpack/file.js',
+        '/target'
+      );
+      expect(result).toBe('/target/web/.next/cache/webpack/file.js');
     });
   });
 
