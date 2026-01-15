@@ -37,6 +37,18 @@ describe('validateProjectName', () => {
     expect(validateProjectName('my@app').valid).toBe(false);
     expect(validateProjectName('my#app').valid).toBe(false);
   });
+
+  it('should accept names at exactly 214 characters (boundary test)', () => {
+    const longName = 'a'.repeat(214);
+    const result = validateProjectName(longName);
+    expect(result.valid).toBe(true);
+  });
+
+  it('should reject names at exactly 215 characters (boundary test)', () => {
+    const longName = 'a'.repeat(215);
+    const result = validateProjectName(longName);
+    expect(result.valid).toBe(false);
+  });
 });
 
 describe('validateConfiguration', () => {
