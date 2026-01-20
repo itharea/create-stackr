@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/node/v/create-stackr)](https://nodejs.org)
 
-> **v0.2.0**: Now with OAuth, Drizzle ORM support, and Next.js for web. Feedback welcome!
+> **v0.3**: Now with Two-Factor Authentication, enhanced security headers, and improved CLI UX. Feedback welcome!
 
 Create production-ready fullstack apps with Expo (mobile), Next.js (web), and Node.js backend in minutes.
 
@@ -559,17 +559,22 @@ A: Yes, Next.js App Router uses React Server Components by default. Client compo
 
 ## Roadmap
 
+### Completed in v0.3.0
+- [x] Two-Factor Authentication for mobile and web
+- [x] Enhanced security headers for Next.js
+- [x] Improved CLI UX for platform selection
+- [x] Better error handling and user feedback
+- [x] Improved documentation site
+
 ### Completed in v0.2.0
 - [x] OAuth support (Google, Apple, GitHub)
 - [x] BetterAuth authentication framework
 - [x] Drizzle ORM as alternative to Prisma
 - [x] Next.js web app support
 - [x] Native OAuth SDKs with browser fallback
-- [x] Two-factor authentication (TOTP)
 - [x] Email verification & password reset
 
 ### Upcoming
-- [ ] v0.3.0: Additional template customization
 - [ ] v0.4.0: More SDK integrations (Firebase, Supabase)
 - [ ] v1.0.0: Stable API, production-ready
 
