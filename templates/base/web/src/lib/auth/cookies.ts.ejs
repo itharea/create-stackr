@@ -72,3 +72,64 @@ export async function clearDeviceSessionCookie(): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.delete(COOKIE_NAMES.DEVICE_SESSION);
 }
+<% if (features.authentication.twoFactor) { %>
+
+/**
+ * Set the two-factor cookie for 2FA verification
+ * Stores both the token and expiration timestamp for client-side timeout handling
+ *
+ * Uses absolute expiration (expires) instead of relative (maxAge) to ensure
+ * frontend cookies expire at exactly the same time as backend cookies.
+ */
+export async function setTwoFactorCookie(
+  token: string,
+  expiresAt: number // Absolute Unix timestamp (seconds)
+): Promise<void> {
+  const cookieStore = await cookies();
+  const expiresDate = new Date(expiresAt * 1000); // Convert to Date object
+
+  // Store the token (httpOnly for security)
+  cookieStore.set(COOKIE_NAMES.TWO_FACTOR, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    expires: expiresDate, // Use absolute expiration directly
+  });
+
+  // Store expiration timestamp (readable by client for timeout handling)
+  cookieStore.set(COOKIE_NAMES.TWO_FACTOR_EXPIRES_AT, expiresAt.toString(), {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    expires: expiresDate, // Same absolute expiration
+  });
+}
+
+/**
+ * Get the two-factor token from cookies
+ */
+export async function getTwoFactorToken(): Promise<string | undefined> {
+  const cookieStore = await cookies();
+  return cookieStore.get(COOKIE_NAMES.TWO_FACTOR)?.value;
+}
+
+/**
+ * Get the two-factor expiration timestamp from cookies
+ */
+export async function getTwoFactorExpiresAt(): Promise<number | undefined> {
+  const cookieStore = await cookies();
+  const value = cookieStore.get(COOKIE_NAMES.TWO_FACTOR_EXPIRES_AT)?.value;
+  return value ? parseInt(value, 10) : undefined;
+}
+
+/**
+ * Clear all two-factor cookies
+ */
+export async function clearTwoFactorCookie(): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.delete(COOKIE_NAMES.TWO_FACTOR);
+  cookieStore.delete(COOKIE_NAMES.TWO_FACTOR_EXPIRES_AT);
+}
+<% } %>

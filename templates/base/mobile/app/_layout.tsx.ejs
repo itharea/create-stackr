@@ -2,12 +2,12 @@ import { Stack, router<% if (features.authentication.enabled) { %>, useSegments<
 import { useEffect, useRef<% if (!features.sessionManagement) { %>, useState<% } %> } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import Constants from 'expo-constants';
-import { ThemeProvider } from '@/context/ThemeContext';
-import { Toast } from '@/components/ui/Toast';
+import { ThemeProvider } from '@/context/theme-context';
+import { Toast } from '@/components/ui/toast';
 <% if (features.onboarding.enabled) { %>import AsyncStorage from '@react-native-async-storage/async-storage';
-<% } %><% if (integrations.revenueCat.enabled || integrations.adjust.enabled || integrations.scate.enabled) { %>import { initializeSDKs } from '@/services/sdkInitializer';
-<% } %><% if (features.sessionManagement) { %>import { useSessionActions, useSession } from '../src/store/deviceSession.store';
-<% } %><% if (features.authentication.enabled) { %>import { useAuth } from '../src/hooks';
+<% } %><% if (integrations.revenueCat.enabled || integrations.adjust.enabled || integrations.scate.enabled) { %>import { initializeSDKs } from '@/services/sdk-initializer';
+<% } %><% if (features.sessionManagement) { %>import { useSessionActions, useSession } from '../src/store/device-session-store';
+<% } %><% if (features.authentication.enabled) { %>import { useAuth } from '../src/hooks/auth';
 <% } %>import { logger } from '../src/utils/logger';
 
 export default function RootLayout() {
@@ -99,9 +99,10 @@ export default function RootLayout() {
     const inTabsGroup = currentRoute === '(tabs)';
 <% if (features.onboarding.enabled) { %>    const inOnboardingGroup = currentRoute === '(onboarding)';
 <% } %><% if (features.authentication.emailVerification) { %>    const onVerifyEmail = currentRoute === 'verify-email';
-<% } %>
-    // Don't interfere with<% if (features.onboarding.enabled) { %> onboarding or<% } %> auth modal flows
-    if (<% if (features.onboarding.enabled) { %>inOnboardingGroup || <% } %>inAuthGroup) {
+<% } %>    const onAccountScreen = currentRoute === 'account';
+
+    // Don't interfere with<% if (features.onboarding.enabled) { %> onboarding,<% } %> auth modal, or account screen flows
+    if (<% if (features.onboarding.enabled) { %>inOnboardingGroup || <% } %>inAuthGroup || onAccountScreen) {
       return;
     }
 
@@ -146,7 +147,8 @@ export default function RootLayout() {
 <% if (features.authentication.emailVerification) { %>        <Stack.Screen name="verify-email" />
 <% } %><% } %><% if (features.paywall) { %>        <Stack.Screen name="paywall" options={{ presentation: 'modal' }} />
 <% } %>        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="+not-found" />
+<% if (features.authentication.enabled) { %>        <Stack.Screen name="account" options={{ presentation: 'card' }} />
+<% } %>        <Stack.Screen name="+not-found" />
       </Stack>
       <Toast />
     </ThemeProvider>

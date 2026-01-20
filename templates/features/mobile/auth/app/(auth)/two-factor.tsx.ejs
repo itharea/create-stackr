@@ -1,0 +1,259 @@
+import React, { useState, useMemo } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Alert,
+  Switch,
+} from 'react-native';
+import { router } from 'expo-router';
+import { Button } from '../../src/components/ui/button';
+import { Input } from '../../src/components/ui/input';
+import { IconSymbol } from '../../src/components/ui/icon-symbol';
+import { useAppTheme, AppTheme } from '@/context/theme-context';
+import { useAuth } from '../../src/hooks/auth';
+import { useTwoFactorTimeout } from '../../src/hooks/two-factor-timeout';
+
+export default function TwoFactorScreen() {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  const { verifyTotpLogin, verifyBackupCode, isLoading } = useAuth();
+  const { isExpired } = useTwoFactorTimeout();
+
+  const [code, setCode] = useState('');
+  const [trustDevice, setTrustDevice] = useState(false);
+  const [useBackupCode, setUseBackupCode] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleVerify = async () => {
+    if (!code.trim()) {
+      setError('Please enter a code');
+      return;
+    }
+
+    // Check if session has expired before submitting
+    if (isExpired()) {
+      router.replace('/(auth)/two-factor-expired');
+      return;
+    }
+
+    setError(null);
+
+    const result = useBackupCode
+      ? await verifyBackupCode(code.trim())
+      : await verifyTotpLogin(code.trim(), trustDevice);
+
+    if (result.success) {
+      // Authentication complete - close auth modal
+      // Root layout will handle navigation based on auth state
+      if (router.canGoBack()) {
+        router.back();
+      }
+    } else {
+      Alert.alert('Verification Failed', result.error || 'Invalid code. Please try again.');
+    }
+  };
+
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    }
+  };
+
+  const toggleMode = () => {
+    setUseBackupCode(!useBackupCode);
+    setCode('');
+    setError(null);
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+        {/* Back Button */}
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={handleBack}
+          activeOpacity={0.7}
+        >
+          <IconSymbol
+            name="chevron.left"
+            size={24}
+            color={theme.colors.text}
+          />
+        </TouchableOpacity>
+
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardView}
+        >
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.form}>
+              {/* Icon */}
+              <View style={styles.iconContainer}>
+                <IconSymbol
+                  name={useBackupCode ? 'key.fill' : 'lock.shield.fill'}
+                  size={48}
+                  color={theme.colors.primary}
+                />
+              </View>
+
+              <Text style={styles.title}>
+                {useBackupCode ? 'Enter Backup Code' : 'Two-Factor Authentication'}
+              </Text>
+              <Text style={styles.subtitle}>
+                {useBackupCode
+                  ? 'Enter one of your backup codes to sign in'
+                  : 'Enter the 6-digit code from your authenticator app'}
+              </Text>
+
+              <Input
+                label={useBackupCode ? 'Backup Code' : 'Verification Code'}
+                value={code}
+                onChangeText={(text) => {
+                  // For TOTP, only allow digits and limit to 6
+                  const value = useBackupCode
+                    ? text
+                    : text.replace(/\D/g, '').slice(0, 6);
+                  setCode(value);
+                  if (error) setError(null);
+                }}
+                placeholder={useBackupCode ? 'Enter backup code' : '000000'}
+                keyboardType={useBackupCode ? 'default' : 'number-pad'}
+                autoCapitalize="none"
+                autoComplete="one-time-code"
+                maxLength={useBackupCode ? 20 : 6}
+                error={error || undefined}
+                containerStyle={styles.inputContainer}
+              />
+
+              {!useBackupCode && (
+                <View style={styles.trustDeviceContainer}>
+                  <Text style={styles.trustDeviceText}>
+                    Trust this device for 30 days
+                  </Text>
+                  <Switch
+                    value={trustDevice}
+                    onValueChange={setTrustDevice}
+                    trackColor={{
+                      false: theme.colors.border,
+                      true: theme.colors.primary,
+                    }}
+                    thumbColor={theme.colors.background}
+                  />
+                </View>
+              )}
+
+              <Button
+                title="Verify"
+                onPress={handleVerify}
+                loading={isLoading}
+                disabled={isLoading}
+                style={styles.submitButton}
+              />
+
+              <TouchableOpacity
+                onPress={toggleMode}
+                style={styles.toggleButton}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.toggleButtonText}>
+                  {useBackupCode
+                    ? 'Use authenticator app instead'
+                    : 'Use a backup code instead'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
+const createStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  backButton: {
+    position: 'absolute',
+    top: 60,
+    left: 16,
+    width: 44,
+    height: 44,
+    backgroundColor: theme.colors.backgroundSecondary,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+    ...theme.shadows.small,
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: theme.spacing[5],
+  },
+  form: {
+    width: '100%',
+    maxWidth: 400,
+    alignSelf: 'center',
+  },
+  iconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: theme.colors.primary + '15',
+    justifyContent: 'center',
+    alignItems: 'center',
+    alignSelf: 'center',
+    marginBottom: theme.spacing[6],
+  },
+  title: {
+    fontSize: theme.typography.fontSize['2xl'],
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    textAlign: 'center',
+    marginBottom: theme.spacing[2],
+  },
+  subtitle: {
+    fontSize: theme.typography.fontSize.base,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: theme.spacing[8],
+  },
+  inputContainer: {
+    marginBottom: theme.spacing[4],
+  },
+  trustDeviceContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing[6],
+    paddingHorizontal: theme.spacing[1],
+  },
+  trustDeviceText: {
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.textSecondary,
+  },
+  submitButton: {
+    marginBottom: theme.spacing[4],
+  },
+  toggleButton: {
+    alignItems: 'center',
+    paddingVertical: theme.spacing[2],
+  },
+  toggleButtonText: {
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.primary,
+    fontWeight: '500',
+  },
+});

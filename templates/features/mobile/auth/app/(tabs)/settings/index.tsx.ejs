@@ -1,0 +1,137 @@
+import React, { useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useAuth } from '../../../src/hooks/auth';
+import { IconSymbol } from '../../../src/components/ui/icon-symbol';
+import { useAppTheme, AppTheme } from '@/context/theme-context';
+
+export default function SettingsScreen() {
+  const router = useRouter();
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  const { user } = useAuth();
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Settings</Text>
+          <Text style={styles.headerSubtitle}>{user?.email}</Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Account</Text>
+
+          <TouchableOpacity
+            style={styles.settingsItem}
+            onPress={() => router.push('/account')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.settingsItemLeft}>
+              <View style={[styles.iconContainer, { backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' }]}>
+                <IconSymbol name="person.fill" size={20} color={theme.colors.text} />
+              </View>
+              <View style={styles.settingsItemContent}>
+                <Text style={styles.settingsItemText}>Account Details</Text>
+                <Text style={styles.settingsItemSubtext}>Manage your profile information</Text>
+              </View>
+            </View>
+            <IconSymbol name="chevron.right" size={18} color={theme.colors.textMuted} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.settingsItem}
+            onPress={() => router.push('/(tabs)/settings/security')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.settingsItemLeft}>
+              <View style={[styles.iconContainer, { backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' }]}>
+                <IconSymbol name="lock.shield.fill" size={20} color={theme.colors.text} />
+              </View>
+              <View style={styles.settingsItemContent}>
+                <Text style={styles.settingsItemText}>Security</Text>
+                <Text style={styles.settingsItemSubtext}>Two-factor authentication & more</Text>
+              </View>
+            </View>
+            <IconSymbol name="chevron.right" size={18} color={theme.colors.textMuted} />
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const createStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  scrollContent: {
+    paddingBottom: theme.spacing[8],
+  },
+  header: {
+    padding: theme.spacing[6],
+    paddingTop: theme.spacing[4],
+    paddingBottom: theme.spacing[6],
+  },
+  headerTitle: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: theme.colors.text,
+    letterSpacing: -0.5,
+  },
+  headerSubtitle: {
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing[1],
+  },
+  section: {
+    paddingHorizontal: theme.spacing[5],
+    marginBottom: theme.spacing[6],
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: theme.spacing[3],
+    marginLeft: theme.spacing[1],
+  },
+  settingsItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: theme.spacing[4],
+    backgroundColor: theme.colors.backgroundSecondary,
+    borderRadius: 16,
+    marginBottom: theme.spacing[3],
+    ...theme.shadows.small,
+  },
+  settingsItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  settingsItemContent: {
+    marginLeft: theme.spacing[3],
+    flex: 1,
+  },
+  settingsItemText: {
+    fontSize: theme.typography.fontSize.base,
+    fontWeight: '500',
+    color: theme.colors.text,
+  },
+  settingsItemSubtext: {
+    fontSize: theme.typography.fontSize.xs,
+    color: theme.colors.textSecondary,
+    marginTop: 2,
+  },
+});

@@ -1,0 +1,249 @@
+'use client';
+
+import { useState } from 'react';
+import QRCode from 'react-qr-code';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Shield, Copy, Download, Check, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { enableTwoFactor, verifyTotpSetup } from '@/lib/auth/actions';
+
+interface TwoFactorSetupProps {
+  onComplete: () => void;
+}
+
+type Step = 'password' | 'qr' | 'verify' | 'backup';
+
+export function TwoFactorSetup({ onComplete }: TwoFactorSetupProps) {
+  const [step, setStep] = useState<Step>('password');
+  const [password, setPassword] = useState('');
+  const [totpURI, setTotpURI] = useState<string | null>(null);
+  const [backupCodes, setBackupCodes] = useState<string[]>([]);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleStartSetup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!password) {
+      toast.error('Please enter your password');
+      return;
+    }
+
+    setIsLoading(true);
+    const result = await enableTwoFactor(password);
+    setIsLoading(false);
+
+    if (!result.success) {
+      toast.error(result.error || 'Failed to start 2FA setup');
+      return;
+    }
+
+    setTotpURI(result.totpURI || null);
+    setBackupCodes(result.backupCodes || []);
+    setStep('qr');
+  };
+
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (verificationCode.length !== 6) {
+      toast.error('Please enter a 6-digit code');
+      return;
+    }
+
+    setIsLoading(true);
+    const result = await verifyTotpSetup(verificationCode);
+    setIsLoading(false);
+
+    if (!result.success) {
+      toast.error(result.error || 'Invalid verification code');
+      return;
+    }
+
+    setStep('backup');
+  };
+
+  const copySecret = () => {
+    if (totpURI) {
+      // Extract secret from URI
+      const match = totpURI.match(/secret=([^&]+)/);
+      if (match) {
+        navigator.clipboard.writeText(match[1]);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+        toast.success('Secret copied to clipboard');
+      }
+    }
+  };
+
+  const downloadBackupCodes = () => {
+    const content = `Two-Factor Authentication Backup Codes\n${'='.repeat(40)}\n\nKeep these codes safe. Each code can only be used once.\n\n${backupCodes.join('\n')}`;
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '2fa-backup-codes.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Backup codes downloaded');
+  };
+
+  const handleFinish = () => {
+    toast.success('Two-factor authentication enabled!');
+    onComplete();
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Shield className="h-5 w-5" />
+          Two-Factor Authentication
+        </CardTitle>
+        <CardDescription>
+          Add an extra layer of security to your account
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {step === 'password' && (
+          <form onSubmit={handleStartSetup} className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Two-factor authentication adds an additional layer of security by
+              requiring a code from your authenticator app when signing in.
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="password">Confirm your password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                disabled={isLoading}
+              />
+            </div>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Setting up...
+                </>
+              ) : (
+                'Enable 2FA'
+              )}
+            </Button>
+          </form>
+        )}
+
+        {step === 'qr' && totpURI && (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Scan this QR code with your authenticator app (Google Authenticator,
+              Authy, 1Password, etc.)
+            </p>
+
+            <div className="flex justify-center">
+              <div className="rounded-lg bg-white p-4">
+                <QRCode value={totpURI} size={200} />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Input
+                value={totpURI.match(/secret=([^&]+)/)?.[1] || ''}
+                readOnly
+                className="font-mono text-sm"
+              />
+              <Button variant="outline" size="icon" onClick={copySecret}>
+                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              </Button>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Can&apos;t scan? Enter the secret key manually in your app.
+            </p>
+
+            <Button onClick={() => setStep('verify')} className="w-full">
+              Continue
+            </Button>
+          </div>
+        )}
+
+        {step === 'verify' && (
+          <form onSubmit={handleVerify} className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Enter the 6-digit code from your authenticator app to verify setup.
+            </p>
+
+            <div className="space-y-2">
+              <Label htmlFor="verification-code">Verification Code</Label>
+              <Input
+                id="verification-code"
+                value={verificationCode}
+                onChange={(e) =>
+                  setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))
+                }
+                placeholder="000000"
+                className="text-center font-mono text-lg tracking-widest"
+                maxLength={6}
+                autoComplete="one-time-code"
+              />
+            </div>
+
+            <Button type="submit" disabled={isLoading} className="w-full">
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Verifying...
+                </>
+              ) : (
+                'Verify'
+              )}
+            </Button>
+          </form>
+        )}
+
+        {step === 'backup' && (
+          <div className="space-y-4">
+            <div className="rounded-lg border bg-muted/50 p-4">
+              <p className="mb-3 text-sm font-medium">Backup Codes</p>
+              <div className="grid grid-cols-2 gap-2">
+                {backupCodes.map((code, i) => (
+                  <code
+                    key={i}
+                    className="rounded bg-background px-2 py-1 text-center text-sm font-mono"
+                  >
+                    {code}
+                  </code>
+                ))}
+              </div>
+            </div>
+
+            <p className="text-sm text-muted-foreground">
+              Save these backup codes in a safe place. You can use them to access
+              your account if you lose your authenticator device. Each code can
+              only be used once.
+            </p>
+
+            <Button variant="outline" onClick={downloadBackupCodes} className="w-full">
+              <Download className="mr-2 h-4 w-4" />
+              Download Backup Codes
+            </Button>
+
+            <Button onClick={handleFinish} className="w-full">
+              Done
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

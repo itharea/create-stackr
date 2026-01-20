@@ -1,0 +1,366 @@
+import React, { useState, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, Alert, Modal } from 'react-native';
+import { useRouter } from 'expo-router';
+import { File, Paths } from 'expo-file-system/next';
+import * as Sharing from 'expo-sharing';
+import { useAuth } from '../../../../src/hooks/auth';
+import { Button } from '../../../../src/components/ui/button';
+import { Input } from '../../../../src/components/ui/input';
+import { IconSymbol } from '../../../../src/components/ui/icon-symbol';
+import { useAppTheme, AppTheme } from '@/context/theme-context';
+
+export default function TwoFactorManageScreen() {
+  const router = useRouter();
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  const { generateBackupCodes, disableTwoFactor, isLoading } = useAuth();
+
+  const [backupModalVisible, setBackupModalVisible] = useState(false);
+  const [disableModalVisible, setDisableModalVisible] = useState(false);
+  const [password, setPassword] = useState('');
+  const [newBackupCodes, setNewBackupCodes] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleGenerateBackupCodes = async () => {
+    setError(null);
+    const result = await generateBackupCodes(password);
+
+    if (!result.success) {
+      setError(result.error || 'Failed to generate codes');
+      return;
+    }
+
+    setNewBackupCodes(result.backupCodes || []);
+    setPassword('');
+  };
+
+  const handleDownloadCodes = async () => {
+    const content = [
+      'Two-Factor Authentication Backup Codes',
+      '========================================',
+      '',
+      'Keep these codes safe. Each code can only be used once.',
+      '',
+      ...newBackupCodes,
+    ].join('\n');
+
+    const file = new File(Paths.cache, '2fa-backup-codes.txt');
+    file.write(content);
+    await Sharing.shareAsync(file.uri);
+  };
+
+  const handleDisableTwoFactor = async () => {
+    setError(null);
+    const result = await disableTwoFactor(password);
+
+    if (!result.success) {
+      setError(result.error || 'Failed to disable 2FA');
+      return;
+    }
+
+    Alert.alert('Success', 'Two-factor authentication has been disabled.');
+    setDisableModalVisible(false);
+    setPassword('');
+    router.back();
+  };
+
+  const closeBackupModal = () => {
+    setBackupModalVisible(false);
+    setNewBackupCodes([]);
+    setPassword('');
+    setError(null);
+  };
+
+  const closeDisableModal = () => {
+    setDisableModalVisible(false);
+    setPassword('');
+    setError(null);
+  };
+
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+      {/* Status Banner */}
+      <View style={[
+        styles.statusBanner,
+        { backgroundColor: theme.mode === 'dark' ? 'rgba(74, 222, 128, 0.1)' : 'rgba(34, 197, 94, 0.08)' }
+      ]}>
+        <View style={[
+          styles.statusIconContainer,
+          { backgroundColor: theme.mode === 'dark' ? 'rgba(74, 222, 128, 0.2)' : 'rgba(34, 197, 94, 0.15)' }
+        ]}>
+          <IconSymbol name="checkmark.shield.fill" size={24} color={theme.colors.success ?? theme.colors.primary} />
+        </View>
+        <Text style={[styles.statusText, { color: theme.colors.success }]}>
+          2FA is Active
+        </Text>
+      </View>
+
+      {/* Generate Backup Codes */}
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View style={[styles.cardIconContainer, { backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' }]}>
+            <IconSymbol name="key.fill" size={20} color={theme.colors.text} />
+          </View>
+          <View style={styles.cardHeaderText}>
+            <Text style={styles.cardTitle}>Backup Codes</Text>
+            <Text style={styles.cardSubtitle}>Recovery options for your account</Text>
+          </View>
+        </View>
+        <Text style={styles.cardDescription}>
+          Generate new backup codes. This will invalidate any previously generated codes.
+        </Text>
+        <Button
+          onPress={() => setBackupModalVisible(true)}
+          title="Generate New Codes"
+          fullWidth
+        />
+      </View>
+
+      {/* Disable 2FA */}
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View style={[styles.cardIconContainer, { backgroundColor: theme.mode === 'dark' ? 'rgba(248, 113, 113, 0.15)' : 'rgba(239, 68, 68, 0.08)' }]}>
+            <IconSymbol name="shield.slash.fill" size={20} color={theme.colors.error} />
+          </View>
+          <View style={styles.cardHeaderText}>
+            <Text style={styles.cardTitle}>Disable 2FA</Text>
+            <Text style={styles.cardSubtitle}>Remove extra security</Text>
+          </View>
+        </View>
+        <Text style={styles.cardDescription}>
+          Remove two-factor authentication from your account. This will make your account less secure.
+        </Text>
+        <Button
+          onPress={() => setDisableModalVisible(true)}
+          title="Disable 2FA"
+          variant="destructive"
+          fullWidth
+        />
+      </View>
+
+      {/* Backup Codes Modal */}
+      <Modal visible={backupModalVisible} animationType="slide" presentationStyle="pageSheet">
+        <View style={styles.modalContainer}>
+          <View style={[styles.modalIconContainer, { backgroundColor: theme.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' }]}>
+            <IconSymbol name="key.fill" size={32} color={theme.colors.text} />
+          </View>
+          <Text style={styles.modalTitle}>Generate Backup Codes</Text>
+
+          {newBackupCodes.length === 0 ? (
+            <>
+              <Text style={styles.modalDescription}>
+                Enter your password to generate new backup codes.
+              </Text>
+              <Input
+                label="Password"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                error={error || undefined}
+                containerStyle={styles.inputContainer}
+              />
+              <Button
+                onPress={handleGenerateBackupCodes}
+                title="Generate Codes"
+                loading={isLoading}
+                disabled={!password}
+                fullWidth
+              />
+            </>
+          ) : (
+            <>
+              <Text style={styles.modalDescription}>
+                Save these codes in a secure location.
+              </Text>
+              <View style={styles.codesContainer}>
+                {newBackupCodes.map((code, index) => (
+                  <Text key={index} style={styles.code}>{code}</Text>
+                ))}
+              </View>
+              <Button
+                onPress={handleDownloadCodes}
+                title="Download Codes"
+                style={styles.downloadButton}
+                fullWidth
+              />
+            </>
+          )}
+
+          <Button
+            onPress={closeBackupModal}
+            title={newBackupCodes.length > 0 ? 'Done' : 'Cancel'}
+            variant="ghost"
+            fullWidth
+          />
+        </View>
+      </Modal>
+
+      {/* Disable Modal */}
+      <Modal visible={disableModalVisible} animationType="slide" presentationStyle="pageSheet">
+        <View style={styles.modalContainer}>
+          <View style={[styles.modalIconContainer, { backgroundColor: theme.mode === 'dark' ? 'rgba(248, 113, 113, 0.15)' : 'rgba(239, 68, 68, 0.1)' }]}>
+            <IconSymbol name="shield.slash.fill" size={32} color={theme.colors.error} />
+          </View>
+          <Text style={styles.modalTitle}>Disable 2FA</Text>
+          <Text style={styles.warningText}>
+            Warning: This will make your account less secure.
+          </Text>
+          <Text style={styles.modalDescription}>
+            Enter your password to confirm.
+          </Text>
+
+          <Input
+            label="Password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            error={error || undefined}
+            containerStyle={styles.inputContainer}
+          />
+
+          <Button
+            onPress={handleDisableTwoFactor}
+            title="Disable 2FA"
+            variant="destructive"
+            loading={isLoading}
+            disabled={!password}
+            fullWidth
+          />
+          <Button
+            onPress={closeDisableModal}
+            title="Cancel"
+            variant="ghost"
+            fullWidth
+          />
+        </View>
+      </Modal>
+    </ScrollView>
+  );
+}
+
+const createStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  scrollContent: {
+    padding: theme.spacing[5],
+  },
+  statusBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: theme.spacing[4],
+    borderRadius: 16,
+    marginBottom: theme.spacing[5],
+  },
+  statusIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statusText: {
+    fontSize: theme.typography.fontSize.base,
+    fontWeight: '600',
+    marginLeft: theme.spacing[3],
+  },
+  card: {
+    padding: theme.spacing[5],
+    borderRadius: 20,
+    backgroundColor: theme.colors.backgroundSecondary,
+    marginBottom: theme.spacing[4],
+    ...theme.shadows.small,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing[3],
+  },
+  cardIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cardHeaderText: {
+    marginLeft: theme.spacing[3],
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: theme.typography.fontSize.base,
+    fontWeight: '600',
+    color: theme.colors.text,
+  },
+  cardSubtitle: {
+    fontSize: theme.typography.fontSize.xs,
+    color: theme.colors.textSecondary,
+    marginTop: 2,
+  },
+  cardDescription: {
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.textSecondary,
+    lineHeight: 20,
+    marginBottom: theme.spacing[4],
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+    padding: theme.spacing[6],
+    justifyContent: 'center',
+  },
+  modalIconContainer: {
+    width: 72,
+    height: 72,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    alignSelf: 'center',
+    marginBottom: theme.spacing[5],
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: theme.colors.text,
+    textAlign: 'center',
+    marginBottom: theme.spacing[2],
+    letterSpacing: -0.3,
+  },
+  modalDescription: {
+    fontSize: theme.typography.fontSize.base,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: theme.spacing[6],
+    lineHeight: 22,
+  },
+  warningText: {
+    fontSize: theme.typography.fontSize.sm,
+    fontWeight: '500',
+    color: theme.colors.error,
+    textAlign: 'center',
+    marginBottom: theme.spacing[2],
+  },
+  inputContainer: {
+    marginBottom: theme.spacing[4],
+  },
+  codesContainer: {
+    padding: theme.spacing[4],
+    borderRadius: 16,
+    backgroundColor: theme.colors.backgroundSecondary,
+    marginBottom: theme.spacing[6],
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  code: {
+    fontFamily: 'monospace',
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.text,
+    width: '48%',
+    marginBottom: theme.spacing[2],
+  },
+  downloadButton: {
+    marginBottom: theme.spacing[4],
+  },
+});

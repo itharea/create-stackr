@@ -1,0 +1,317 @@
+import React, { useState, useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, Alert, ScrollView, TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
+import QRCode from 'react-native-qrcode-svg';
+import * as Clipboard from 'expo-clipboard';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import { useAuth } from '../../../../src/hooks/auth';
+import { Button } from '../../../../src/components/ui/button';
+import { Input } from '../../../../src/components/ui/input';
+import { IconSymbol } from '../../../../src/components/ui/icon-symbol';
+import { useAppTheme, AppTheme } from '@/context/theme-context';
+
+type SetupStep = 'password' | 'qr-code' | 'verify' | 'backup-codes';
+
+export default function TwoFactorSetupScreen() {
+  const router = useRouter();
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  const { enableTwoFactor, verifyTotpSetup, isLoading } = useAuth();
+
+  const [step, setStep] = useState<SetupStep>('password');
+  const [password, setPassword] = useState('');
+  const [totpURI, setTotpURI] = useState<string | null>(null);
+  const [backupCodes, setBackupCodes] = useState<string[]>([]);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  // Extract secret from TOTP URI for manual entry
+  const getSecretFromURI = useCallback((uri: string): string => {
+    const match = uri.match(/secret=([^&]+)/);
+    return match ? match[1] : '';
+  }, []);
+
+  const handlePasswordSubmit = async () => {
+    setError(null);
+    const result = await enableTwoFactor(password);
+
+    if (!result.success) {
+      setError(result.error || 'Failed to enable 2FA');
+      return;
+    }
+
+    setTotpURI(result.totpURI || null);
+    setBackupCodes(result.backupCodes || []);
+    setStep('qr-code');
+  };
+
+  const handleVerifyCode = async () => {
+    setError(null);
+
+    if (verificationCode.length !== 6) {
+      setError('Please enter a 6-digit code');
+      return;
+    }
+
+    const result = await verifyTotpSetup(verificationCode);
+
+    if (!result.success) {
+      setError(result.error || 'Verification failed');
+      return;
+    }
+
+    setStep('backup-codes');
+  };
+
+  const handleCopySecret = async () => {
+    if (!totpURI) return;
+    const secret = getSecretFromURI(totpURI);
+    await Clipboard.setStringAsync(secret);
+    Alert.alert('Copied', 'Secret key copied to clipboard');
+  };
+
+  const handleDownloadBackupCodes = async () => {
+    const content = [
+      'Two-Factor Authentication Backup Codes',
+      '========================================',
+      '',
+      'Keep these codes safe. Each code can only be used once.',
+      '',
+      ...backupCodes,
+    ].join('\n');
+
+    const fileUri = FileSystem.documentDirectory + '2fa-backup-codes.txt';
+    await FileSystem.writeAsStringAsync(fileUri, content);
+    await Sharing.shareAsync(fileUri);
+  };
+
+  const handleComplete = () => {
+    router.back();
+  };
+
+  // Step 1: Password confirmation
+  if (step === 'password') {
+    return (
+      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+        <View style={styles.iconContainer}>
+          <IconSymbol name="lock.shield.fill" size={48} color={theme.colors.primary} />
+        </View>
+        <Text style={styles.title}>Enable Two-Factor Authentication</Text>
+        <Text style={styles.description}>
+          Enter your password to begin setting up two-factor authentication.
+        </Text>
+
+        <Input
+          label="Password"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          autoCapitalize="none"
+          error={error || undefined}
+          containerStyle={styles.inputContainer}
+        />
+
+        <Button
+          onPress={handlePasswordSubmit}
+          title="Continue"
+          loading={isLoading}
+          disabled={!password}
+        />
+      </ScrollView>
+    );
+  }
+
+  // Step 2: QR Code scanning
+  if (step === 'qr-code') {
+    const secret = totpURI ? getSecretFromURI(totpURI) : '';
+
+    return (
+      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+        <Text style={styles.title}>Scan QR Code</Text>
+        <Text style={styles.description}>
+          Open your authenticator app and scan this QR code to add your account.
+        </Text>
+
+        {totpURI && (
+          <View style={styles.qrContainer}>
+            <QRCode value={totpURI} size={200} backgroundColor="#FFFFFF" />
+          </View>
+        )}
+
+        <Text style={styles.subtitle}>Or enter manually:</Text>
+        <View style={styles.secretContainer}>
+          <Text style={styles.secret} selectable>
+            {secret}
+          </Text>
+          <TouchableOpacity onPress={handleCopySecret} style={styles.copyButton}>
+            <IconSymbol name="doc.on.doc" size={20} color={theme.colors.primary} />
+          </TouchableOpacity>
+        </View>
+
+        <Button
+          onPress={() => setStep('verify')}
+          title="I've Added the Account"
+          style={styles.continueButton}
+        />
+      </ScrollView>
+    );
+  }
+
+  // Step 3: Verification
+  if (step === 'verify') {
+    return (
+      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+        <Text style={styles.title}>Verify Setup</Text>
+        <Text style={styles.description}>
+          Enter the 6-digit code from your authenticator app to verify the setup.
+        </Text>
+
+        <Input
+          label="Verification Code"
+          value={verificationCode}
+          onChangeText={(text) => setVerificationCode(text.replace(/\D/g, ''))}
+          placeholder="000000"
+          keyboardType="number-pad"
+          maxLength={6}
+          error={error || undefined}
+          containerStyle={styles.codeInputContainer}
+        />
+
+        <Button
+          onPress={handleVerifyCode}
+          title="Verify"
+          loading={isLoading}
+          disabled={verificationCode.length !== 6}
+        />
+      </ScrollView>
+    );
+  }
+
+  // Step 4: Backup codes
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+      <View style={styles.iconContainer}>
+        <IconSymbol name="checkmark.circle.fill" size={48} color={theme.colors.success ?? theme.colors.primary} />
+      </View>
+      <Text style={styles.title}>Save Backup Codes</Text>
+      <Text style={styles.description}>
+        Save these backup codes in a secure location. Each code can only be used once
+        if you lose access to your authenticator app.
+      </Text>
+
+      <View style={styles.codesContainer}>
+        {backupCodes.map((code, index) => (
+          <Text key={index} style={styles.code}>
+            {code}
+          </Text>
+        ))}
+      </View>
+
+      <Button
+        onPress={handleDownloadBackupCodes}
+        title="Download Codes"
+        style={styles.downloadButton}
+      />
+
+      <Button
+        onPress={handleComplete}
+        title="Done"
+        variant="outline"
+      />
+    </ScrollView>
+  );
+}
+
+const createStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  scrollContent: {
+    padding: theme.spacing[6],
+  },
+  iconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: theme.colors.primary + '15',
+    justifyContent: 'center',
+    alignItems: 'center',
+    alignSelf: 'center',
+    marginBottom: theme.spacing[6],
+  },
+  title: {
+    fontSize: theme.typography.fontSize['2xl'],
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    textAlign: 'center',
+    marginBottom: theme.spacing[2],
+  },
+  subtitle: {
+    fontSize: theme.typography.fontSize.base,
+    fontWeight: '500',
+    color: theme.colors.text,
+    marginTop: theme.spacing[6],
+    marginBottom: theme.spacing[2],
+  },
+  description: {
+    fontSize: theme.typography.fontSize.base,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: theme.spacing[6],
+    lineHeight: 24,
+  },
+  inputContainer: {
+    marginBottom: theme.spacing[4],
+  },
+  codeInputContainer: {
+    marginBottom: theme.spacing[4],
+  },
+  qrContainer: {
+    alignItems: 'center',
+    padding: theme.spacing[6],
+    backgroundColor: '#FFFFFF', // White for QR scanability
+    borderRadius: 16,
+    alignSelf: 'center',
+    marginBottom: theme.spacing[6],
+  },
+  secretContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: theme.spacing[6],
+    flexWrap: 'wrap',
+  },
+  secret: {
+    fontFamily: 'monospace',
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.text,
+  },
+  copyButton: {
+    marginLeft: theme.spacing[2],
+    padding: theme.spacing[2],
+  },
+  continueButton: {
+    marginTop: theme.spacing[4],
+  },
+  codesContainer: {
+    padding: theme.spacing[4],
+    borderRadius: 12,
+    backgroundColor: theme.colors.backgroundSecondary,
+    marginBottom: theme.spacing[6],
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  code: {
+    fontFamily: 'monospace',
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.text,
+    width: '48%',
+    marginBottom: theme.spacing[2],
+  },
+  downloadButton: {
+    marginBottom: theme.spacing[4],
+  },
+});

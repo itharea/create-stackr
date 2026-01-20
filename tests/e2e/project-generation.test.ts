@@ -167,16 +167,16 @@ describe('E2E: Full Project Generation', () => {
 
     // Verify integration services
     expect(
-      await fs.pathExists(path.join(projectDir, 'mobile/src/services/revenuecatService.ts'))
+      await fs.pathExists(path.join(projectDir, 'mobile/src/services/revenuecat-service.ts'))
     ).toBe(true);
     expect(
-      await fs.pathExists(path.join(projectDir, 'mobile/src/services/adjustService.ts'))
+      await fs.pathExists(path.join(projectDir, 'mobile/src/services/adjust-service.ts'))
     ).toBe(true);
     expect(
-      await fs.pathExists(path.join(projectDir, 'mobile/src/services/scateService.ts'))
+      await fs.pathExists(path.join(projectDir, 'mobile/src/services/scate-service.ts'))
     ).toBe(true);
     expect(
-      await fs.pathExists(path.join(projectDir, 'mobile/src/services/attService.ts'))
+      await fs.pathExists(path.join(projectDir, 'mobile/src/services/att-service.ts'))
     ).toBe(true);
 
     // Verify backend has event queue
@@ -505,9 +505,9 @@ describe('E2E: Full Project Generation', () => {
       expect(await fs.pathExists(path.join(projectDir, 'web/src/components/auth/oauth-buttons.tsx'))).toBe(true);
       expect(await fs.pathExists(path.join(projectDir, 'web/src/app/auth/callback/route.ts'))).toBe(true);
 
-      // Verify dashboard
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(app)/dashboard/page.tsx'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(app)/layout.tsx'))).toBe(true);
+      // Verify protected routes (dashboard now in (protected) route group)
+      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(protected)/dashboard/page.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(protected)/layout.tsx'))).toBe(true);
 
       // Verify package.json validity
       const webPkg = await fs.readJSON(path.join(projectDir, 'web/package.json'));

@@ -1,0 +1,39 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { COOKIE_NAMES } from '@/lib/auth/config';
+
+/**
+ * Session Expiration Route Handler
+ *
+ * CRITICAL: We use a Route Handler because:
+ * - Route Handlers can delete cookies that are sent to the browser
+ * - Server Components that call redirect() never send Set-Cookie headers
+ * - This prevents infinite redirect loops with stale cookies
+ *
+ * Flow:
+ * 1. Protected layout detects invalid session (backend returns 401)
+ * 2. Layout redirects to this route handler
+ * 3. This handler clears the session cookie (browser receives Set-Cookie header)
+ * 4. Redirects to /login with error message
+ * 5. User can log in fresh - no more stale cookie causing loops
+ */
+export async function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams;
+  const callbackUrl = searchParams.get('callbackUrl');
+
+  // Build login URL with error message
+  const loginUrl = new URL('/login', request.url);
+  loginUrl.searchParams.set('error', 'session_expired');
+  if (callbackUrl) {
+    loginUrl.searchParams.set('redirect', callbackUrl);
+  }
+
+  // Create redirect response
+  const response = NextResponse.redirect(loginUrl);
+
+  // CRITICAL: Clear session cookie - Route Handler properly sends Set-Cookie header
+  // This is the key difference from Server Components where cookies().delete() only
+  // affects the server-side cookie jar and doesn't send headers to the browser
+  response.cookies.delete(COOKIE_NAMES.SESSION);
+
+  return response;
+}

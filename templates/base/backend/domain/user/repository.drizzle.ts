@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { db, schema } from "../../utils/db";
 import { ErrorFactory } from "../../utils/errors";
 
@@ -120,6 +120,33 @@ export const deleteUser = async (userId: string): Promise<void> => {
   } catch (error) {
     throw ErrorFactory.databaseError({
       operation: 'deleteUser',
+      userId,
+      originalError: error instanceof Error ? error.message : String(error)
+    });
+  }
+};
+
+/**
+ * Check if user has a credential account with password
+ * Returns true if user signed up with email/password, false for OAuth-only users
+ */
+export const userHasPassword = async (userId: string): Promise<boolean> => {
+  try {
+    const [credentialAccount] = await db
+      .select({ password: schema.account.password })
+      .from(schema.account)
+      .where(
+        and(
+          eq(schema.account.userId, userId),
+          eq(schema.account.providerId, 'credential')
+        )
+      )
+      .limit(1);
+
+    return !!credentialAccount?.password;
+  } catch (error) {
+    throw ErrorFactory.databaseError({
+      operation: 'userHasPassword',
       userId,
       originalError: error instanceof Error ? error.message : String(error)
     });

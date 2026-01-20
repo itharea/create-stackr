@@ -1,23 +1,40 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
 <% if (features.authentication.enabled) { %>
-import { ProtectedScreen } from '../../src/components/auth';
+import { ProtectedScreen } from '../../src/components/auth/protected-screen';
+import { IconSymbol } from '../../src/components/ui/icon-symbol';
+import { useAppTheme } from '@/context/theme-context';
 <% } %>
 
 export default function TabLayout() {
 <% if (features.authentication.enabled) { %>
+  const theme = useAppTheme();
+
   return (
     <ProtectedScreen>
       <Tabs
         screenOptions={{
           headerShown: false,
-          tabBarStyle: { display: 'none' },
+          tabBarActiveTintColor: theme.colors.primary,
+          tabBarInactiveTintColor: theme.colors.textSecondary,
+          tabBarStyle: {
+            backgroundColor: theme.colors.background,
+            borderTopColor: theme.colors.border,
+          },
         }}
       >
         <Tabs.Screen
           name="index"
           options={{
             title: 'Home',
+            tabBarIcon: ({ color }) => <IconSymbol name="house.fill" size={24} color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="settings"
+          options={{
+            title: 'Settings',
+            tabBarIcon: ({ color }) => <IconSymbol name="gearshape.fill" size={24} color={color} />,
           }}
         />
       </Tabs>

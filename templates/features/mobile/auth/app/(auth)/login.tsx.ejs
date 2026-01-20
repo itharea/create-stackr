@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo } from 'react';
 import { View, StyleSheet, SafeAreaView, TouchableOpacity } from 'react-native';
 import { router, Stack } from 'expo-router';
-import { LoginForm } from '../../src/components/auth';
-import { IconSymbol } from '../../src/components/ui/IconSymbol';
-import { useAppTheme, AppTheme } from '@/context/ThemeContext';
-import { useAuth } from '../../src/hooks';
+import { LoginForm } from '../../src/components/auth/login-form';
+import { IconSymbol } from '../../src/components/ui/icon-symbol';
+import { useAppTheme, AppTheme } from '@/context/theme-context';
+import { useAuth } from '../../src/hooks/auth';
 
 export default function LoginScreen() {
   const theme = useAppTheme();

@@ -18,6 +18,9 @@ export const auth = betterAuth({
       session: schema.session,
       account: schema.account,
       verification: schema.verification,
+<% if (features.authentication.twoFactor) { %>
+      twoFactor: schema.twoFactor,
+<% } %>
     },
   }),
   basePath: "/api/auth", // BetterAuth endpoints will be at /api/auth/*

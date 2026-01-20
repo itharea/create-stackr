@@ -3,7 +3,7 @@
 import {
   useDeviceSession as useDeviceSessionStore,
   useDeviceSessionActions,
-} from "@/store/deviceSession.store";
+} from "@/store/device-session-store";
 
 /**
  * Hook to access the current device session
@@ -37,4 +37,4 @@ export function useDeviceSession() {
 }
 
 // Re-export store hooks for direct access when needed
-export { useDeviceSessionStore, useDeviceSessionActions } from "@/store/deviceSession.store";
+export { useDeviceSessionStore, useDeviceSessionActions } from "@/store/device-session-store";

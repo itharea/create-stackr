@@ -56,6 +56,12 @@ export const COOKIE_NAMES = {
 
   // OAuth state for CSRF protection (temporary, during OAuth flow)
   OAUTH_STATE: "oauth_state",
+<% if (features.authentication.twoFactor) { %>
+
+  // Two-factor authentication cookies (temporary, during 2FA verification)
+  TWO_FACTOR: "two_factor",
+  TWO_FACTOR_EXPIRES_AT: "two_factor_expires",
+<% } %>
 } as const;
 
 /**
@@ -63,3 +69,10 @@ export const COOKIE_NAMES = {
  * This must match the cookie name that Better Auth uses
  */
 export const BETTER_AUTH_COOKIE_NAME = "better-auth.session_token";
+<% if (features.authentication.twoFactor) { %>
+
+/**
+ * Better Auth two-factor cookie name (used during 2FA verification)
+ */
+export const BETTER_AUTH_TWO_FACTOR_COOKIE_NAME = "better-auth.two_factor";
+<% } %>

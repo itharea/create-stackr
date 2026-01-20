@@ -1,0 +1,20 @@
+import { Stack } from 'expo-router';
+import { useAppTheme } from '@/context/theme-context';
+
+export default function SettingsLayout() {
+  const theme = useAppTheme();
+
+  return (
+    <Stack
+      screenOptions={{
+        headerStyle: { backgroundColor: theme.colors.background },
+        headerTintColor: theme.colors.text,
+        headerShadowVisible: false,
+        headerBackTitleVisible: false,
+      }}
+    >
+      <Stack.Screen name="index" options={{ headerShown: false, title: 'Settings' }} />
+      <Stack.Screen name="security" options={{ headerShown: false }} />
+    </Stack>
+  );
+}

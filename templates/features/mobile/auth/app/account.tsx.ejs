@@ -1,0 +1,331 @@
+import React, { useState, useMemo } from 'react';
+import {
+    View,
+    Text,
+    StyleSheet,
+    ScrollView,
+    Modal,
+    Pressable,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    TouchableOpacity,
+    SafeAreaView,
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useAuth } from '@/hooks/auth';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { formatDisplayName } from '@/utils/formatters';
+import { useAppTheme, AppTheme } from '@/context/theme-context';
+
+export default function AccountScreen() {
+    const router = useRouter();
+    const theme = useAppTheme();
+    const styles = useMemo(() => createStyles(theme), [theme]);
+
+    const { user, signOut, deleteAccount } = useAuth();
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [deleteConfirmText, setDeleteConfirmText] = useState('');
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const gradientColors = theme.mode === 'dark'
+        ? [theme.colors.card, 'transparent'] as const
+        : ['#ffffff', '#f8fafc'] as const;
+
+    const handleDeleteAccount = async () => {
+        if (deleteConfirmText !== 'DELETE') {
+            return;
+        }
+
+        setIsDeleting(true);
+        const result = await deleteAccount();
+        setIsDeleting(false);
+
+        if (result.success) {
+            await signOut();
+            setShowDeleteModal(false);
+            setDeleteConfirmText('');
+            router.replace('/');
+        } else {
+            Alert.alert('Error', result.error || 'Failed to delete account. Please try again.');
+        }
+    };
+
+    const isDeleteButtonEnabled = deleteConfirmText === 'DELETE' && !isDeleting;
+
+    return (
+        <SafeAreaView style={styles.safeArea}>
+            {/* Custom Header */}
+            <View style={styles.header}>
+                <TouchableOpacity
+                    onPress={() => router.dismiss()}
+                    style={styles.backButton}
+                >
+                    <IconSymbol name="chevron.left" size={24} color={theme.colors.text} />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>Account</Text>
+                <View style={styles.headerSpacer} />
+            </View>
+
+            <ScrollView style={styles.container}>
+                <View style={styles.content}>
+
+                    {/* User Info Section */}
+                    {user && (
+                        <LinearGradient
+                            colors={gradientColors}
+                            style={styles.userInfo}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 0, y: 1 }}
+                        >
+                            <Text style={styles.greeting}>
+                                {formatDisplayName(user.name)}
+                            </Text>
+                            <Text style={styles.email}>{user.email}</Text>
+                            <Text style={styles.userId}>User ID: {user.id}</Text>
+                        </LinearGradient>
+                    )}
+
+                    <View style={styles.dangerZone}>
+                        <Text style={styles.dangerTitle}>Danger Zone</Text>
+                        <Text style={styles.dangerDescription}>
+                            Deleting your account is permanent and cannot be undone.
+                        </Text>
+                        <Button
+                            title="Delete Account"
+                            variant="destructive"
+                            onPress={() => setShowDeleteModal(true)}
+                        />
+                    </View>
+
+                </View>
+
+                {/* Delete Account Confirmation Modal */}
+                <Modal
+                    visible={showDeleteModal}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={() => setShowDeleteModal(false)}
+                    statusBarTranslucent
+                >
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                        style={styles.keyboardAvoidingModal}
+                    >
+                        <Pressable
+                            style={styles.modalOverlay}
+                            onPress={() => setShowDeleteModal(false)}
+                        >
+                            <Pressable
+                                style={styles.modalContent}
+                                onPress={(e) => e.stopPropagation()}
+                            >
+                                <Text style={styles.modalTitle}>Delete Account</Text>
+
+                                <View style={styles.warningContainer}>
+                                    <Text style={styles.warningTitle}>Warning</Text>
+                                    <Text style={styles.warningText}>
+                                        This action is permanent and cannot be undone. All your account data will be deleted immediately.
+                                    </Text>
+                                </View>
+
+                                <View style={styles.gdprNotice}>
+                                    <Text style={styles.gdprTitle}>Third-Party Data Notice</Text>
+                                    <Text style={styles.gdprText}>
+                                        Please note that data stored by third-party services (RevenueCat, Adjust, Scate) may persist on their servers.
+                                    </Text>
+                                </View>
+
+                                <Input
+                                    label="Type DELETE to confirm"
+                                    value={deleteConfirmText}
+                                    onChangeText={setDeleteConfirmText}
+                                    placeholder="DELETE"
+                                    autoCapitalize="characters"
+                                    containerStyle={styles.confirmInput}
+                                />
+
+                                <View style={styles.modalActions}>
+                                    <Button
+                                        title="Cancel"
+                                        variant="ghost"
+                                        onPress={() => {
+                                            setShowDeleteModal(false);
+                                            setDeleteConfirmText('');
+                                        }}
+                                        style={styles.modalButton}
+                                    />
+
+                                    <Button
+                                        title={isDeleting ? "Deleting..." : "Delete"}
+                                        variant="destructive"
+                                        onPress={handleDeleteAccount}
+                                        disabled={!isDeleteButtonEnabled}
+                                        loading={isDeleting}
+                                        style={styles.modalButton}
+                                    />
+                                </View>
+                            </Pressable>
+                        </Pressable>
+                    </KeyboardAvoidingView>
+                </Modal>
+            </ScrollView>
+        </SafeAreaView>
+    );
+}
+
+const createStyles = (theme: AppTheme) => StyleSheet.create({
+    safeArea: {
+        flex: 1,
+        backgroundColor: theme.colors.background,
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: theme.spacing[4],
+        paddingVertical: theme.spacing[3],
+        backgroundColor: theme.colors.background,
+    },
+    backButton: {
+        padding: theme.spacing[2],
+        marginLeft: -theme.spacing[2],
+    },
+    headerTitle: {
+        fontSize: theme.typography.fontSize.lg,
+        fontWeight: '600',
+        color: theme.colors.text,
+    },
+    headerSpacer: {
+        width: 40,
+    },
+    container: {
+        flex: 1,
+        backgroundColor: theme.colors.background,
+    },
+    content: {
+        padding: theme.spacing[5],
+    },
+    userInfo: {
+        borderRadius: theme.borderRadius.xl,
+        padding: theme.spacing[5],
+        marginBottom: theme.spacing[8],
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: theme.colors.borderLight,
+    },
+    greeting: {
+        fontSize: theme.typography.fontSize['xl'],
+        fontWeight: '700',
+        color: theme.colors.text,
+        marginBottom: theme.spacing[2],
+    },
+    email: {
+        fontSize: theme.typography.fontSize.base,
+        color: theme.colors.textSecondary,
+        marginBottom: theme.spacing[1],
+    },
+    userId: {
+        fontSize: theme.typography.fontSize.sm,
+        color: theme.colors.textMuted,
+    },
+    dangerZone: {
+        marginTop: theme.spacing[4],
+        padding: theme.spacing[4],
+        borderRadius: theme.borderRadius.lg,
+        backgroundColor: 'rgba(239, 68, 68, 0.05)',
+        borderWidth: 1,
+        borderColor: 'rgba(239, 68, 68, 0.2)',
+    },
+    dangerTitle: {
+        fontSize: theme.typography.fontSize.lg,
+        fontWeight: '600',
+        color: theme.colors.error,
+        marginBottom: theme.spacing[2],
+    },
+    dangerDescription: {
+        fontSize: theme.typography.fontSize.base,
+        color: theme.colors.textSecondary,
+        marginBottom: theme.spacing[4],
+    },
+    keyboardAvoidingModal: {
+        flex: 1,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: theme.spacing[5],
+    },
+    modalContent: {
+        backgroundColor: theme.colors.background,
+        borderRadius: 24,
+        padding: theme.spacing[6],
+        paddingBottom: theme.spacing[12],
+        width: '100%',
+        maxWidth: 400,
+        borderWidth: 1,
+        borderColor: theme.colors.borderLight,
+        ...theme.shadows.large,
+    },
+    modalTitle: {
+        fontSize: theme.typography.fontSize['xl'],
+        fontWeight: 'bold',
+        color: theme.colors.text,
+        marginBottom: theme.spacing[6],
+        textAlign: 'center',
+    },
+    warningContainer: {
+        backgroundColor: 'transparent',
+        borderRadius: theme.borderRadius.lg,
+        padding: theme.spacing[4],
+        marginBottom: theme.spacing[5],
+        borderWidth: 1,
+        borderColor: theme.colors.warning,
+        borderStyle: 'dashed',
+    },
+    warningTitle: {
+        fontSize: theme.typography.fontSize.base,
+        fontWeight: '700',
+        color: theme.colors.warning,
+        marginBottom: theme.spacing[2],
+    },
+    warningText: {
+        fontSize: theme.typography.fontSize.sm,
+        color: theme.colors.textSecondary,
+        lineHeight: 20,
+    },
+    gdprNotice: {
+        backgroundColor: 'transparent',
+        borderRadius: theme.borderRadius.lg,
+        padding: theme.spacing[4],
+        marginBottom: theme.spacing[5],
+        borderWidth: 1,
+        borderColor: theme.colors.info,
+    },
+    gdprTitle: {
+        fontSize: theme.typography.fontSize.sm,
+        fontWeight: '600',
+        color: theme.colors.info,
+        marginBottom: theme.spacing[2],
+    },
+    gdprText: {
+        fontSize: theme.typography.fontSize.xs,
+        color: theme.colors.textMuted,
+        lineHeight: 18,
+    },
+    confirmInput: {
+        marginBottom: theme.spacing[6],
+    },
+    modalActions: {
+        flexDirection: 'row',
+        gap: theme.spacing[3],
+    },
+    modalButton: {
+        flex: 1,
+    },
+});

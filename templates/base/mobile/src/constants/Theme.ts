@@ -51,8 +51,8 @@ const fontFamily = Platform.OS === 'ios'
 // Light theme colors (monochrome primary matching web)
 const lightColors = {
   background: palette.neutral[0],
-  backgroundSecondary: palette.neutral[50],
-  backgroundTertiary: palette.neutral[100],
+  backgroundSecondary: palette.neutral[100], // More distinct from white background
+  backgroundTertiary: palette.neutral[200],
   card: palette.neutral[0],
 
   text: palette.neutral[950],
@@ -82,7 +82,7 @@ const lightColors = {
 // Dark theme colors (monochrome primary matching web)
 const darkColors = {
   background: palette.neutral[950],
-  backgroundSecondary: palette.neutral[900],
+  backgroundSecondary: 'rgba(255, 255, 255, 0.04)', // Subtle overlay, less prominent
   backgroundTertiary: palette.neutral[800],
   card: palette.neutral[900],
 

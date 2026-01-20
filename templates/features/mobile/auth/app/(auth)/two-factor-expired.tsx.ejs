@@ -1,0 +1,88 @@
+import React, { useMemo } from 'react';
+import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Button } from '../../src/components/ui/button';
+import { IconSymbol } from '../../src/components/ui/icon-symbol';
+import { useAppTheme, AppTheme } from '@/context/theme-context';
+import { useAuth } from '../../src/hooks/auth';
+
+export default function TwoFactorExpiredScreen() {
+  const router = useRouter();
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  const { clearTwoFactorState } = useAuth();
+
+  const handleReturnToLogin = async () => {
+    // Clear the expired 2FA state before navigating back
+    await clearTwoFactorState();
+    // Navigate back to the existing login screen instead of creating a new one
+    // This prevents duplicate login modals in the navigation stack
+    if (router.canGoBack()) {
+      router.back();
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+        <View style={styles.content}>
+          <View style={styles.iconContainer}>
+            <IconSymbol
+              name="exclamationmark.triangle.fill"
+              size={48}
+              color={theme.colors.warning ?? theme.colors.error}
+            />
+          </View>
+          <Text style={styles.title}>Verification Expired</Text>
+          <Text style={styles.description}>
+            Your two-factor verification session has expired for security reasons.
+            Please sign in again to continue.
+          </Text>
+          <Button
+            onPress={handleReturnToLogin}
+            title="Return to Login"
+            style={styles.button}
+          />
+        </View>
+    </SafeAreaView>
+  );
+}
+
+const createStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  content: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: theme.spacing[6],
+  },
+  iconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: (theme.colors.warning ?? theme.colors.error) + '15',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: theme.spacing[6],
+  },
+  title: {
+    fontSize: theme.typography.fontSize['2xl'],
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    marginBottom: theme.spacing[2],
+    textAlign: 'center',
+  },
+  description: {
+    fontSize: theme.typography.fontSize.base,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: theme.spacing[6],
+    lineHeight: 24,
+    paddingHorizontal: theme.spacing[4],
+  },
+  button: {
+    minWidth: 200,
+  },
+});

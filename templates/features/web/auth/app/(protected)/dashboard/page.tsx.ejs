@@ -1,0 +1,26 @@
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/auth/actions";
+import { DashboardClient } from "./dashboard-client";
+
+export default async function DashboardPage() {
+  const session = await getSession();
+
+  // Handle concurrent rendering - layout redirects but page may render first
+  if (!session) {
+    redirect("/auth/session-expired");
+  }
+
+  return (
+    <div className="space-y-8">
+      {/* Page Header */}
+      <div className="space-y-1">
+        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+        <p className="text-muted-foreground">
+          Welcome back, {session.user.name || session.user.email}
+        </p>
+      </div>
+
+      <DashboardClient user={session.user} />
+    </div>
+  );
+}

@@ -1,0 +1,73 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { TwoFactorSetup } from '@/components/settings/two-factor-setup';
+import { TwoFactorManage } from '@/components/settings/two-factor-manage';
+import { SetPasswordForm } from '@/components/settings/set-password-form';
+import { checkHasPassword, type User } from '@/lib/auth/actions';
+import { Loader2 } from 'lucide-react';
+
+interface SecuritySettingsProps {
+  user: User;
+}
+
+type SetupStep = 'idle' | 'checking' | 'set-password' | 'setup-2fa';
+
+export function SecuritySettings({ user }: SecuritySettingsProps) {
+  const router = useRouter();
+  const [setupStep, setSetupStep] = useState<SetupStep>('idle');
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(user.twoFactorEnabled);
+
+  const handleEnableClick = async () => {
+    setSetupStep('checking');
+    const { hasPassword } = await checkHasPassword();
+    setSetupStep(hasPassword ? 'setup-2fa' : 'set-password');
+  };
+
+  // Show loading state while checking password
+  if (setupStep === 'checking') {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // Show set password form for OAuth users
+  if (setupStep === 'set-password') {
+    return (
+      <SetPasswordForm
+        onComplete={() => setSetupStep('setup-2fa')}
+        onCancel={() => setSetupStep('idle')}
+      />
+    );
+  }
+
+  // Show 2FA setup form
+  if (setupStep === 'setup-2fa') {
+    return (
+      <TwoFactorSetup
+        onComplete={() => {
+          setSetupStep('idle');
+          setTwoFactorEnabled(true);
+          router.refresh();
+        }}
+      />
+    );
+  }
+
+  // Default: show 2FA manage (enable/disable) UI
+  return (
+    <div className="space-y-6">
+      <TwoFactorManage
+        enabled={twoFactorEnabled}
+        onSetupClick={handleEnableClick}
+        onDisabled={() => {
+          setTwoFactorEnabled(false);
+          router.refresh();
+        }}
+      />
+    </div>
+  );
+}

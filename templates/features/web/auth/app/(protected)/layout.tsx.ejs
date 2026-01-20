@@ -1,0 +1,67 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/auth/actions";
+import { ThemeToggle } from "@/components/theme-toggle";
+
+export default async function ProtectedLayout({ children }: { children: React.ReactNode }) {
+  const session = await getSession();
+
+  // CRITICAL: Use route handler to properly clear stale cookies
+  // Direct redirect("/login") doesn't clear browser cookies because Server Components
+  // can't send Set-Cookie headers. This causes infinite redirect loops when:
+  // 1. User has stale cookie
+  // 2. Backend returns 401
+  // 3. Redirect to /login
+  // 4. Proxy sees cookie, redirects back to /dashboard
+  // 5. Loop repeats
+  if (!session) {
+    redirect("/auth/session-expired");
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col bg-background">
+      {/* App Header - matching landing page style */}
+      <header className="w-full border-b bg-background/80 backdrop-blur-sm sticky top-0 z-50">
+        <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-8">
+            <Link href="/dashboard" className="text-xl font-semibold tracking-tight">
+              <%= projectName %>
+            </Link>
+            <nav className="hidden sm:flex items-center gap-6">
+              <Link
+                href="/dashboard"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Dashboard
+              </Link>
+<% if (features.sessionManagement) { %>
+              <Link
+                href="/settings/sessions"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Sessions
+              </Link>
+<% } %>
+<% if (features.authentication.twoFactor) { %>
+              <Link
+                href="/settings/security"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Security
+              </Link>
+<% } %>
+            </nav>
+          </div>
+          <ThemeToggle />
+        </div>
+      </header>
+
+      {/* Main content area */}
+      <main className="flex-1">
+        <div className="max-w-4xl mx-auto px-6 py-8">
+          {children}
+        </div>
+      </main>
+    </div>
+  );
+}

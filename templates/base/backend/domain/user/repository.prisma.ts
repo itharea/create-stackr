@@ -113,3 +113,28 @@ export const deleteUser = async (userId: string): Promise<void> => {
     });
   }
 };
+
+/**
+ * Check if user has a credential account with password
+ * Returns true if user signed up with email/password, false for OAuth-only users
+ */
+export const userHasPassword = async (userId: string): Promise<boolean> => {
+  try {
+    const credentialAccount = await db.account.findFirst({
+      where: {
+        userId,
+        providerId: 'credential',
+        password: { not: null },
+      },
+      select: { password: true },
+    });
+
+    return !!credentialAccount?.password;
+  } catch (error) {
+    throw ErrorFactory.databaseError({
+      operation: 'userHasPassword',
+      userId,
+      originalError: error instanceof Error ? error.message : String(error)
+    });
+  }
+};

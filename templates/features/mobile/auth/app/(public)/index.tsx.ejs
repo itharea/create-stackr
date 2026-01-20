@@ -13,10 +13,12 @@ import {
 import { router } from 'expo-router';
 <% if (features.sessionManagement) { %>import Constants from 'expo-constants';
 <% } %>import { LinearGradient } from 'expo-linear-gradient';
-import { Button<% if (features.sessionManagement) { %>, Input<% } %> } from '@/components/ui';
-import { IconSymbol } from '@/components/ui/IconSymbol';
-import { useAppTheme, AppTheme } from '@/context/ThemeContext';
-<% if (features.sessionManagement) { %>import { useSessionActions } from '@/store/deviceSession.store';
+import { Button } from '@/components/ui/button';
+<% if (features.sessionManagement) { %>import { Input } from '@/components/ui/input';
+<% } %>
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useAppTheme, AppTheme } from '@/context/theme-context';
+<% if (features.sessionManagement) { %>import { useSessionActions } from '@/store/device-session-store';
 <% } %>
 
 export default function LandingScreen() {

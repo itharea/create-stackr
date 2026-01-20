@@ -2,7 +2,7 @@ import type { AuthFastifyRequest } from "fastify";
 import { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { auth } from "../../../lib/auth";
 import { Type } from "@sinclair/typebox";
-import { updateUserProfile, deleteUser } from "../../../domain/user/repository";
+import { updateUserProfile, deleteUser, userHasPassword } from "../../../domain/user/repository";
 import { findUserSessionById, revokeSessionByToken } from "../../../domain/session/repository";
 
 /**
@@ -33,6 +33,38 @@ function toFetchRequest(request: FastifyRequest): Request {
 }
 
 const authRoutes: FastifyPluginAsync = async (server) => {
+  // Check if user has a credential account with password
+  // Used to determine if OAuth user needs to set password before enabling 2FA
+  server.get(
+    "/has-password",
+    { onRequest: server.requireAuth },
+    async (request, reply) => {
+      const { user } = request as AuthFastifyRequest;
+      const hasPassword = await userHasPassword(user.id);
+      return reply.send({ hasPassword });
+    }
+  );
+
+  // Set password for OAuth users (uses BetterAuth's setPassword API)
+  server.post(
+    "/set-password",
+    {
+      onRequest: server.requireAuth,
+      schema: { body: Type.Object({ newPassword: Type.String() }) },
+    },
+    async (request, reply) => {
+      const { newPassword } = request.body as { newPassword: string };
+      const fetchRequest = toFetchRequest(request);
+
+      const response = await auth.api.setPassword({
+        body: { newPassword },
+        headers: fetchRequest.headers,
+      });
+
+      return reply.send(response);
+    }
+  );
+
   // Mount BetterAuth handler for all /* routes under this plugin
   // Since this plugin is registered at /api/auth, BetterAuth handles /api/auth/*
   // BetterAuth handles: sign-in, sign-up, sign-out, oauth callbacks, etc.

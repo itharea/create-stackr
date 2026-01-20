@@ -11,9 +11,9 @@ import {
   SafeAreaView,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
-import { useAppTheme, AppTheme } from "@/context/ThemeContext";
+import { useAppTheme, AppTheme } from "@/context/theme-context";
 import { emailOtp } from "@/lib/auth-client";
-import { useAuth } from "../src/hooks";
+import { useAuth } from "../src/hooks/auth";
 
 export default function VerifyEmailScreen() {
   const { email } = useLocalSearchParams<{ email: string }>();

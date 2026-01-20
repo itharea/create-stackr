@@ -1,0 +1,19 @@
+import { getSession } from "@/lib/auth/actions";
+import { SecuritySettings } from "./security-settings";
+
+export default async function SecurityPage() {
+  // Session is guaranteed by (protected) layout - it redirects if not authenticated
+  const session = (await getSession())!;
+
+  return (
+    <div className="space-y-8">
+      <div className="space-y-1">
+        <h1 className="text-2xl font-bold tracking-tight">Security Settings</h1>
+        <p className="text-muted-foreground">
+          Manage your account security settings including two-factor authentication.
+        </p>
+      </div>
+      <SecuritySettings user={session.user} />
+    </div>
+  );
+}

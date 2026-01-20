@@ -10,7 +10,7 @@ import {
   Pressable,
   Animated,
 } from 'react-native';
-import { useAppTheme, AppTheme } from '@/context/ThemeContext';
+import { useAppTheme, AppTheme } from '@/context/theme-context';
 
 interface InputProps extends Omit<TextInputProps, 'style'> {
   label?: string;

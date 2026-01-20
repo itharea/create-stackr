@@ -29,6 +29,14 @@ export function LoginForm({ redirectTo = "/dashboard" }: LoginFormProps) {
     try {
       const result = await signIn(email, password);
 
+<% if (features.authentication.twoFactor) { %>
+      // Check if 2FA is required
+      if (result.requiresTwoFactor) {
+        router.push('/login/two-factor');
+        return;
+      }
+<% } %>
+
 <% if (features.authentication.emailVerification) { %>
       // Check if email verification is needed (can happen on success)
       if (result.needsEmailVerification) {
