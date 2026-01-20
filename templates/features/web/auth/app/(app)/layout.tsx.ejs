@@ -1,46 +1,29 @@
 import Link from "next/link";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { ProtectedRoute } from "@/components/auth/protected-route";
 
+/**
+ * Layout for regular (non-protected) app routes.
+ * For protected routes, use the (protected) route group instead.
+ */
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ProtectedRoute>
-      <div className="min-h-screen flex flex-col bg-background">
-        {/* App Header - matching landing page style */}
-        <header className="w-full border-b bg-background/80 backdrop-blur-sm sticky top-0 z-50">
-          <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
-            <div className="flex items-center gap-8">
-              <Link href="/dashboard" className="text-xl font-semibold tracking-tight">
-                <%= projectName %>
-              </Link>
-              <nav className="hidden sm:flex items-center gap-6">
-                <Link
-                  href="/dashboard"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Dashboard
-                </Link>
-<% if (features.sessionManagement) { %>
-                <Link
-                  href="/settings/sessions"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Sessions
-                </Link>
-<% } %>
-              </nav>
-            </div>
-            <ThemeToggle />
-          </div>
-        </header>
+    <div className="min-h-screen flex flex-col bg-background">
+      {/* App Header */}
+      <header className="w-full border-b bg-background/80 backdrop-blur-sm sticky top-0 z-50">
+        <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
+          <Link href="/" className="text-xl font-semibold tracking-tight">
+            <%= projectName %>
+          </Link>
+          <ThemeToggle />
+        </div>
+      </header>
 
-        {/* Main content area */}
-        <main className="flex-1">
-          <div className="max-w-4xl mx-auto px-6 py-8">
-            {children}
-          </div>
-        </main>
-      </div>
-    </ProtectedRoute>
+      {/* Main content area */}
+      <main className="flex-1">
+        <div className="max-w-4xl mx-auto px-6 py-8">
+          {children}
+        </div>
+      </main>
+    </div>
   );
 }

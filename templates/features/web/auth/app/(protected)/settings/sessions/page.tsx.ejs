@@ -1,0 +1,25 @@
+import { getSession } from "@/lib/auth/actions";
+import { listSessions } from "@/lib/auth/sessions";
+import { SessionsClient } from "./sessions-client";
+
+export default async function SessionsPage() {
+  // Session is guaranteed by (protected) layout - it redirects if not authenticated
+  const authSession = (await getSession())!;
+  const { sessions } = await listSessions();
+
+  return (
+    <div className="space-y-8">
+      <div className="space-y-1">
+        <h1 className="text-2xl font-bold tracking-tight">Active Sessions</h1>
+        <p className="text-muted-foreground">
+          Manage your active sessions across devices. You can revoke access to any session except your current one.
+        </p>
+      </div>
+
+      <SessionsClient
+        sessions={sessions}
+        currentSessionId={authSession.session.id}
+      />
+    </div>
+  );
+}

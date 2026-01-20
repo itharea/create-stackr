@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Animated, StyleSheet, Text, Pressable, Platform } from "react-native";
-import { useUI, useUIActions } from "@/store/ui.store";
+import { useUI, useUIActions } from "@/store/ui-store";
 
 const COLORS = {
   success: { bg: "#dcfce7", border: "#16a34a", text: "#166534" },

@@ -1,0 +1,253 @@
+'use client';
+
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Shield, ShieldCheck, ShieldOff, Download, Loader2, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
+import { disableTwoFactor, generateBackupCodes } from '@/lib/auth/actions';
+
+interface TwoFactorManageProps {
+  enabled: boolean;
+  onSetupClick: () => void;
+  onDisabled: () => void;
+}
+
+export function TwoFactorManage({ enabled, onSetupClick, onDisabled }: TwoFactorManageProps) {
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [disableDialogOpen, setDisableDialogOpen] = useState(false);
+  const [backupDialogOpen, setBackupDialogOpen] = useState(false);
+  const [newBackupCodes, setNewBackupCodes] = useState<string[]>([]);
+
+  const handleDisable = async () => {
+    if (!password) {
+      toast.error('Please enter your password');
+      return;
+    }
+
+    setIsLoading(true);
+    const result = await disableTwoFactor(password);
+    setIsLoading(false);
+
+    if (!result.success) {
+      toast.error(result.error || 'Failed to disable 2FA');
+      return;
+    }
+
+    toast.success('Two-factor authentication disabled');
+    setDisableDialogOpen(false);
+    setPassword('');
+    onDisabled();
+  };
+
+  const handleGenerateBackupCodes = async () => {
+    if (!password) {
+      toast.error('Please enter your password');
+      return;
+    }
+
+    setIsLoading(true);
+    const result = await generateBackupCodes(password);
+    setIsLoading(false);
+
+    if (!result.success) {
+      toast.error(result.error || 'Failed to generate backup codes');
+      return;
+    }
+
+    setNewBackupCodes(result.backupCodes || []);
+    toast.success('New backup codes generated');
+  };
+
+  const downloadBackupCodes = () => {
+    const content = `Two-Factor Authentication Backup Codes\n${'='.repeat(40)}\n\nKeep these codes safe. Each code can only be used once.\n\n${newBackupCodes.join('\n')}`;
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '2fa-backup-codes.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  if (!enabled) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            Two-Factor Authentication
+          </CardTitle>
+          <CardDescription>
+            Add an extra layer of security to your account
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <ShieldOff className="h-4 w-4" />
+              <span className="text-sm">Not enabled</span>
+            </div>
+            <Button onClick={onSetupClick}>Enable 2FA</Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <ShieldCheck className="h-5 w-5 text-green-600" />
+          Two-Factor Authentication
+        </CardTitle>
+        <CardDescription>
+          Your account is protected with two-factor authentication
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center gap-2 text-green-600">
+          <ShieldCheck className="h-4 w-4" />
+          <span className="text-sm font-medium">Enabled</span>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {/* Generate new backup codes */}
+          <Dialog open={backupDialogOpen} onOpenChange={setBackupDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm">
+                <RefreshCw className="mr-2 h-4 w-4" />
+                New Backup Codes
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Generate New Backup Codes</DialogTitle>
+                <DialogDescription>
+                  This will invalidate your existing backup codes and generate new ones.
+                </DialogDescription>
+              </DialogHeader>
+
+              {newBackupCodes.length === 0 ? (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="backup-password">Confirm your password</Label>
+                    <Input
+                      id="backup-password"
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Enter your password"
+                    />
+                  </div>
+                  <Button onClick={handleGenerateBackupCodes} disabled={isLoading} className="w-full">
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      'Generate New Codes'
+                    )}
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="rounded-lg border bg-muted/50 p-4">
+                    <div className="grid grid-cols-2 gap-2">
+                      {newBackupCodes.map((code, i) => (
+                        <code
+                          key={i}
+                          className="rounded bg-background px-2 py-1 text-center text-sm font-mono"
+                        >
+                          {code}
+                        </code>
+                      ))}
+                    </div>
+                  </div>
+                  <Button onClick={downloadBackupCodes} className="w-full">
+                    <Download className="mr-2 h-4 w-4" />
+                    Download Backup Codes
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setBackupDialogOpen(false);
+                      setNewBackupCodes([]);
+                      setPassword('');
+                    }}
+                    className="w-full"
+                  >
+                    Done
+                  </Button>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
+
+          {/* Disable 2FA */}
+          <Dialog open={disableDialogOpen} onOpenChange={setDisableDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
+                <ShieldOff className="mr-2 h-4 w-4" />
+                Disable 2FA
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Disable Two-Factor Authentication</DialogTitle>
+                <DialogDescription>
+                  This will make your account less secure. Are you sure you want to disable 2FA?
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2">
+                <Label htmlFor="disable-password">Confirm your password</Label>
+                <Input
+                  id="disable-password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setDisableDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button variant="destructive" onClick={handleDisable} disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Disabling...
+                    </>
+                  ) : (
+                    'Disable 2FA'
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

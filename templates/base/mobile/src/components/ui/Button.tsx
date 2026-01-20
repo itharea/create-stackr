@@ -9,12 +9,12 @@ import {
   PressableProps,
   Animated,
 } from 'react-native';
-import { useAppTheme, AppTheme } from '@/context/ThemeContext';
+import { useAppTheme, AppTheme } from '@/context/theme-context';
 
 interface ButtonProps extends Omit<PressableProps, 'style'> {
   title: string;
   loading?: boolean;
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive';
   size?: 'small' | 'medium' | 'large';
   fullWidth?: boolean;
   style?: ViewStyle;
@@ -79,7 +79,7 @@ export const Button: React.FC<ButtonProps> = ({
         {loading ? (
           <ActivityIndicator
             size="small"
-            color={variant === 'primary' ? theme.colors.textInverse : theme.colors.primary}
+            color={variant === 'primary' || variant === 'destructive' ? theme.colors.textInverse : theme.colors.primary}
           />
         ) : (
           <Text style={[
@@ -109,6 +109,7 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
   secondary: { backgroundColor: theme.colors.backgroundSecondary },
   outline: { backgroundColor: 'transparent', borderColor: theme.colors.borderStrong },
   ghost: { backgroundColor: 'transparent' },
+  destructive: { backgroundColor: theme.colors.error, borderColor: theme.colors.error },
 
   small: { paddingHorizontal: theme.spacing[3], paddingVertical: theme.spacing[2], minHeight: 36 },
   medium: { paddingHorizontal: theme.spacing[4], paddingVertical: theme.spacing[3], minHeight: 48 },
@@ -122,6 +123,7 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
   secondaryText: { color: theme.colors.text },
   outlineText: { color: theme.colors.text },
   ghostText: { color: theme.colors.primary },
+  destructiveText: { color: theme.colors.textInverse },
 
   smallText: { fontSize: theme.typography.fontSize.sm },
   mediumText: { fontSize: theme.typography.fontSize.base },

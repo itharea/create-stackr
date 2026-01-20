@@ -1,7 +1,9 @@
 import { FastifyPluginAsync } from 'fastify';
 import crypto from 'crypto';
+
 import { oauthStore, isRedisAvailable, isUsingMemoryFallback } from '../../../utils/redis';
 import { auth } from '../../../lib/auth';
+
 import { BETTER_AUTH_COOKIE_NAME } from '../../../lib/constants';
 import { Type } from '@sinclair/typebox';
 
@@ -342,6 +344,10 @@ const oauthWebRoutes: FastifyPluginAsync = async (server) => {
       }
 
       // PKCE verified! Return session token
+      // Note: We trust OAuth providers for 2FA - they typically handle 2FA themselves.
+      // Better Auth by design doesn't support 2FA for OAuth: "Two Factor can only be
+      // enabled for credential accounts. For social accounts, it's assumed the provider
+      // already handles 2FA."
       server.log.info('Token exchange successful');
       return reply.send({ session_token: exchangeData.session_token });
     }

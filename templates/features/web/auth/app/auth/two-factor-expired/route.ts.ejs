@@ -1,0 +1,22 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { COOKIE_NAMES } from '@/lib/auth/config';
+
+/**
+ * Route handler for 2FA session expiration
+ * Clears all 2FA-related cookies and redirects to login with error message
+ */
+export async function GET(request: NextRequest) {
+  const loginUrl = new URL('/login', request.url);
+  loginUrl.searchParams.set('error', 'two_factor_expired');
+
+  const response = NextResponse.redirect(loginUrl);
+
+  // Clear 2FA cookies
+  response.cookies.delete(COOKIE_NAMES.TWO_FACTOR);
+  response.cookies.delete(COOKIE_NAMES.TWO_FACTOR_EXPIRES_AT);
+
+  // Clear session cookie (the temporary 2FA session is no longer valid)
+  response.cookies.delete(COOKIE_NAMES.SESSION);
+
+  return response;
+}

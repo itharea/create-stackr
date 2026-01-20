@@ -3,7 +3,7 @@
 import { useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/hooks/use-session";
-import { getSession } from "@/lib/auth/actions";
+import { getSession, signOut } from "@/lib/auth/actions";
 import { toast } from "sonner";
 import { useAuthActions, useAuthStore } from "@/store/auth.store";
 
@@ -54,7 +54,9 @@ export function ProtectedRoute({
 
     const session = await getSession();
     if (!session) {
-      // Session expired on backend - update UI state
+      // Session expired on backend - call signOut to properly clear cookie via Server Action
+      // This ensures the browser gets the Set-Cookie header to clear the cookie
+      await signOut();
       handleAuthError();
     }
   }, [isAuthenticated, handleAuthError]);

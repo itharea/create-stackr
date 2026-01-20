@@ -1,0 +1,56 @@
+import { View, StyleSheet } from 'react-native';
+import { useAuth } from '../../hooks/auth';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
+
+interface ProtectedScreenProps {
+  children: React.ReactNode;
+}
+
+/**
+ * Client-side screen protection component for mobile
+ *
+ * Wraps content that should only be visible to authenticated<% if (features.authentication.emailVerification) { %> and verified<% } %> users.
+ * Does NOT redirect - the root layout handles all navigation.
+ * This component just prevents rendering protected content until auth state is verified.
+ *
+ * @example
+ * ```tsx
+ * <ProtectedScreen>
+ *   <DashboardContent />
+ * </ProtectedScreen>
+ * ```
+ */
+export function ProtectedScreen({ children }: ProtectedScreenProps) {
+  const { isAuthenticated, isPending<% if (features.authentication.emailVerification) { %>, user<% } %> } = useAuth();
+
+  // Show loading state while checking auth
+  if (isPending) {
+    return (
+      <View style={styles.container}>
+        <LoadingSpinner size="large" />
+      </View>
+    );
+  }
+
+  // Don't render content if not authenticated
+  if (!isAuthenticated) {
+    return null;
+  }
+
+<% if (features.authentication.emailVerification) { %>
+  // Don't render content if email is not verified
+  if (user && user.emailVerified === false) {
+    return null;
+  }
+
+<% } %>
+  return <>{children}</>;
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});

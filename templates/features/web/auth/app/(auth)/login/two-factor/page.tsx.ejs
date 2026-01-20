@@ -1,0 +1,24 @@
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { TwoFactorVerify } from '@/components/auth/two-factor-verify';
+import { COOKIE_NAMES } from '@/lib/auth/config';
+
+export default async function TwoFactorPage() {
+  const cookieStore = await cookies();
+  const twoFactorToken = cookieStore.get(COOKIE_NAMES.TWO_FACTOR)?.value;
+  const expiresAtStr = cookieStore.get(COOKIE_NAMES.TWO_FACTOR_EXPIRES_AT)?.value;
+  const expiresAt = expiresAtStr ? parseInt(expiresAtStr, 10) : null;
+
+  // Redirect to expiration handler if no 2FA token
+  if (!twoFactorToken) {
+    redirect('/auth/two-factor-expired');
+  }
+
+  // Redirect if already expired
+  const now = Math.floor(Date.now() / 1000);
+  if (expiresAt && expiresAt <= now) {
+    redirect('/auth/two-factor-expired');
+  }
+
+  return <TwoFactorVerify expiresAt={expiresAt} />;
+}

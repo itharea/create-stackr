@@ -3,6 +3,9 @@ import { expoClient } from "@better-auth/expo/client";
 <% if (features.authentication.emailVerification) { %>
 import { emailOTPClient } from "better-auth/client/plugins";
 <% } %>
+<% if (features.authentication.twoFactor) { %>
+import { twoFactorClient } from "better-auth/client/plugins";
+<% } %>
 import * as SecureStore from "expo-secure-store";
 import Constants from "expo-constants";
 
@@ -31,6 +34,9 @@ export const authClient = createAuthClient({
 <% if (features.authentication.emailVerification) { %>
     emailOTPClient(),
 <% } %>
+<% if (features.authentication.twoFactor) { %>
+    twoFactorClient(),
+<% } %>
   ],
 });
 
@@ -43,6 +49,9 @@ export const {
   getSession,
 <% if (features.authentication.emailVerification) { %>
   emailOtp,
+<% } %>
+<% if (features.authentication.twoFactor) { %>
+  twoFactor,
 <% } %>
 } = authClient;
 

@@ -7,13 +7,13 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { IconSymbol } from '../src/components/ui/IconSymbol';
-import { Theme } from '@/constants/Theme';
+import { IconSymbol } from '../src/components/ui/icon-symbol';
+import { Theme } from '@/constants/theme';
 import { router, Stack } from 'expo-router';
-import { useRevenueCat, useRevenueCatActions } from '../src/store/revenuecat.store';
+import { useRevenueCat, useRevenueCatActions } from '../src/store/revenuecat-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logger } from '../src/utils/logger';
-import OnboardingLayout from '../src/components/ui/OnboardingLayout';
+import OnboardingLayout from '../src/components/ui/onboarding-layout';
 import { responsive, fontSize, getSpacing } from '@/utils/responsive';
 
 interface PlanOption {

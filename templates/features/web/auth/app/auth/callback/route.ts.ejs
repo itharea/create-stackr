@@ -93,7 +93,11 @@ export async function GET(request: NextRequest) {
       return response;
     }
 
-    const { session_token } = await exchangeResponse.json();
+    const data = await exchangeResponse.json();
+
+    // Note: We trust OAuth providers for 2FA - they typically handle 2FA themselves.
+    // Better Auth by design doesn't support 2FA for OAuth users.
+    const { session_token } = data;
 
     // Success! Create response with session cookie and redirect to dashboard
     const response = NextResponse.redirect(new URL('/dashboard', baseUrl));

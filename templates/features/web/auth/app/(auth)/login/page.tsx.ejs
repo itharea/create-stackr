@@ -8,9 +8,21 @@ interface LoginPageProps {
   }>;
 }
 
+// Map error codes to user-friendly messages
+const errorMessages: Record<string, string> = {
+  session_expired: 'Your session has expired. Please sign in again.',
+  two_factor_expired: 'Two-factor verification timed out. Please sign in again.',
+  oauth_error: 'OAuth authentication failed. Please try again.',
+};
+
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
   const { redirect, error } = params;
+
+  // Get error message from mapping or decode the error
+  const errorMessage = error
+    ? (errorMessages[error] || decodeURIComponent(error))
+    : null;
 
   return (
     <div className="space-y-6">
@@ -21,9 +33,13 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         </p>
       </div>
 
-      {error && (
-        <div className="p-3 text-sm text-red-500 bg-red-50 dark:bg-red-950/20 rounded-md">
-          {decodeURIComponent(error)}
+      {errorMessage && (
+        <div className={`p-3 text-sm rounded-md ${
+          error === 'session_expired' || error === 'two_factor_expired'
+            ? 'text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-950/20'
+            : 'text-red-500 bg-red-50 dark:bg-red-950/20'
+        }`}>
+          {errorMessage}
         </div>
       )}
 

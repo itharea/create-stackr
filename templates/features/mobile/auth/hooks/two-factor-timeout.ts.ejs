@@ -1,0 +1,56 @@
+import { useEffect, useCallback } from 'react';
+import { useRouter } from 'expo-router';
+import { useAuth } from './auth';
+
+/**
+ * Hook for managing 2FA session timeout
+ *
+ * - Automatically redirects to expired screen when timeout occurs
+ * - Provides `isExpired()` check for pre-submission validation
+ * - Uses absolute Unix timestamps (not relative durations)
+ */
+export function useTwoFactorTimeout() {
+  const router = useRouter();
+  const { twoFactorExpiresAt, clearTwoFactorState } = useAuth();
+
+  const handleExpiration = useCallback(async () => {
+    await clearTwoFactorState();
+    router.replace('/(auth)/two-factor-expired');
+  }, [clearTwoFactorState, router]);
+
+  useEffect(() => {
+    if (!twoFactorExpiresAt) return;
+
+    const now = Math.floor(Date.now() / 1000);
+    const remainingMs = (twoFactorExpiresAt - now) * 1000;
+
+    // Already expired
+    if (remainingMs <= 0) {
+      handleExpiration();
+      return;
+    }
+
+    // Schedule redirect at exact expiration time
+    const timeout = setTimeout(handleExpiration, remainingMs);
+    return () => clearTimeout(timeout);
+  }, [twoFactorExpiresAt, handleExpiration]);
+
+  // Utility to check expiration before submission
+  const isExpired = useCallback((): boolean => {
+    if (!twoFactorExpiresAt) return true;
+    return Math.floor(Date.now() / 1000) >= twoFactorExpiresAt;
+  }, [twoFactorExpiresAt]);
+
+  // Calculate remaining time for UI display (optional)
+  const getRemainingSeconds = useCallback((): number => {
+    if (!twoFactorExpiresAt) return 0;
+    const remaining = twoFactorExpiresAt - Math.floor(Date.now() / 1000);
+    return Math.max(0, remaining);
+  }, [twoFactorExpiresAt]);
+
+  return {
+    isExpired,
+    twoFactorExpiresAt,
+    getRemainingSeconds,
+  };
+}

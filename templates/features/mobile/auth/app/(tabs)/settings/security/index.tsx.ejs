@@ -1,0 +1,147 @@
+import React, { useState, useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useAuth } from '../../../../src/hooks/auth';
+import { Button } from '../../../../src/components/ui/button';
+import { IconSymbol } from '../../../../src/components/ui/icon-symbol';
+import { useAppTheme, AppTheme } from '@/context/theme-context';
+
+type FlowStep = 'idle' | 'checking' | 'set-password' | 'setup-2fa';
+
+export default function SecuritySettingsScreen() {
+  const router = useRouter();
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  const { user, checkHasPassword } = useAuth();
+
+  const [flowStep, setFlowStep] = useState<FlowStep>('idle');
+
+  const twoFactorEnabled = user?.twoFactorEnabled ?? false;
+
+  // Refresh state when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      setFlowStep('idle');
+    }, [])
+  );
+
+  const handleEnableTwoFactor = async () => {
+    setFlowStep('checking');
+    const hasPassword = await checkHasPassword();
+
+    if (!hasPassword) {
+      // OAuth user without password - must set one first
+      setFlowStep('set-password');
+      router.push('/(tabs)/settings/security/set-password');
+    } else {
+      setFlowStep('setup-2fa');
+      router.push('/(tabs)/settings/security/two-factor-setup');
+    }
+  };
+
+  const handleManageTwoFactor = () => {
+    router.push('/(tabs)/settings/security/two-factor-manage');
+  };
+
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+      <View style={styles.card}>
+        <View style={[
+          styles.iconContainer,
+          { backgroundColor: twoFactorEnabled
+            ? (theme.mode === 'dark' ? 'rgba(74, 222, 128, 0.15)' : 'rgba(34, 197, 94, 0.1)')
+            : (theme.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)')
+          }
+        ]}>
+          {twoFactorEnabled ? (
+            <IconSymbol name="checkmark.shield.fill" size={28} color={theme.colors.success ?? theme.colors.primary} />
+          ) : (
+            <IconSymbol name="shield.slash.fill" size={28} color={theme.colors.textSecondary} />
+          )}
+        </View>
+
+        <Text style={styles.cardTitle}>Two-Factor Authentication</Text>
+
+        <Text style={styles.cardDescription}>
+          {twoFactorEnabled
+            ? 'Your account is protected with two-factor authentication.'
+            : 'Add an extra layer of security to your account by requiring a verification code in addition to your password.'}
+        </Text>
+
+        {twoFactorEnabled ? (
+          <Button
+            onPress={handleManageTwoFactor}
+            title="Manage 2FA"
+            fullWidth
+          />
+        ) : (
+          <Button
+            onPress={handleEnableTwoFactor}
+            title="Enable 2FA"
+            loading={flowStep === 'checking'}
+            fullWidth
+          />
+        )}
+      </View>
+
+      <View style={styles.noteContainer}>
+        <IconSymbol name="info.circle.fill" size={16} color={theme.colors.textMuted} />
+        <Text style={styles.note}>
+          Two-factor authentication only applies when signing in with email and password. OAuth providers handle their own security.
+        </Text>
+      </View>
+    </ScrollView>
+  );
+}
+
+const createStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  scrollContent: {
+    padding: theme.spacing[5],
+  },
+  card: {
+    padding: theme.spacing[6],
+    borderRadius: 20,
+    backgroundColor: theme.colors.backgroundSecondary,
+    marginBottom: theme.spacing[4],
+    alignItems: 'center',
+    ...theme.shadows.small,
+  },
+  iconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: theme.spacing[4],
+  },
+  cardTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: theme.colors.text,
+    marginBottom: theme.spacing[2],
+    textAlign: 'center',
+  },
+  cardDescription: {
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.textSecondary,
+    lineHeight: 22,
+    marginBottom: theme.spacing[5],
+    textAlign: 'center',
+  },
+  noteContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: theme.spacing[2],
+    gap: theme.spacing[2],
+  },
+  note: {
+    flex: 1,
+    fontSize: theme.typography.fontSize.xs,
+    color: theme.colors.textMuted,
+    lineHeight: 18,
+  },
+});

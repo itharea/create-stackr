@@ -20,10 +20,16 @@ model User {
   image         String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+<% if (features.authentication.twoFactor) { %>
+  twoFactorEnabled Boolean @default(false)
+<% } %>
 
   // BetterAuth relations
   sessions      Session[]
   accounts      Account[]
+<% if (features.authentication.twoFactor) { %>
+  twoFactor     TwoFactor[]
+<% } %>
 
   // Device session migration relation
   deviceSessions DeviceSession[]
@@ -100,3 +106,17 @@ model DeviceSession {
 
   @@map("device_session")
 }
+
+<% if (features.authentication.twoFactor) { %>
+// BetterAuth TwoFactor model
+model TwoFactor {
+  id          String  @id @default(cuid())
+  userId      String
+  secret      String?
+  backupCodes String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("two_factor")
+}
+<% } %>

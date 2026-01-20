@@ -21,12 +21,22 @@ const protectedRoutes = ["/dashboard", "/settings", "/profile"];
 // Routes that should redirect to dashboard if already authenticated
 const authRoutes = ["/login", "/register", "/forgot-password"];
 
-// Routes that are always public
-const publicRoutes = ["/", "/auth/callback", "/reset-password", "/verify-email"];
+// Routes that are always public (including 2FA verification which needs session but shouldn't redirect)
+const publicRoutes = ["/", "/auth/callback", "/auth/session-expired", "/reset-password", "/verify-email"<% if (features.authentication.twoFactor) { %>, "/login/two-factor", "/auth/two-factor-expired"<% } %>];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const sessionToken = request.cookies.get(COOKIE_NAMES.SESSION)?.value;
+
+  // Check if current path matches any public routes (these always pass through)
+  const isPublicRoute = publicRoutes.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`)
+  );
+
+  // Public routes always pass through
+  if (isPublicRoute) {
+    return NextResponse.next();
+  }
 
   // Check if current path matches any protected routes
   const isProtectedRoute = protectedRoutes.some(

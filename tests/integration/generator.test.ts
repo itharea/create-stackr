@@ -174,10 +174,10 @@ describe('ProjectGenerator', () => {
 
     // Verify integration service files exist
     expect(
-      await fs.pathExists(path.join(projectDir, 'mobile/src/services/revenuecatService.ts'))
+      await fs.pathExists(path.join(projectDir, 'mobile/src/services/revenuecat-service.ts'))
     ).toBe(true);
     expect(
-      await fs.pathExists(path.join(projectDir, 'mobile/src/services/adjustService.ts'))
+      await fs.pathExists(path.join(projectDir, 'mobile/src/services/adjust-service.ts'))
     ).toBe(true);
   });
 

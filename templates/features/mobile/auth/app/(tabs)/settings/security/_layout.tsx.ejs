@@ -1,0 +1,35 @@
+import { Stack, useRouter } from 'expo-router';
+import { TouchableOpacity } from 'react-native';
+import { useAppTheme } from '@/context/theme-context';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+
+export default function SecurityLayout() {
+  const theme = useAppTheme();
+  const router = useRouter();
+
+  const BackButton = () => (
+    <TouchableOpacity
+      onPress={() => router.back()}
+      style={{ marginRight: 16 }}
+    >
+      <IconSymbol name="chevron.left" size={24} color={theme.colors.text} />
+    </TouchableOpacity>
+  );
+
+  return (
+    <Stack
+      screenOptions={{
+        headerStyle: { backgroundColor: theme.colors.background },
+        headerTintColor: theme.colors.text,
+        headerShadowVisible: false,
+        headerBackTitleVisible: false,
+        headerLeft: () => <BackButton />,
+      }}
+    >
+      <Stack.Screen name="index" options={{ title: 'Security' }} />
+      <Stack.Screen name="two-factor-setup" options={{ title: 'Enable 2FA' }} />
+      <Stack.Screen name="two-factor-manage" options={{ title: 'Manage 2FA' }} />
+      <Stack.Screen name="set-password" options={{ title: 'Set Password' }} />
+    </Stack>
+  );
+}

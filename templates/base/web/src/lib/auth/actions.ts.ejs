@@ -5,8 +5,13 @@ import {
   getSessionToken,
   clearSessionCookie,
   getDeviceSessionToken,
+<% if (features.authentication.twoFactor) { %>
+  setTwoFactorCookie,
+  getTwoFactorToken,
+  clearTwoFactorCookie,
+<% } %>
 } from './cookies';
-import { AUTH_CONFIG, BETTER_AUTH_COOKIE_NAME } from './config';
+import { AUTH_CONFIG, BETTER_AUTH_COOKIE_NAME<% if (features.authentication.twoFactor) { %>, BETTER_AUTH_TWO_FACTOR_COOKIE_NAME, COOKIE_NAMES<% } %> } from './config';
 
 // Types
 export interface User {
@@ -17,6 +22,9 @@ export interface User {
   image: string | null;
   createdAt: string;
   updatedAt: string;
+<% if (features.authentication.twoFactor) { %>
+  twoFactorEnabled: boolean;
+<% } %>
 }
 
 export interface Session {
@@ -42,6 +50,9 @@ interface SignInResult {
 <% if (features.authentication.emailVerification) { %>
   needsEmailVerification?: boolean;
 <% } %>
+<% if (features.authentication.twoFactor) { %>
+  requiresTwoFactor?: boolean;
+<% } %>
 }
 
 interface SignUpResult {
@@ -51,6 +62,21 @@ interface SignUpResult {
   needsEmailVerification?: boolean;
 <% } %>
 }
+
+<% if (features.authentication.twoFactor) { %>
+interface EnableTwoFactorResult {
+  success: boolean;
+  error?: string;
+  totpURI?: string;
+  backupCodes?: string[];
+}
+
+interface VerifyTotpResult {
+  success: boolean;
+  error?: string;
+  session?: AuthSession;
+}
+<% } %>
 
 /**
  * Build headers for Fastify requests
@@ -65,9 +91,24 @@ export async function buildAuthHeaders(): Promise<HeadersInit> {
     'Origin': AUTH_CONFIG.appUrl,
   };
 
+  // Build cookie header with all auth-related cookies
+  const cookieParts: string[] = [];
+
   const sessionToken = await getSessionToken();
   if (sessionToken) {
-    headers['Cookie'] = `${BETTER_AUTH_COOKIE_NAME}=${sessionToken}`;
+    cookieParts.push(`${BETTER_AUTH_COOKIE_NAME}=${sessionToken}`);
+  }
+
+<% if (features.authentication.twoFactor) { %>
+  // Include two-factor cookie if present (needed for 2FA verification)
+  const twoFactorToken = await getTwoFactorToken();
+  if (twoFactorToken) {
+    cookieParts.push(`${BETTER_AUTH_TWO_FACTOR_COOKIE_NAME}=${twoFactorToken}`);
+  }
+<% } %>
+
+  if (cookieParts.length > 0) {
+    headers['Cookie'] = cookieParts.join('; ');
   }
 
   const deviceToken = await getDeviceSessionToken();
@@ -90,11 +131,31 @@ export async function signIn(email: string, password: string): Promise<SignInRes
       cache: 'no-store',
     });
 
+    const data = await response.json().catch(() => ({}));
+
+<% if (features.authentication.twoFactor) { %>
+    // Check if 2FA is required (Better Auth returns twoFactorRedirect: true)
+    if (data.twoFactorRedirect) {
+      // Extract and store temporary 2FA session token
+      const sessionToken = extractSessionToken(response);
+      if (sessionToken) {
+        await setSessionCookie(sessionToken);
+      }
+
+      // Extract and store the two-factor cookie with expiration (required for TOTP verification)
+      const { token: twoFactorToken, expiresAt } = extractTwoFactorTokenAndExpiration(response);
+      if (twoFactorToken && expiresAt) {
+        await setTwoFactorCookie(twoFactorToken, expiresAt);
+      }
+
+      return { success: true, requiresTwoFactor: true };
+    }
+<% } %>
+
     if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
       return {
         success: false,
-        error: error.message || 'Invalid email or password',
+        error: data.message || 'Invalid email or password',
       };
     }
 
@@ -226,8 +287,10 @@ export async function getSession(): Promise<AuthSession | null> {
     });
 
     if (!response.ok) {
-      // Session invalid, clear cookie
-      await clearSessionCookie();
+      // Don't try to clear cookie here - it doesn't work in Server Components
+      // Server Components can't send Set-Cookie headers when using redirect()
+      // The protected layout redirects to /auth/session-expired which is a
+      // Route Handler that properly clears the cookie
       return null;
     }
 
@@ -351,6 +414,235 @@ export async function verifyEmailOtp(email: string, otp: string): Promise<{
 }
 <% } %>
 
+<% if (features.authentication.twoFactor) { %>
+/**
+ * Enable two-factor authentication
+ * Returns TOTP URI for QR code and backup codes
+ */
+export async function enableTwoFactor(password: string): Promise<EnableTwoFactorResult> {
+  try {
+    const response = await fetch(`${AUTH_CONFIG.backendUrl}/api/auth/two-factor/enable`, {
+      method: 'POST',
+      headers: await buildAuthHeaders(),
+      body: JSON.stringify({ password }),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      return { success: false, error: error.message || 'Failed to enable 2FA' };
+    }
+
+    const data = await response.json();
+    return {
+      success: true,
+      totpURI: data.totpURI,
+      backupCodes: data.backupCodes,
+    };
+  } catch (error) {
+    console.error('Enable 2FA error:', error);
+    return { success: false, error: 'An error occurred' };
+  }
+}
+
+/**
+ * Verify TOTP code during 2FA setup (activates 2FA)
+ */
+export async function verifyTotpSetup(code: string): Promise<VerifyTotpResult> {
+  try {
+    const response = await fetch(`${AUTH_CONFIG.backendUrl}/api/auth/two-factor/verify-totp`, {
+      method: 'POST',
+      headers: await buildAuthHeaders(),
+      body: JSON.stringify({ code }),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      return { success: false, error: error.message || 'Invalid verification code' };
+    }
+
+    // Extract and set session token after successful 2FA setup
+    const sessionToken = extractSessionToken(response);
+    if (sessionToken) {
+      await setSessionCookie(sessionToken);
+    }
+
+    const session = await getSession();
+    return { success: true, session: session || undefined };
+  } catch (error) {
+    console.error('Verify TOTP setup error:', error);
+    return { success: false, error: 'An error occurred' };
+  }
+}
+
+/**
+ * Verify TOTP code during login (2FA challenge)
+ */
+export async function verifyTotpLogin(code: string, trustDevice?: boolean): Promise<VerifyTotpResult> {
+  try {
+    const response = await fetch(`${AUTH_CONFIG.backendUrl}/api/auth/two-factor/verify-totp`, {
+      method: 'POST',
+      headers: await buildAuthHeaders(),
+      body: JSON.stringify({ code, trustDevice }),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      return { success: false, error: error.message || 'Invalid verification code' };
+    }
+
+    // Extract and set session token after successful 2FA
+    const sessionToken = extractSessionToken(response);
+    if (sessionToken) {
+      await setSessionCookie(sessionToken);
+    }
+
+    // Clear 2FA cookies after successful verification
+    await clearTwoFactorCookie();
+
+    const session = await getSession();
+    return { success: true, session: session || undefined };
+  } catch (error) {
+    console.error('Verify TOTP login error:', error);
+    return { success: false, error: 'An error occurred' };
+  }
+}
+
+/**
+ * Disable two-factor authentication
+ */
+export async function disableTwoFactor(password: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const response = await fetch(`${AUTH_CONFIG.backendUrl}/api/auth/two-factor/disable`, {
+      method: 'POST',
+      headers: await buildAuthHeaders(),
+      body: JSON.stringify({ password }),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      return { success: false, error: error.message || 'Failed to disable 2FA' };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Disable 2FA error:', error);
+    return { success: false, error: 'An error occurred' };
+  }
+}
+
+/**
+ * Generate new backup codes
+ */
+export async function generateBackupCodes(password: string): Promise<{ success: boolean; error?: string; backupCodes?: string[] }> {
+  try {
+    const response = await fetch(`${AUTH_CONFIG.backendUrl}/api/auth/two-factor/generate-backup-codes`, {
+      method: 'POST',
+      headers: await buildAuthHeaders(),
+      body: JSON.stringify({ password }),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      return { success: false, error: error.message || 'Failed to generate backup codes' };
+    }
+
+    const data = await response.json();
+    return { success: true, backupCodes: data.backupCodes };
+  } catch (error) {
+    console.error('Generate backup codes error:', error);
+    return { success: false, error: 'An error occurred' };
+  }
+}
+
+/**
+ * Verify backup code during login
+ */
+export async function verifyBackupCode(code: string): Promise<VerifyTotpResult> {
+  try {
+    const response = await fetch(`${AUTH_CONFIG.backendUrl}/api/auth/two-factor/verify-backup-code`, {
+      method: 'POST',
+      headers: await buildAuthHeaders(),
+      body: JSON.stringify({ code }),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      return { success: false, error: error.message || 'Invalid backup code' };
+    }
+
+    const sessionToken = extractSessionToken(response);
+    if (sessionToken) {
+      await setSessionCookie(sessionToken);
+    }
+
+    // Clear 2FA cookies after successful verification
+    await clearTwoFactorCookie();
+
+    const session = await getSession();
+    return { success: true, session: session || undefined };
+  } catch (error) {
+    console.error('Verify backup code error:', error);
+    return { success: false, error: 'An error occurred' };
+  }
+}
+
+/**
+ * Check if user has a password (credential account)
+ * Used to determine if OAuth user needs to set password before enabling 2FA
+ */
+export async function checkHasPassword(): Promise<{ hasPassword: boolean }> {
+  try {
+    const response = await fetch(`${AUTH_CONFIG.backendUrl}/api/auth/has-password`, {
+      method: 'GET',
+      headers: await buildAuthHeaders(),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      return { hasPassword: false };
+    }
+
+    return response.json();
+  } catch (error) {
+    console.error('Check has password error:', error);
+    return { hasPassword: false };
+  }
+}
+
+/**
+ * Set initial password for OAuth users
+ * Allows OAuth users to add a password to their account for 2FA
+ */
+export async function setInitialPassword(
+  newPassword: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const response = await fetch(`${AUTH_CONFIG.backendUrl}/api/auth/set-password`, {
+      method: 'POST',
+      headers: await buildAuthHeaders(),
+      body: JSON.stringify({ newPassword }),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      return { success: false, error: error.message || 'Failed to set password' };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Set initial password error:', error);
+    return { success: false, error: 'An error occurred' };
+  }
+}
+<% } %>
+
 /**
  * Extract session token from Set-Cookie header
  *
@@ -384,3 +676,82 @@ function extractSessionToken(response: Response): string | null {
 
   return null;
 }
+<% if (features.authentication.twoFactor) { %>
+
+/**
+ * Extract two-factor token and expiration from Set-Cookie header
+ * Used during 2FA verification flow
+ *
+ * Extracts the absolute Expires attribute to avoid time delta issues between
+ * backend and frontend.
+ */
+function extractTwoFactorTokenAndExpiration(response: Response): {
+  token: string | null;
+  expiresAt: number | null; // Absolute Unix timestamp (seconds)
+} {
+  const setCookies = response.headers.getSetCookie?.() ?? [];
+  let token: string | null = null;
+  let expiresAt: number | null = null;
+
+  /**
+   * Parse expiration from a cookie string.
+   * Handles both Expires (absolute) and Max-Age (relative) attributes.
+   *
+   * IMPORTANT: We subtract a safety buffer when using Max-Age to account for
+   * the time delta between when the backend created the cookie (t_0) and when
+   * we process it (t_1). This ensures our cookie expires BEFORE the backend's,
+   * preventing edge cases where we think we have a valid token but the backend
+   * has already expired it.
+   */
+  const SAFETY_BUFFER_SECONDS = 5;
+
+  const parseExpiration = (cookie: string): number | null => {
+    // Try Expires first (absolute timestamp) - no buffer needed since it's absolute
+    const expiresMatch = cookie.match(/Expires=([^;]+)/i);
+    if (expiresMatch) {
+      const parsedDate = new Date(expiresMatch[1]);
+      if (!isNaN(parsedDate.getTime())) {
+        return Math.floor(parsedDate.getTime() / 1000);
+      }
+    }
+
+    // Fall back to Max-Age (relative seconds from now)
+    // Subtract safety buffer to ensure we expire before the backend
+    const maxAgeMatch = cookie.match(/Max-Age=(\d+)/i);
+    if (maxAgeMatch) {
+      const maxAgeSeconds = parseInt(maxAgeMatch[1], 10);
+      return Math.floor(Date.now() / 1000) + maxAgeSeconds - SAFETY_BUFFER_SECONDS;
+    }
+
+    return null;
+  };
+
+  if (setCookies.length === 0) {
+    const setCookieHeader = response.headers.get('set-cookie');
+    if (!setCookieHeader) return { token: null, expiresAt: null };
+
+    const tokenMatch = setCookieHeader.match(
+      new RegExp(`${BETTER_AUTH_TWO_FACTOR_COOKIE_NAME}=([^;]+)`)
+    );
+    token = tokenMatch ? tokenMatch[1] : null;
+
+    if (token) {
+      expiresAt = parseExpiration(setCookieHeader);
+    }
+    return { token, expiresAt };
+  }
+
+  for (const cookie of setCookies) {
+    const tokenMatch = cookie.match(
+      new RegExp(`${BETTER_AUTH_TWO_FACTOR_COOKIE_NAME}=([^;]+)`)
+    );
+    if (tokenMatch) {
+      token = tokenMatch[1];
+      expiresAt = parseExpiration(cookie);
+      break;
+    }
+  }
+
+  return { token, expiresAt };
+}
+<% } %>

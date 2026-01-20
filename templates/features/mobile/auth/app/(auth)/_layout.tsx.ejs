@@ -11,6 +11,13 @@ export default function AuthLayout() {
     >
       <Stack.Screen name="login" />
       <Stack.Screen name="register" />
+      <Stack.Screen name="two-factor" />
+      <Stack.Screen
+        name="two-factor-expired"
+        options={{
+          gestureEnabled: false,
+        }}
+      />
     </Stack>
   );
 }

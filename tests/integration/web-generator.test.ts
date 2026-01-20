@@ -372,8 +372,8 @@ describe('Integration: Web Template Generation', () => {
       expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(auth)/forgot-password/page.tsx'))).toBe(true);
       expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(auth)/reset-password/page.tsx'))).toBe(true);
 
-      // Verify dashboard
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(app)/dashboard/page.tsx'))).toBe(true);
+      // Verify protected routes (dashboard now in (protected) route group)
+      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(protected)/dashboard/page.tsx'))).toBe(true);
     });
 
     it('should generate OAuth components when OAuth providers enabled', async () => {
@@ -462,9 +462,9 @@ describe('Integration: Web Template Generation', () => {
       const projectDir = path.join(tempDir, 'web-sessions-test');
       await generator.generate(projectDir);
 
-      // Verify session management pages
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(app)/settings/sessions/page.tsx'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(app)/settings/sessions/sessions-client.tsx'))).toBe(true);
+      // Verify session management pages (in (protected) route group)
+      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(protected)/settings/sessions/page.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(protected)/settings/sessions/sessions-client.tsx'))).toBe(true);
       expect(await fs.pathExists(path.join(projectDir, 'web/src/components/settings/session-card.tsx'))).toBe(true);
     });
   });
