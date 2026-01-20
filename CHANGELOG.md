@@ -5,6 +5,53 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-01-20
+
+### Added
+
+- **Two-Factor Authentication**: Complete 2FA implementation for mobile and web templates with TOTP support, QR code setup, backup codes, and secure token verification
+- **Documentation Website**: Improved documentation site design with better mobile responsiveness
+
+### Changed
+
+- **Template Quality**: Enhanced template quality and developer experience with better code organization
+- **CLI UX**: Improved platform selection flow and conditional prompts for a smoother user experience
+- **Error Handling**: Better error messages and user feedback throughout templates
+
+### Security
+
+- **Security Headers**: Added comprehensive security headers and configuration to Next.js template
+
+### Fixed
+
+- Various template fixes for improved error handling and edge cases
+
+### Maintenance
+
+- Updated Next.js to 16.1.1
+- Improved test coverage and addressed testing gaps
+
+## [0.2.0] - 2026-01-03
+
+### Added
+
+- **Next.js Web Platform**: Full web platform support with Next.js, including authentication and shared components
+- **Better Auth Integration**: Replaced custom JWT/bcrypt authentication with Better Auth for improved security and developer experience
+- **Drizzle ORM**: Added Drizzle ORM as an alternative to Prisma for database operations
+- **Native OAuth Flow**: Implemented native ID token OAuth flow with browser fallback for mobile authentication
+- **Shared Design System**: Cross-platform design system with dark mode support
+- **Documentation Website**: Added documentation and landing page website
+
+### Changed
+
+- **Tab Navigation**: Made tab navigation the default and removed it from selectable features
+- **Web Platform Testing**: Added comprehensive testing and documentation for web platform
+
+### Fixed
+
+- Critical bugs addressed before v0.2.0 release
+- CI improvements for publish workflow and GitHub release permissions
+
 ## [0.1.0] - 2025-11-26
 
 ### Initial Beta Release
@@ -85,4 +132,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Docker required for backend development
 - PostgreSQL and Redis required for full features
 
+[0.3.0]: https://github.com/itharea/create-stackr/releases/tag/v0.3.0
+[0.2.0]: https://github.com/itharea/create-stackr/releases/tag/v0.2.0
 [0.1.0]: https://github.com/itharea/create-stackr/releases/tag/v0.1.0

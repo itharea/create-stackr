@@ -1,6 +1,6 @@
 {
   "name": "create-stackr",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Create production-ready full-stack mobile apps with React Native (Expo) and Node.js backend",
   "type": "module",
   "bin": {
