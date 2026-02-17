@@ -3,7 +3,8 @@ import { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { auth } from "../../../lib/auth";
 import { Type } from "@sinclair/typebox";
 import { updateUserProfile, deleteUser, userHasPassword } from "../../../domain/user/repository";
-import { findUserSessionById, revokeSessionByToken } from "../../../domain/session/repository";
+import { findUserSessionById } from "../../../domain/session/repository";
+import { revokeSessionByToken } from "../../../domain/session/service";
 
 /**
  * Convert Fastify request to Fetch API Request for BetterAuth

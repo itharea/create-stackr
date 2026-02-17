@@ -1,61 +1,33 @@
 import { db } from "../../utils/db";
 import { ErrorFactory } from "../../utils/errors";
-import {
-  DeviceSession,
-  CreateDeviceSessionBody,
-  CreateDeviceSessionResponse,
-  DeviceSessionMigrationEligibilityResponse,
-} from "./schema";
+import { DeviceSession } from "./schema";
 
-// Generate a UUID v4 for session tokens
-const generateSessionToken = (): string => {
-  return crypto.randomUUID();
-};
+/**
+ * Device Session Repository (Prisma)
+ *
+ * Pure database operations only. Business logic belongs in service.ts.
+ */
 
-export const createDeviceSession = async (data: CreateDeviceSessionBody): Promise<CreateDeviceSessionResponse> => {
-  const { deviceId } = data;
+// Helper to transform Prisma session to API format
+const toDeviceSession = (session: {
+  id: string;
+  deviceId: string;
+  sessionToken: string;
+  createdAt: Date;
+  lastActiveAt: Date;
+  migrated: boolean;
+  migratedToUserId: string | null;
+  preferredCurrency: string;
+}): DeviceSession => ({
+  ...session,
+  createdAt: session.createdAt.toISOString(),
+  lastActiveAt: session.lastActiveAt.toISOString(),
+});
 
-  try {
-    const sessionToken = generateSessionToken();
-
-    const session = await db.deviceSession.create({
-      data: {
-        deviceId,
-        sessionToken,
-        preferredCurrency: 'USD',
-        migrated: false,
-        lastActiveAt: new Date(),
-      },
-      select: {
-        id: true,
-        deviceId: true,
-        sessionToken: true,
-        createdAt: true,
-        lastActiveAt: true,
-        migrated: true,
-        migratedToUserId: true,
-        preferredCurrency: true,
-      },
-    });
-
-    return {
-      session: {
-        ...session,
-        createdAt: session.createdAt.toISOString(),
-        lastActiveAt: session.lastActiveAt.toISOString(),
-      },
-      sessionToken,
-    };
-  } catch (error) {
-    throw ErrorFactory.databaseError({
-      operation: 'createDeviceSession',
-      deviceId,
-      originalError: error instanceof Error ? error.message : String(error)
-    });
-  }
-};
-
-export const validateDeviceSession = async (sessionToken: string): Promise<DeviceSession | null> => {
+/**
+ * Find a device session by token (pure fetch, no expiration logic)
+ */
+export const findDeviceSessionByToken = async (sessionToken: string): Promise<DeviceSession | null> => {
   try {
     const session = await db.deviceSession.findUnique({
       where: { sessionToken },
@@ -71,34 +43,89 @@ export const validateDeviceSession = async (sessionToken: string): Promise<Devic
       },
     });
 
-    if (!session) {
-      return null;
-    }
-
-    // Check if session is expired (30 days of inactivity)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    if (session.lastActiveAt < thirtyDaysAgo) {
-      // Session expired, delete it
-      await deleteDeviceSession(sessionToken);
-      return null;
-    }
-
-    return {
-      ...session,
-      createdAt: session.createdAt.toISOString(),
-      lastActiveAt: session.lastActiveAt.toISOString(),
-    };
+    return session ? toDeviceSession(session) : null;
   } catch (error) {
     throw ErrorFactory.databaseError({
-      operation: 'validateDeviceSession',
+      operation: 'findDeviceSessionByToken',
       sessionToken,
       originalError: error instanceof Error ? error.message : String(error)
     });
   }
 };
 
+/**
+ * Find a device session by ID (pure fetch)
+ */
+export const getDeviceSessionById = async (sessionId: string): Promise<DeviceSession | null> => {
+  try {
+    const session = await db.deviceSession.findUnique({
+      where: { id: sessionId },
+      select: {
+        id: true,
+        deviceId: true,
+        sessionToken: true,
+        createdAt: true,
+        lastActiveAt: true,
+        migrated: true,
+        migratedToUserId: true,
+        preferredCurrency: true,
+      },
+    });
+
+    return session ? toDeviceSession(session) : null;
+  } catch (error) {
+    throw ErrorFactory.databaseError({
+      operation: 'getDeviceSessionById',
+      sessionId,
+      originalError: error instanceof Error ? error.message : String(error)
+    });
+  }
+};
+
+/**
+ * Insert a new device session (pure insert with all fields provided)
+ */
+export const insertDeviceSession = async (data: {
+  deviceId: string;
+  sessionToken: string;
+  preferredCurrency: string;
+  migrated: boolean;
+  lastActiveAt: Date;
+}): Promise<DeviceSession> => {
+  try {
+    const session = await db.deviceSession.create({
+      data: {
+        deviceId: data.deviceId,
+        sessionToken: data.sessionToken,
+        preferredCurrency: data.preferredCurrency,
+        migrated: data.migrated,
+        lastActiveAt: data.lastActiveAt,
+      },
+      select: {
+        id: true,
+        deviceId: true,
+        sessionToken: true,
+        createdAt: true,
+        lastActiveAt: true,
+        migrated: true,
+        migratedToUserId: true,
+        preferredCurrency: true,
+      },
+    });
+
+    return toDeviceSession(session);
+  } catch (error) {
+    throw ErrorFactory.databaseError({
+      operation: 'insertDeviceSession',
+      deviceId: data.deviceId,
+      originalError: error instanceof Error ? error.message : String(error)
+    });
+  }
+};
+
+/**
+ * Update device session activity timestamp (pure DB update)
+ */
 export const updateDeviceSessionActivity = async (sessionToken: string): Promise<void> => {
   try {
     await db.deviceSession.update({
@@ -114,6 +141,9 @@ export const updateDeviceSessionActivity = async (sessionToken: string): Promise
   }
 };
 
+/**
+ * Delete a device session by token (pure DB delete)
+ */
 export const deleteDeviceSession = async (sessionToken: string): Promise<void> => {
   try {
     await db.deviceSession.delete({
@@ -133,39 +163,30 @@ export const deleteDeviceSession = async (sessionToken: string): Promise<void> =
   }
 };
 
-export const validateDeviceSessionMigrationEligibility = async (sessionToken: string): Promise<DeviceSessionMigrationEligibilityResponse> => {
+/**
+ * Delete expired device sessions (pure batch delete with provided threshold)
+ */
+export const deleteExpiredDeviceSessions = async (threshold: Date): Promise<number> => {
   try {
-    const session = await validateDeviceSession(sessionToken);
+    const result = await db.deviceSession.deleteMany({
+      where: {
+        lastActiveAt: {
+          lt: threshold,
+        },
+      },
+    });
 
-    if (!session) {
-      return {
-        canMigrate: false,
-        reason: 'Device session not found or expired',
-      };
-    }
-
-    if (session.migrated) {
-      return {
-        canMigrate: false,
-        reason: 'Device session already migrated to user account',
-      };
-    }
-
-    return {
-      canMigrate: true,
-    };
+    return result.count;
   } catch (error) {
     throw ErrorFactory.databaseError({
-      operation: 'validateDeviceSessionMigrationEligibility',
-      sessionToken,
+      operation: 'deleteExpiredDeviceSessions',
       originalError: error instanceof Error ? error.message : String(error)
     });
   }
 };
 
 /**
- * Migrate a device session to a user account
- * This is called after a user signs up through BetterAuth to link their device session
+ * Migrate a device session to a user account (pure DB update)
  */
 export const migrateDeviceSessionToUser = async (sessionToken: string, userId: string): Promise<void> => {
   try {
@@ -184,65 +205,4 @@ export const migrateDeviceSessionToUser = async (sessionToken: string, userId: s
       originalError: error instanceof Error ? error.message : String(error)
     });
   }
-};
-
-export const cleanupExpiredDeviceSessions = async (): Promise<number> => {
-  try {
-    // Delete sessions older than 30 days of inactivity
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    const result = await db.deviceSession.deleteMany({
-      where: {
-        lastActiveAt: {
-          lt: thirtyDaysAgo,
-        },
-      },
-    });
-
-    return result.count;
-  } catch (error) {
-    throw ErrorFactory.databaseError({
-      operation: 'cleanupExpiredDeviceSessions',
-      originalError: error instanceof Error ? error.message : String(error)
-    });
-  }
-};
-
-export const getDeviceSessionById = async (sessionId: string): Promise<DeviceSession | null> => {
-  try {
-    const session = await db.deviceSession.findUnique({
-      where: { id: sessionId },
-      select: {
-        id: true,
-        deviceId: true,
-        sessionToken: true,
-        createdAt: true,
-        lastActiveAt: true,
-        migrated: true,
-        migratedToUserId: true,
-        preferredCurrency: true,
-      },
-    });
-
-    if (!session) {
-      return null;
-    }
-
-    return {
-      ...session,
-      createdAt: session.createdAt.toISOString(),
-      lastActiveAt: session.lastActiveAt.toISOString(),
-    };
-  } catch (error) {
-    throw ErrorFactory.databaseError({
-      operation: 'getDeviceSessionById',
-      sessionId,
-      originalError: error instanceof Error ? error.message : String(error)
-    });
-  }
-};
-
-export const getDeviceSessionByToken = async (sessionToken: string): Promise<DeviceSession | null> => {
-  return validateDeviceSession(sessionToken);
 };
