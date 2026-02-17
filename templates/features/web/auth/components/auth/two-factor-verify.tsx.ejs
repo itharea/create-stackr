@@ -9,7 +9,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { verifyTotpLogin, verifyBackupCode } from '@/lib/auth/actions';
-import { useAuthStore } from '@/store/auth.store';
 
 interface TwoFactorVerifyProps {
   redirectTo?: string;
@@ -21,7 +20,6 @@ export function TwoFactorVerify({
   expiresAt
 }: TwoFactorVerifyProps) {
   const router = useRouter();
-  const setSession = useAuthStore((s) => s.setSession);
   const [code, setCode] = useState('');
   const [trustDevice, setTrustDevice] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -86,10 +84,6 @@ export function TwoFactorVerify({
 
       toast.error(result.error || 'Invalid code');
       return;
-    }
-
-    if (result.session) {
-      setSession(result.session);
     }
 
     router.push(redirectTo);

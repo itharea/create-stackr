@@ -1,32 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { useSession } from "@/hooks/use-session";
-import type { User } from "@/lib/auth/actions";
+import { SubmitButton } from "@/components/ui/submit-button";
+import { signOutAction, type User } from "@/lib/auth/actions";
 
 interface DashboardClientProps {
   user: User;
 }
 
 export function DashboardClient({ user }: DashboardClientProps) {
-  const router = useRouter();
-  const { signOut } = useSession();
-  const [isSigningOut, setIsSigningOut] = useState(false);
-
-  const handleSignOut = async () => {
-    setIsSigningOut(true);
-    try {
-      await signOut();
-      router.push("/login");
-    } catch (error) {
-      console.error("Sign out error:", error);
-      setIsSigningOut(false);
-    }
-  };
-
   return (
     <div className="space-y-6">
       {/* User Profile Card */}
@@ -192,13 +174,11 @@ export function DashboardClient({ user }: DashboardClientProps) {
               End your current session
             </p>
           </div>
-          <Button
-            variant="destructive"
-            onClick={handleSignOut}
-            disabled={isSigningOut}
-          >
-            {isSigningOut ? "Signing out..." : "Sign out"}
-          </Button>
+          <form action={signOutAction}>
+            <SubmitButton variant="destructive" pendingText="Signing out...">
+              Sign out
+            </SubmitButton>
+          </form>
         </div>
       </div>
     </div>

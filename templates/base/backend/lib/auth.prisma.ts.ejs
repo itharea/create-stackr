@@ -16,7 +16,7 @@ export const auth = betterAuth({
   basePath: "/api/auth", // BetterAuth endpoints will be at /api/auth/*
   emailAndPassword: {
     enabled: true,
-    requireEmailVerification: false,  // Allow sign-in, control access on frontend via ProtectedRoute
+    requireEmailVerification: false,  // Allow sign-in, control access on frontend via protected layout
 <% if (features.authentication.passwordReset) { %>
     sendResetPassword: async ({ user, url }) => {
       await sendEmail({

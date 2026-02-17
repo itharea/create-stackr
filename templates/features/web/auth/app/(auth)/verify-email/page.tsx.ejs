@@ -11,7 +11,6 @@ import {
   InputOTPSeparator,
 } from "@/components/ui/input-otp";
 import { verifyEmailOtp, sendVerificationOtp } from "@/lib/auth/actions";
-import { useAuthStore } from "@/store/auth.store";
 
 export default function VerifyEmailPage() {
   const searchParams = useSearchParams();
@@ -62,14 +61,8 @@ export default function VerifyEmailPage() {
       return;
     }
 
-    if (result.session) {
-      setStatus("success");
-      useAuthStore.getState().setSession(result.session);
-      router.push("/dashboard");
-    } else {
-      setStatus("error");
-      setError("Verification succeeded but sign-in failed. Please sign in manually.");
-    }
+    setStatus("success");
+    router.push("/dashboard");
   };
 
   const handleResend = async () => {

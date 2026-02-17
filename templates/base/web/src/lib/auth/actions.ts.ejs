@@ -1,5 +1,6 @@
 'use server';
 
+import { redirect } from 'next/navigation';
 import {
   setSessionCookie,
   getSessionToken,
@@ -61,6 +62,12 @@ interface SignUpResult {
 <% if (features.authentication.emailVerification) { %>
   needsEmailVerification?: boolean;
 <% } %>
+}
+
+export interface FormActionState {
+  error: string | null;
+  success?: boolean;
+  email?: string;
 }
 
 <% if (features.authentication.twoFactor) { %>
@@ -356,6 +363,133 @@ export async function resetPassword(
     console.error('Password reset error:', error);
     return { success: false, error: 'An error occurred' };
   }
+}
+
+// ============================================================================
+// Form Actions (useActionState-compatible)
+// ============================================================================
+
+/**
+ * Login form action for useActionState
+ */
+export async function loginAction(
+  _prevState: FormActionState,
+  formData: FormData
+): Promise<FormActionState> {
+  const email = formData.get('email') as string;
+  const password = formData.get('password') as string;
+  const redirectTo = (formData.get('redirectTo') as string) || '/dashboard';
+
+  const result = await signIn(email, password);
+
+<% if (features.authentication.twoFactor) { %>
+  if (result.requiresTwoFactor) {
+    redirect('/login/two-factor');
+  }
+<% } %>
+
+<% if (features.authentication.emailVerification) { %>
+  if (result.needsEmailVerification) {
+    redirect(`/verify-email?email=${encodeURIComponent(email)}`);
+  }
+<% } %>
+
+  if (!result.success) {
+    return { error: result.error || 'Failed to sign in' };
+  }
+
+  redirect(redirectTo);
+}
+
+/**
+ * Register form action for useActionState
+ */
+export async function registerAction(
+  _prevState: FormActionState,
+  formData: FormData
+): Promise<FormActionState> {
+  const name = formData.get('name') as string;
+  const email = formData.get('email') as string;
+  const password = formData.get('password') as string;
+  const confirmPassword = formData.get('confirmPassword') as string;
+
+  if (password !== confirmPassword) {
+    return { error: 'Passwords do not match' };
+  }
+
+  if (password.length < 8) {
+    return { error: 'Password must be at least 8 characters' };
+  }
+
+  const result = await signUp(email, password, name || undefined);
+
+  if (!result.success) {
+    return { error: result.error || 'Failed to create account' };
+  }
+
+<% if (features.authentication.emailVerification) { %>
+  if (result.needsEmailVerification) {
+    redirect(`/verify-email?email=${encodeURIComponent(email)}`);
+  }
+<% } %>
+
+  redirect('/dashboard');
+}
+
+<% if (features.authentication.passwordReset) { %>
+/**
+ * Forgot password form action for useActionState
+ */
+export async function forgotPasswordAction(
+  _prevState: FormActionState,
+  formData: FormData
+): Promise<FormActionState> {
+  const email = formData.get('email') as string;
+
+  const result = await requestPasswordReset(email);
+
+  if (!result.success) {
+    return { error: result.error || 'Failed to send reset email' };
+  }
+
+  return { error: null, success: true, email };
+}
+
+/**
+ * Reset password form action for useActionState
+ */
+export async function resetPasswordAction(
+  _prevState: FormActionState,
+  formData: FormData
+): Promise<FormActionState> {
+  const token = formData.get('token') as string;
+  const password = formData.get('password') as string;
+  const confirmPassword = formData.get('confirmPassword') as string;
+
+  if (password !== confirmPassword) {
+    return { error: 'Passwords do not match' };
+  }
+
+  if (password.length < 8) {
+    return { error: 'Password must be at least 8 characters' };
+  }
+
+  const result = await resetPassword(token, password);
+
+  if (!result.success) {
+    return { error: result.error || 'Failed to reset password' };
+  }
+
+  redirect('/login?message=Password+reset+successfully');
+}
+<% } %>
+
+/**
+ * Sign out action for form submission
+ */
+export async function signOutAction(_formData: FormData): Promise<void> {
+  await signOut();
+  redirect('/login');
 }
 
 <% if (features.authentication.emailVerification) { %>

@@ -469,6 +469,145 @@ describe('Integration: Web Template Generation', () => {
     });
   });
 
+  describe('React 19 patterns (useActionState, no Zustand auth store)', () => {
+    it('should NOT generate deleted auth store files', async () => {
+      const config: ProjectConfig = {
+        projectName: 'web-no-store-test',
+        packageManager: 'npm',
+        appScheme: 'webnostoretest',
+        platforms: ['web'],
+        features: {
+          onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
+          authentication: {
+            enabled: true,
+            providers: { emailPassword: true, google: false, apple: false, github: false },
+            emailVerification: true,
+            passwordReset: true,
+            twoFactor: true,
+          },
+          paywall: false,
+          sessionManagement: true,
+        },
+        integrations: {
+          revenueCat: { enabled: false, iosKey: '', androidKey: '' },
+          adjust: { enabled: false, appToken: '', environment: 'sandbox' },
+          scate: { enabled: false, apiKey: '' },
+          att: { enabled: false },
+        },
+        backend: {
+          database: 'postgresql',
+          orm: 'prisma',
+          eventQueue: false,
+          docker: true,
+        },
+        preset: 'custom',
+        customized: true,
+      };
+
+      const generator = new ProjectGenerator(config);
+      const projectDir = path.join(tempDir, 'web-no-store-test');
+      await generator.generate(projectDir);
+
+      // Verify deleted files are NOT generated
+      expect(await fs.pathExists(path.join(projectDir, 'web/src/store/auth.store.ts'))).toBe(false);
+      expect(await fs.pathExists(path.join(projectDir, 'web/src/components/auth/auth-hydrator.tsx'))).toBe(false);
+      expect(await fs.pathExists(path.join(projectDir, 'web/src/hooks/use-session.ts'))).toBe(false);
+      expect(await fs.pathExists(path.join(projectDir, 'web/src/components/auth/protected-route.tsx'))).toBe(false);
+
+      // Verify submit-button IS generated
+      expect(await fs.pathExists(path.join(projectDir, 'web/src/components/ui/submit-button.tsx'))).toBe(true);
+
+      // Verify login-form uses useActionState, not useAuthStore
+      const loginForm = await fs.readFile(path.join(projectDir, 'web/src/components/auth/login-form.tsx'), 'utf-8');
+      expect(loginForm).toContain('useActionState');
+      expect(loginForm).not.toContain('useAuthStore');
+    });
+
+    it('should NOT include zustand when auth enabled but sessionManagement disabled', async () => {
+      const config: ProjectConfig = {
+        projectName: 'web-no-zustand-test',
+        packageManager: 'npm',
+        appScheme: 'webnozustandtest',
+        platforms: ['web'],
+        features: {
+          onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
+          authentication: {
+            enabled: true,
+            providers: { emailPassword: true, google: false, apple: false, github: false },
+            emailVerification: false,
+            passwordReset: true,
+            twoFactor: false,
+          },
+          paywall: false,
+          sessionManagement: false,
+        },
+        integrations: {
+          revenueCat: { enabled: false, iosKey: '', androidKey: '' },
+          adjust: { enabled: false, appToken: '', environment: 'sandbox' },
+          scate: { enabled: false, apiKey: '' },
+          att: { enabled: false },
+        },
+        backend: {
+          database: 'postgresql',
+          orm: 'prisma',
+          eventQueue: false,
+          docker: true,
+        },
+        preset: 'minimal',
+        customized: false,
+      };
+
+      const generator = new ProjectGenerator(config);
+      const projectDir = path.join(tempDir, 'web-no-zustand-test');
+      await generator.generate(projectDir);
+
+      const packageJson = await fs.readJSON(path.join(projectDir, 'web/package.json'));
+      expect(packageJson.dependencies.zustand).toBeUndefined();
+    });
+
+    it('should include zustand when sessionManagement enabled', async () => {
+      const config: ProjectConfig = {
+        projectName: 'web-zustand-test',
+        packageManager: 'npm',
+        appScheme: 'webzustandtest',
+        platforms: ['web'],
+        features: {
+          onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
+          authentication: {
+            enabled: true,
+            providers: { emailPassword: true, google: false, apple: false, github: false },
+            emailVerification: false,
+            passwordReset: true,
+            twoFactor: false,
+          },
+          paywall: false,
+          sessionManagement: true,
+        },
+        integrations: {
+          revenueCat: { enabled: false, iosKey: '', androidKey: '' },
+          adjust: { enabled: false, appToken: '', environment: 'sandbox' },
+          scate: { enabled: false, apiKey: '' },
+          att: { enabled: false },
+        },
+        backend: {
+          database: 'postgresql',
+          orm: 'prisma',
+          eventQueue: false,
+          docker: true,
+        },
+        preset: 'minimal',
+        customized: false,
+      };
+
+      const generator = new ProjectGenerator(config);
+      const projectDir = path.join(tempDir, 'web-zustand-test');
+      await generator.generate(projectDir);
+
+      const packageJson = await fs.readJSON(path.join(projectDir, 'web/package.json'));
+      expect(packageJson.dependencies.zustand).toBeDefined();
+    });
+  });
+
   describe('web UI components', () => {
     it('should generate all shadcn UI components', async () => {
       const config: ProjectConfig = {
