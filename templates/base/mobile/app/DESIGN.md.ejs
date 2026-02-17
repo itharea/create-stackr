@@ -1,0 +1,262 @@
+# Mobile App Routing Design
+
+This document describes the navigation architecture of the Expo Router mobile app.
+
+## Overview
+
+The mobile app uses Expo Router for file-based navigation. Routes are organized into groups that control navigation flow, authentication requirements, and presentation styles.
+
+## Directory Structure
+
+```
+app/
+├── _layout.tsx          # Root layout - navigation orchestration
+├── +not-found.tsx       # 404 handler
+<% if (features.onboarding.enabled) { %>
+├── (onboarding)/        # First-run onboarding flow
+│   ├── _layout.tsx
+<% for (let i = 1; i <= features.onboarding.pages; i++) { %>
+│   ├── page-<%= i %>.tsx
+<% } %>
+<% } %>
+├── (public)/            # Unauthenticated landing
+│   ├── _layout.tsx
+│   └── index.tsx
+<% if (features.authentication.enabled) { %>
+├── (auth)/              # Auth modal screens
+│   ├── _layout.tsx
+│   ├── login.tsx
+│   ├── register.tsx
+<% if (features.authentication.twoFactor) { %>
+│   ├── two-factor.tsx
+│   └── two-factor-expired.tsx
+<% } %>
+<% } %>
+├── (tabs)/              # Main authenticated app
+│   ├── _layout.tsx
+│   ├── index.tsx
+│   └── settings/
+│       ├── _layout.tsx
+│       ├── index.tsx
+<% if (features.authentication.twoFactor) { %>
+│       └── security/
+<% } %>
+<% if (features.authentication.emailVerification) { %>
+├── verify-email.tsx     # Email verification (full screen)
+<% } %>
+├── account.tsx          # Account management
+<% if (features.paywall) { %>
+└── paywall.tsx          # In-app purchase modal
+<% } %>
+```
+
+## Route Groups
+<% if (features.onboarding.enabled) { %>
+
+### `(onboarding)/` - First-Run Experience
+
+Shown once when the app is first installed:
+
+- **Layout**: Full-screen pages with next/back navigation
+- **Persistence**: Completion stored in AsyncStorage
+- **Exit**: Navigates to `(public)` or `(tabs)` based on auth state
+
+```typescript
+// Check if onboarding completed
+const completed = await AsyncStorage.getItem('onboarding_completed');
+if (completed !== 'true') {
+  router.replace('/(onboarding)/page-1');
+}
+```
+<% } %>
+
+### `(public)/` - Unauthenticated Landing
+
+Landing page for unauthenticated users:
+
+- **Content**: Welcome screen with sign-in/sign-up buttons
+- **Access**: Open to all users
+<% if (features.authentication.enabled) { %>
+- **Exit**: Opens `(auth)` modal for login/register
+<% } %>
+<% if (features.authentication.enabled) { %>
+
+### `(auth)/` - Authentication Modal
+
+Modal screens for authentication:
+
+- **Presentation**: `presentation: 'modal'` in Stack config
+- **Screens**:
+  - `/login` - Email/password sign-in
+  - `/register` - Account creation
+<% if (features.authentication.twoFactor) { %>
+  - `/two-factor` - 2FA code entry
+  - `/two-factor-expired` - 2FA timeout message
+<% } %>
+- **Exit**: Dismisses modal, root layout handles navigation
+
+```typescript
+// In _layout.tsx
+<Stack.Screen name="(auth)" options={{ presentation: 'modal' }} />
+```
+<% } %>
+
+### `(tabs)/` - Main Application
+
+Tab-based navigation for authenticated users:
+
+- **Layout**: Bottom tab bar
+- **Screens**:
+  - `/` (index) - Home/Dashboard
+  - `/settings` - Settings stack
+<% if (features.authentication.twoFactor) { %>
+  - `/settings/security` - Security settings (2FA, password)
+<% } %>
+- **Protection**: Root layout redirects unauthenticated users
+
+### Standalone Screens
+
+Screens outside route groups for special flows:
+
+| Screen | Presentation | Purpose |
+|--------|--------------|---------|
+<% if (features.authentication.emailVerification) { %>
+| `verify-email` | Full screen | Email verification blocking |
+<% } %>
+| `account` | Card | Account management after login |
+<% if (features.paywall) { %>
+| `paywall` | Modal | In-app purchase flow |
+<% } %>
+
+## Navigation Flow
+
+### App Initialization
+
+```
+App Launch
+    │
+    ▼
+<% if (features.onboarding.enabled) { %>
+Onboarding completed?
+    │
+    ├── No  ──────► (onboarding)/page-1
+    │
+    └── Yes
+        │
+        ▼
+<% } %>
+   Auth state?
+        │
+        ├── Authenticated ──► (tabs)/
+        │
+        └── Not auth ────────► (public)/
+```
+<% if (features.authentication.enabled) { %>
+
+### Authentication Flow
+
+```
+(public)/index
+    │
+    ├── "Sign In" ────► (auth)/login
+    │                       │
+<% if (features.authentication.twoFactor) { %>
+    │                       ├── Success (no 2FA) ──► (tabs)/
+    │                       │
+    │                       └── 2FA required ─────► (auth)/two-factor
+    │                                                    │
+    │                                                    └── Success ──► (tabs)/
+<% } %>
+    │
+    └── "Sign Up" ────► (auth)/register
+                            │
+<% if (features.authentication.emailVerification) { %>
+                            └── Success ──► verify-email
+                                                │
+                                                └── Verified ──► (tabs)/
+<% } %>
+```
+<% } %>
+
+## Root Layout Orchestration
+
+The `_layout.tsx` file orchestrates navigation based on state:
+
+```typescript
+export default function RootLayout() {
+<% if (features.authentication.enabled) { %>
+  const { isAuthenticated, isPending, user } = useAuth();
+<% } %>
+  const segments = useSegments();
+
+  useEffect(() => {
+<% if (features.authentication.enabled) { %>
+    if (isPending) return; // Wait for auth check
+<% } %>
+
+    const currentRoute = segments[0];
+
+<% if (features.authentication.enabled) { %>
+    if (isAuthenticated) {
+<% if (features.authentication.emailVerification) { %>
+      // Email verification check
+      if (user?.emailVerified === false) {
+        router.replace(`/verify-email?email=${user.email}`);
+        return;
+      }
+<% } %>
+
+      // Navigate to tabs if not already there
+      if (currentRoute !== '(tabs)') {
+        router.replace('/(tabs)');
+      }
+    } else {
+      // Navigate to public if not already there
+      if (currentRoute !== '(public)' && currentRoute !== '(auth)') {
+        router.replace('/(public)');
+      }
+    }
+<% } %>
+  }, [<%= features.authentication.enabled ? 'isAuthenticated, isPending, user, ' : '' %>segments]);
+}
+```
+
+## Design Decisions
+
+### Why Route Groups?
+
+1. **Shared layouts**: Each group has its own `_layout.tsx`
+2. **URL structure**: Groups don't appear in URLs (`/(tabs)/` → `/`)
+3. **Presentation control**: Configure modal vs. stack per group
+4. **Code organization**: Related screens grouped together
+<% if (features.authentication.enabled) { %>
+
+### Why Modal for Auth?
+
+- User stays in context (can dismiss to return)
+- Cleaner UX than full navigation replacement
+- Allows deep linking to auth screens
+<% } %>
+<% if (features.authentication.emailVerification) { %>
+
+### Why Full Screen for Email Verification?
+
+- Blocking flow - user must verify to continue
+- Prevents accessing protected content
+- Clear call-to-action without distractions
+<% } %>
+
+### Session Revalidation
+
+Session validity is checked when the app returns to foreground:
+
+```typescript
+useEffect(() => {
+  const subscription = AppState.addEventListener('change', (state) => {
+    if (state === 'active') {
+      isSessionValid(); // Revalidate on foreground
+    }
+  });
+  return () => subscription.remove();
+}, []);
+```

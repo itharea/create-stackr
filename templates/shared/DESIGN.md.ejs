@@ -1,0 +1,148 @@
+# System Design
+
+## Overview
+
+<% if (platforms.includes('mobile') && platforms.includes('web')) { %>
+This is a full-stack application with mobile, web, and backend components:
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   Mobile    │────▶│   Backend   │◀────│     Web     │
+│  (Expo/RN)  │     │  (Fastify)  │     │  (Next.js)  │
+└─────────────┘     └─────────────┘     └─────────────┘
+                           │
+                    ┌──────┴──────┐
+                    │  PostgreSQL │
+<% if (backend.eventQueue) { %>
+                    │    Redis    │
+<% } %>
+                    └─────────────┘
+```
+<% } else if (platforms.includes('mobile')) { %>
+This is a mobile application with a backend API:
+
+```
+┌─────────────┐     ┌─────────────┐
+│   Mobile    │────▶│   Backend   │
+│  (Expo/RN)  │     │  (Fastify)  │
+└─────────────┘     └─────────────┘
+                           │
+                    ┌──────┴──────┐
+                    │  PostgreSQL │
+<% if (backend.eventQueue) { %>
+                    │    Redis    │
+<% } %>
+                    └─────────────┘
+```
+<% } else { %>
+This is a web application with a backend API:
+
+```
+┌─────────────┐     ┌─────────────┐
+│     Web     │────▶│   Backend   │
+│  (Next.js)  │     │  (Fastify)  │
+└─────────────┘     └─────────────┘
+                           │
+                    ┌──────┴──────┐
+                    │  PostgreSQL │
+<% if (backend.eventQueue) { %>
+                    │    Redis    │
+<% } %>
+                    └─────────────┘
+```
+<% } %>
+
+## Architecture Principles
+
+### 1. Monorepo Structure
+<% if (platforms.includes('mobile')) { %>
+- `mobile/` - React Native app (Expo)
+<% } %>
+<% if (platforms.includes('web')) { %>
+- `web/` - Next.js web app
+<% } %>
+- `backend/` - Fastify API server
+- Shared types via TypeScript, no shared package
+
+### 2. Backend-Driven
+- Backend is the source of truth for business logic
+- Clients (<%= platforms.join(', ') %>) are thin presentation layers
+<% if (features.authentication.enabled) { %>
+- Authentication handled by BetterAuth library
+<% } %>
+
+<% if (features.sessionManagement) { %>
+### 3. Session Model
+- **Device Sessions**: Anonymous users tracked by device ID
+- **User Sessions**: Authenticated users via BetterAuth
+- Sessions can migrate from device → user on sign-up
+<% } %>
+
+## Communication
+<% if (platforms.includes('mobile')) { %>
+
+### Mobile → Backend
+- REST API via Axios
+<% if (features.authentication.enabled) { %>
+- Auth cookies managed by BetterAuth client
+<% } %>
+<% if (features.sessionManagement) { %>
+- Device session token in `X-Device-Session-Token` header
+<% } %>
+<% } %>
+<% if (platforms.includes('web')) { %>
+
+### Web → Backend
+- REST API via fetch
+<% if (features.authentication.enabled) { %>
+- Auth cookies managed by BetterAuth client
+<% } %>
+- Same endpoints as mobile
+<% } %>
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+<% if (platforms.includes('mobile')) { %>
+| **Mobile** | |
+| Framework | Expo |
+| Runtime | React Native |
+| UI Library | React |
+| Routing | Expo Router |
+| State | Zustand |
+| HTTP Client | Axios |
+<% } %>
+<% if (platforms.includes('web')) { %>
+| **Web** | |
+| Framework | Next.js |
+| UI Library | React |
+| Styling | Tailwind CSS |
+| Components | shadcn/ui |
+| State | Zustand |
+<% } %>
+| **Backend** | |
+| Runtime | <%= packageManager === 'bun' ? 'Bun' : 'Node.js' %> |
+| Framework | Fastify |
+| ORM | <%= backend.orm.charAt(0).toUpperCase() + backend.orm.slice(1) %> |
+| Database | PostgreSQL |
+<% if (backend.eventQueue) { %>
+| Cache/Queue | Redis + BullMQ |
+<% } %>
+| Validation | TypeBox |
+| **Shared** | |
+<% if (features.authentication.enabled) { %>
+| Auth | BetterAuth |
+<% } %>
+| Language | TypeScript |
+
+## Security Boundaries
+
+- Never trust client input - validate everything server-side
+<% if (features.authentication.enabled) { %>
+- Session tokens are httpOnly cookies (BetterAuth)
+<% } %>
+<% if (features.sessionManagement) { %>
+- Device sessions use secure token generation
+<% } %>
+- All database operations use parameterized queries (<%= backend.orm.charAt(0).toUpperCase() + backend.orm.slice(1) %>)

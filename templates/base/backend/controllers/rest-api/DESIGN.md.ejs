@@ -1,0 +1,63 @@
+# REST API Controller - Design
+
+## Overview
+
+The REST API controller is a Fastify server that handles all HTTP requests. It uses a plugin-based architecture where cross-cutting concerns are registered as plugins and routes are grouped by domain.
+
+## Boot Sequence
+
+Registration order matters - plugins depend on earlier registrations:
+
+```
+1. config        → Validates env vars, decorates server.config
+2. error-handler → Global error handler, 404 handler, request tracking
+3. cors          → Cookie-based cross-origin with credentials
+<% if (features.authentication.enabled) { %>
+4. auth          → Decorates server.requireAuth<%= features.sessionManagement ? ', server.requireDeviceSession' : '' %>
+<% } %>
+<% if (platforms.includes('web')) { %>
+5. redis         → Initialize Redis for OAuth PKCE state
+<% } %>
+6. routes        → Domain-specific route groups
+```
+
+## Route Groups
+
+| Prefix | File | Auth | Purpose |
+|--------|------|------|---------|
+<% if (features.authentication.enabled) { %>
+| `/api/auth` | `auth.ts` | Mixed | BetterAuth passthrough + custom auth endpoints |
+<% } %>
+<% if (features.sessionManagement) { %>
+| `/device-sessions` | `device-sessions.ts` | None/Device | Anonymous device session CRUD |
+<% } %>
+<% if (platforms.includes('web')) { %>
+| `/api/auth/web/oauth` | `oauth-web.ts` | None | Web OAuth BFF with PKCE |
+<% } %>
+
+## Plugin System
+
+Plugins use `fastify-plugin` (`fp()`) to register in the parent scope (not encapsulated). This means decorators like `server.requireAuth` are available to all routes.
+
+```
+server.ts (creates Fastify instance, registers everything)
+index.ts  (starts server, handles graceful shutdown)
+```
+
+## Request Flow
+
+```
+Request → CORS → Error Handler Hook → Route Match → Auth Middleware → Handler → Domain Layer → Response
+                                         ↓ (on error)
+                                    Error Handler → Normalized AppError Response
+```
+
+## Key Decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| Top-level `await` in server.ts | ESM module, sequential plugin registration |
+| `fp()` for all plugins | Avoids Fastify encapsulation, shares decorators |
+| Auth as route-level hooks | Per-route auth control via `onRequest` |
+| AJV `removeAdditional: "all"` | Strips unknown fields for security |
+| CORS credentials: true | Required for cookie-based auth across origins |

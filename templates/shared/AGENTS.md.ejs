@@ -1,0 +1,106 @@
+# Agent Guidelines
+
+This project uses a documentation system to guide AI agents working on the codebase. This file explains how to use it.
+
+## Documentation Hierarchy
+
+### DESIGN.md (Architecture)
+- Located at **significant architectural nodes** (project root, app roots, major subsystems)
+- Describes system design, architectural decisions, and how components interact
+- **Read these when entering a new area** to understand the big picture
+- Agents should read parent DESIGN.md files when working in subdirectories
+
+### BEST_PRACTICES.md (Conventions)
+- Located in **implementation folders** (services, hooks, components, routes)
+- Describes coding conventions, patterns, and anti-patterns for that folder
+- **Read these before writing code** in that folder
+- More granular and actionable than DESIGN.md
+
+## How to Use This System
+
+<% if (platforms.includes('mobile')) { %>
+When working on a file in `mobile/src/services/`:
+
+1. Read `DESIGN.md` at project root (overall architecture)
+2. Read `mobile/DESIGN.md` (mobile app architecture)
+3. Read `mobile/src/services/BEST_PRACTICES.md` (service conventions)
+<% } %>
+<% if (platforms.includes('web')) { %>
+When working on a file in `web/src/lib/`:
+
+1. Read `DESIGN.md` at project root (overall architecture)
+2. Read `web/DESIGN.md` (web app architecture)
+3. Read `web/src/lib/BEST_PRACTICES.md` (library conventions)
+<% } %>
+
+The hierarchy flows: **Root → App → Feature folder**
+
+## File Locations
+
+```
+<%= projectName %>/
+├── AGENTS.md                    # This file
+├── DESIGN.md                    # System architecture
+│
+├── backend/
+│   ├── DESIGN.md                # Backend layered architecture
+│   ├── domain/
+│   │   ├── DESIGN.md            # Domain entity creation guide
+│   │   └── BEST_PRACTICES.md    # Schema, repository, service patterns
+│   ├── lib/
+│   │   └── BEST_PRACTICES.md    # BetterAuth config, constants
+│   ├── utils/
+│   │   └── BEST_PRACTICES.md    # ErrorFactory, DB, Redis, email
+│   └── controllers/
+│       ├── rest-api/
+│       │   ├── DESIGN.md        # Server boot sequence, request flow
+│       │   ├── plugins/
+│       │   │   └── BEST_PRACTICES.md  # Auth middleware, error handler, config
+│       │   └── routes/
+│       │       └── BEST_PRACTICES.md  # Thin handlers, schema imports, auth hooks
+<% if (backend.eventQueue) { %>
+│       └── event-queue/
+│           └── DESIGN.md        # BullMQ worker architecture
+<% } %>
+│
+<% if (platforms.includes('mobile')) { %>
+├── mobile/
+│   ├── DESIGN.md                # Mobile app architecture
+│   ├── app/
+│   │   └── DESIGN.md           # Routing, navigation, auth flow
+│   └── src/
+│       ├── components/
+│       │   └── BEST_PRACTICES.md  # Theming, props, animations
+│       ├── hooks/
+│       │   └── BEST_PRACTICES.md  # useCallback, result objects
+│       ├── services/
+│       │   └── BEST_PRACTICES.md  # Singleton pattern, logging
+│       ├── store/
+│       │   └── BEST_PRACTICES.md  # Zustand selectors, persistence
+│       ├── lib/
+│       │   └── BEST_PRACTICES.md  # Auth client, SecureStore
+│       └── context/
+│           └── BEST_PRACTICES.md  # Theme context, useAppTheme
+│
+<% } %>
+<% if (platforms.includes('web')) { %>
+├── web/
+│   ├── DESIGN.md                # Next.js architecture, SSR
+│   └── src/
+│       ├── components/
+│       │   └── BEST_PRACTICES.md  # shadcn/ui, server vs client
+│       ├── hooks/
+│       │   └── BEST_PRACTICES.md  # Server hydration, useSession
+│       ├── lib/
+│       │   └── BEST_PRACTICES.md  # Auth actions, cookies, PKCE
+│       └── store/
+│           └── BEST_PRACTICES.md  # Zustand, useShallow, hydration
+<% } %>
+```
+
+## Key Principle
+
+**DESIGN.md = "Why and how things are structured"**
+**BEST_PRACTICES.md = "How to write code here"**
+
+Agents should always check for these files before making changes, starting from the most specific (current folder) and reading up the hierarchy as needed for context.

@@ -1,0 +1,187 @@
+# Domain Layer - Agent Instructions
+
+## Creating a New Domain Entity
+
+When adding a new domain entity, create a folder with up to 3 files:
+
+```
+domain/
+└── {entity-name}/
+    ├── schema.ts       # Required: Types + validation
+    ├── repository.ts   # Required: Database operations
+    └── service.ts      # Optional: Business logic
+```
+
+## File Templates
+
+### schema.ts
+
+```typescript
+import { Type, Static } from "@sinclair/typebox";
+
+// Entity schema (matches database columns)
+export const MyEntity = Type.Object({
+  id: Type.String(),
+  name: Type.String(),
+  createdAt: Type.String({ format: 'date-time' }),
+  updatedAt: Type.String({ format: 'date-time' }),
+});
+export type MyEntity = Static<typeof MyEntity>;
+
+// Request body schemas
+export const CreateMyEntityBody = Type.Object({
+  name: Type.String({ minLength: 1 }),
+});
+export type CreateMyEntityBody = Static<typeof CreateMyEntityBody>;
+
+// Response schemas
+export const CreateMyEntityResponse = Type.Object({
+  entity: MyEntity,
+});
+export type CreateMyEntityResponse = Static<typeof CreateMyEntityResponse>;
+```
+
+### repository.ts
+
+<% if (backend.orm === 'drizzle') { %>
+```typescript
+import { eq } from 'drizzle-orm';
+import { db, schema } from "../../utils/db";
+import { ErrorFactory } from "../../utils/errors";
+import { MyEntity } from "./schema";
+
+/**
+ * MyEntity Repository (Drizzle)
+ *
+ * Pure database operations only. Business logic belongs in service.ts.
+ */
+
+// Transform DB row to API format
+const toMyEntity = (row: typeof schema.myEntity.$inferSelect): MyEntity => ({
+  ...row,
+  createdAt: row.createdAt.toISOString(),
+  updatedAt: row.updatedAt.toISOString(),
+});
+
+export const findMyEntityById = async (id: string): Promise<MyEntity | null> => {
+  try {
+    const [row] = await db
+      .select()
+      .from(schema.myEntity)
+      .where(eq(schema.myEntity.id, id))
+      .limit(1);
+
+    return row ? toMyEntity(row) : null;
+  } catch (error) {
+    throw ErrorFactory.databaseError({
+      operation: 'findMyEntityById',
+      id,
+      originalError: error instanceof Error ? error.message : String(error),
+    });
+  }
+};
+
+export const insertMyEntity = async (data: { name: string }): Promise<MyEntity> => {
+  try {
+    const [row] = await db
+      .insert(schema.myEntity)
+      .values(data)
+      .returning();
+
+    return toMyEntity(row);
+  } catch (error) {
+    throw ErrorFactory.databaseError({
+      operation: 'insertMyEntity',
+      originalError: error instanceof Error ? error.message : String(error),
+    });
+  }
+};
+```
+<% } %>
+<% if (backend.orm === 'prisma') { %>
+```typescript
+import { prisma } from "../../utils/db";
+import { ErrorFactory } from "../../utils/errors";
+import { MyEntity } from "./schema";
+
+/**
+ * MyEntity Repository (Prisma)
+ *
+ * Pure database operations only. Business logic belongs in service.ts.
+ */
+
+// Transform DB row to API format
+const toMyEntity = (row: any): MyEntity => ({
+  ...row,
+  createdAt: row.createdAt.toISOString(),
+  updatedAt: row.updatedAt.toISOString(),
+});
+
+export const findMyEntityById = async (id: string): Promise<MyEntity | null> => {
+  try {
+    const row = await prisma.myEntity.findUnique({ where: { id } });
+    return row ? toMyEntity(row) : null;
+  } catch (error) {
+    throw ErrorFactory.databaseError({
+      operation: 'findMyEntityById',
+      id,
+      originalError: error instanceof Error ? error.message : String(error),
+    });
+  }
+};
+
+export const insertMyEntity = async (data: { name: string }): Promise<MyEntity> => {
+  try {
+    const row = await prisma.myEntity.create({ data });
+    return toMyEntity(row);
+  } catch (error) {
+    throw ErrorFactory.databaseError({
+      operation: 'insertMyEntity',
+      originalError: error instanceof Error ? error.message : String(error),
+    });
+  }
+};
+```
+<% } %>
+
+### service.ts (only if business logic needed)
+
+```typescript
+import { findMyEntityById, insertMyEntity } from "./repository";
+import { CreateMyEntityBody, CreateMyEntityResponse } from "./schema";
+
+/**
+ * MyEntity Service
+ *
+ * Business logic that orchestrates repository calls.
+ */
+
+export const createMyEntity = async (
+  data: CreateMyEntityBody
+): Promise<CreateMyEntityResponse> => {
+  // Business logic here (validation, defaults, etc.)
+  const entity = await insertMyEntity({
+    name: data.name,
+  });
+
+  return { entity };
+};
+```
+
+## Decision: When to Add service.ts
+
+| Scenario | Use service.ts? |
+|----------|-----------------|
+| Simple CRUD | No - routes call repository directly |
+| Token/ID generation | Yes |
+| Expiration/validation logic | Yes |
+| Multi-step operations | Yes |
+| External service calls | Yes |
+| Just fetching data | No |
+
+## Naming Conventions
+
+| File | Function prefix |
+|------|-----------------|
+| repository.ts | `find*`, `insert*`, `update*`, `delete*` |
+| service.ts | Verb describing the action: `create*`, `validate*`, `revoke*` |

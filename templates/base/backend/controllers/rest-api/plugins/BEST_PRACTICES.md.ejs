@@ -1,0 +1,104 @@
+# Plugins - Best Practices
+
+## What Plugins Are
+
+Plugins are Fastify plugins wrapped with `fastify-plugin` that register **server-level concerns**: configuration, middleware decorators, error handling, and lifecycle hooks.
+
+## Plugin Template
+
+```typescript
+import fp from "fastify-plugin";
+import { FastifyPluginAsync } from "fastify";
+
+const myPlugin: FastifyPluginAsync = async (server) => {
+  // Register decorators, hooks, or handlers
+  server.decorate("myDecorator", async (request, reply) => {
+    // ...
+  });
+};
+
+// Extend Fastify types
+declare module "fastify" {
+  interface FastifyInstance {
+    myDecorator: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+  }
+}
+
+export default fp(myPlugin);
+```
+
+**Always use `fp()`** - without it, Fastify encapsulates the plugin and decorators won't be visible to routes.
+
+## Auth Middleware Decorators
+
+<% if (features.sessionManagement) { %>
+Three auth levels available as `onRequest` hooks in routes:
+
+| Decorator | Header/Cookie | Request Type | Use Case |
+|-----------|---------------|--------------|----------|
+| `requireAuth` | Cookie (BetterAuth) | `AuthFastifyRequest` | Authenticated user endpoints |
+| `requireDeviceSession` | `X-Device-Session-Token` | `DeviceSessionFastifyRequest` | Anonymous device endpoints |
+| `requireAuthOrDeviceSession` | Either | `AuthOrDeviceSessionFastifyRequest` | Flexible endpoints |
+<% } else { %>
+Auth middleware available as `onRequest` hooks in routes:
+
+| Decorator | Header/Cookie | Request Type | Use Case |
+|-----------|---------------|--------------|----------|
+| `requireAuth` | Cookie (BetterAuth) | `AuthFastifyRequest` | Authenticated user endpoints |
+<% } %>
+
+### Accessing Auth Data in Routes
+
+```typescript
+// User auth
+server.get("/profile", { onRequest: server.requireAuth }, async (request) => {
+  const { user, session } = request as AuthFastifyRequest;
+});
+<% if (features.sessionManagement) { %>
+
+// Device session
+server.post("/track", { onRequest: server.requireDeviceSession }, async (request) => {
+  const { deviceSession, sessionToken } = request as DeviceSessionFastifyRequest;
+});
+
+// Either auth type
+server.get("/data", { onRequest: server.requireAuthOrDeviceSession }, async (request) => {
+  const req = request as AuthOrDeviceSessionFastifyRequest;
+  if (req.authType === "user") { /* req.user, req.session */ }
+  if (req.authType === "device") { /* req.deviceSession, req.sessionToken */ }
+});
+<% } %>
+```
+
+## Error Handler Plugin
+
+The error handler normalizes all errors into `AppError` responses. Mapping:
+
+| Source Error | Normalized To |
+|-------------|---------------|
+| `AppError` instance | Used as-is |
+| Fastify validation (400 + `.validation`) | `ErrorFactory.validationFailed()` |
+| 401 status | `ErrorFactory.tokenInvalid()` |
+| 403 status | `ErrorFactory.permissionDenied()` |
+| 404 status | `ErrorFactory.resourceNotFound()` |
+| Other 4xx | `ErrorFactory.clientError()` |
+| 5xx / unknown | `normalizeError()` |
+
+**Routes should NOT try-catch.** Throw errors or let domain layer errors propagate - the error handler catches everything.
+
+## Config Plugin
+
+Validates environment variables at startup using TypeBox + AJV. Decorates `server.config`:
+
+```typescript
+server.config.DATABASE_URL  // string (required)
+server.config.NODE_ENV      // "development" | "test" | "production"
+server.config.API_PORT      // string, default "8080"
+```
+
+## Adding a New Plugin
+
+1. Create `plugins/{name}.ts`
+2. Wrap with `fp()` and export default
+3. Add `declare module "fastify"` type augmentation
+4. Register in `server.ts` in correct order (before routes)

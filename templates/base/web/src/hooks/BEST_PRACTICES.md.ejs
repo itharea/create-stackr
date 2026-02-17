@@ -1,0 +1,97 @@
+# Hook Best Practices
+
+Guidelines for custom React hooks in the web application.
+
+## Available Hooks
+<% if (features.sessionManagement) { %>
+
+### `useDeviceSession`
+
+Access device session for anonymous tracking:
+
+```tsx
+import { useDeviceSession } from "@/hooks/use-device-session";
+
+function AnalyticsTracker() {
+  const { deviceId, hasSession, refreshSession } = useDeviceSession();
+
+  useEffect(() => {
+    if (hasSession) {
+      trackPageView(deviceId);
+    }
+  }, [hasSession, deviceId]);
+}
+```
+<% } %>
+
+## Creating Custom Hooks
+
+### Wrap Store Selectors
+
+Create hooks that combine store state with derived values:
+
+```tsx
+// hooks/use-user-preferences.ts
+"use client";
+
+import { useMemo } from "react";
+
+export function useUserPreferences() {
+  const preferences = useMemo(() => ({
+    theme: "system",
+    notifications: true,
+  }), []);
+
+  return preferences;
+}
+```
+
+### Keep Hooks Focused
+
+Each hook should do one thing:
+
+```tsx
+// Good - focused
+export function useSessionExpiry(expiresAt: string | null) {
+  return useMemo(() => {
+    if (!expiresAt) return null;
+    return new Date(expiresAt);
+  }, [expiresAt]);
+}
+
+// Bad - too broad
+export function useEverything() {
+  // Combines auth, preferences, device, theme, etc.
+}
+```
+
+### Handle Loading States
+
+Always expose loading state for async operations:
+
+```tsx
+export function useAsyncData() {
+  const [data, setData] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const fetch = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const result = await fetchData();
+      setData(result);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  return { data, isLoading, fetch };
+}
+```
+
+## Hook Guidelines
+
+1. **Always `"use client"`** - Hooks use React APIs
+2. **Return objects** - Easier to extend than arrays
+3. **Memoize derived state** - Use `useMemo` for computed values
+4. **Expose actions separately** - Consider `useXxxActions` pattern
+5. **Document return values** - JSDoc the hook's return type

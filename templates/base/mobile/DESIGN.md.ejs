@@ -1,0 +1,193 @@
+# Mobile App Design
+
+## Core Architecture
+
+### Layered Data Flow
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                     Components                          │
+│              (React components, screens)                │
+└─────────────────────────┬───────────────────────────────┘
+                          │ use hooks
+┌─────────────────────────▼───────────────────────────────┐
+│                       Hooks                             │
+│         (useAuth, useSession, useTheme, etc.)           │
+└─────────────────────────┬───────────────────────────────┘
+                          │ read from stores / call services
+┌─────────────────────────▼───────────────────────────────┐
+│                      Stores                             │
+│              (Zustand state containers)                 │
+└─────────────────────────┬───────────────────────────────┘
+                          │ delegate to services
+┌─────────────────────────▼───────────────────────────────┐
+│                     Services                            │
+│      (Singletons: API, DeviceSession, Error, etc.)      │
+└─────────────────────────┬───────────────────────────────┘
+                          │ HTTP / Storage
+┌─────────────────────────▼───────────────────────────────┐
+│                  External Systems                       │
+│            (Backend API, SecureStore, AsyncStorage)     │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Why this layering?**
+- **Services** own side effects and external resources (singletons ensure one connection)
+- **Stores** hold reactive state, delegate logic to services
+- **Hooks** provide convenient API for components, can compose multiple stores
+- **Components** stay dumb - they consume hooks, don't know about services
+
+<% if (features.sessionManagement) { %>
+### Dual Session Model
+
+The app maintains two types of sessions:
+
+```
+┌─────────────────────┐     ┌─────────────────────┐
+│   Device Session    │────▶│    User Session     │
+│   (Anonymous)       │     │  (Authenticated)    │
+└─────────────────────┘     └─────────────────────┘
+        │                            │
+        ▼                            ▼
+  deviceSessionService          BetterAuth
+  + Zustand store               + useSession()
+```
+
+**Device Session** (managed by us):
+- Created on first app launch
+- Tracked by device ID stored in SecureStore
+- Token sent via `X-Device-Session-Token` header
+- Can be migrated to a user account on sign-up
+
+**User Session** (managed by BetterAuth):
+- Created on login/register
+- Cookies managed automatically by BetterAuth client
+- Stored securely in expo-secure-store
+- Provides `useSession()` hook for reactive state
+
+**Why two sessions?**
+- Track anonymous users before they register (analytics, preferences)
+- Migrate anonymous data to user account seamlessly
+- BetterAuth doesn't handle anonymous sessions
+<% } %>
+
+## Routing Architecture
+
+### Navigation Tree
+
+```
+app/
+├── _layout.tsx         ← Root: Auth routing logic lives here
+<% if (features.onboarding.enabled) { %>
+├── (onboarding)/       ← First-time user flow
+<% } %>
+├── (public)/           ← Unauthenticated landing
+<% if (features.authentication.enabled) { %>
+├── (auth)/             ← Login/register modals
+<% } %>
+├── (tabs)/             ← Main authenticated app
+<% if (features.authentication.emailVerification) { %>
+├── verify-email.tsx    ← Email verification blocker
+<% } %>
+└── account.tsx         ← Account management (slide-up card)
+```
+
+### Route Protection Strategy
+
+All auth-based routing is centralized in `_layout.tsx`:
+
+```typescript
+// Simplified logic from _layout.tsx
+<% if (features.onboarding.enabled) { %>
+if (inOnboardingGroup || inAuthGroup) return; // Don't interfere
+<% } %>
+
+<% if (features.authentication.enabled) { %>
+if (isAuthenticated) {
+<% if (features.authentication.emailVerification) { %>
+  if (!user.emailVerified) → /verify-email
+<% } %>
+  → /(tabs)
+} else {
+  → /(public)
+}
+<% } %>
+```
+
+**Why centralized?**
+- Single source of truth for navigation rules
+- Route groups don't need their own protection logic
+- Easy to reason about the full navigation flow
+
+### Modal vs Full-Screen
+
+| Route | Presentation | Why |
+|-------|--------------|-----|
+<% if (features.authentication.enabled) { %>
+| `(auth)/*` | Modal | User stays in context, can dismiss |
+<% } %>
+| `account` | Card (slide-up) | Feels like a sheet, not a full navigation |
+<% if (features.authentication.emailVerification) { %>
+| `verify-email` | Full-screen | Blocking action, can't dismiss |
+<% } %>
+| `(tabs)/*` | Stack | Main app navigation |
+
+## State Management
+
+### When to Use What
+
+| Need | Solution |
+|------|----------|
+| Global reactive state | Zustand store |
+<% if (features.authentication.enabled) { %>
+| Auth state | BetterAuth's `useSession()` |
+<% } %>
+| Theme/appearance | React Context |
+| Component-local state | `useState` |
+| Server data caching | (not used - keep it simple) |
+
+### Store Pattern
+
+Stores expose two hooks:
+- `useXxx()` - Read-only state and computed values
+- `useXxxActions()` - Mutation methods
+
+```typescript
+// Consuming a store
+const { session, isLoading } = useSession();          // State
+const { initializeSession } = useSessionActions();    // Actions
+```
+
+**Why separate?** Prevents unnecessary re-renders when you only need actions.
+
+## Error Handling
+
+Centralized in `ErrorService`:
+- Converts Axios errors to typed `AppError` objects
+- Maps HTTP status codes to user-friendly messages
+- Provides recovery suggestions
+
+```typescript
+// In a service or hook
+try {
+  await api.post('/endpoint', data);
+} catch (error) {
+  const appError = errorService.handleAxiosError(error);
+  // appError.type, appError.message, appError.details
+}
+```
+
+## Directory Purpose
+
+| Directory | Purpose |
+|-----------|---------|
+| `app/` | Expo Router pages (file = route) |
+| `src/services/` | Singletons that own external resources |
+| `src/store/` | Zustand stores for global state |
+| `src/hooks/` | Custom hooks that compose stores/services |
+| `src/components/` | Reusable UI components |
+| `src/context/` | React contexts (theming) |
+| `src/lib/` | Library configurations (BetterAuth client) |
+| `src/types/` | Shared TypeScript types |
+| `src/utils/` | Pure utility functions |
+| `src/constants/` | App constants and theme definitions |

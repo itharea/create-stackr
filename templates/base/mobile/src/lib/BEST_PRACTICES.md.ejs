@@ -1,0 +1,67 @@
+# Lib - Best Practices
+
+## What Lib Contains
+
+Library-level configuration modules that set up external SDKs and define app-wide constants. Not business logic - these are **configuration and client setup**.
+<% if (features.authentication.enabled) { %>
+
+## Auth Client (`auth-client.ts`)
+
+The BetterAuth client configured for React Native with Expo:
+
+```typescript
+import { createAuthClient } from "better-auth/react";
+import { expoClient } from "@better-auth/expo/client";
+
+export const authClient = createAuthClient({
+  baseURL: API_URL,
+  plugins: [
+    expoClient({ scheme: APP_SCHEME, storagePrefix: APP_SCHEME, storage: SecureStore }),
+<% if (features.authentication.emailVerification) { %>
+    emailOTPClient(),
+<% } %>
+<% if (features.authentication.twoFactor) { %>
+    twoFactorClient(),
+<% } %>
+  ],
+});
+```
+
+### Key Exports
+
+| Export | Type | Use |
+|--------|------|-----|
+| `authClient` | Client instance | Direct API access |
+| `signIn`, `signUp`, `signOut` | Methods | Auth actions in hooks |
+| `useSession` | Hook | Session state in components |
+<% if (features.authentication.emailVerification) { %>
+| `emailOtp` | Plugin methods | Email verification |
+<% } %>
+<% if (features.authentication.twoFactor) { %>
+| `twoFactor` | Plugin methods | 2FA setup/verify |
+<% } %>
+| `getCookies()` | Function | Auth headers for custom API calls |
+
+### Using Auth in Custom API Calls
+
+```typescript
+import { getCookies } from "@/lib/auth-client";
+
+const response = await fetch(url, {
+  headers: { Cookie: getCookies() || "" },
+  credentials: "omit",  // We manage cookies manually
+});
+```
+<% } %>
+
+## Rules
+
+<% if (features.authentication.enabled) { %>
+- **Never instantiate a second auth client** - import from this file
+- **Scheme must match `app.json`** - deep links break otherwise
+- **Use SecureStore, not AsyncStorage** - session tokens are sensitive
+<% } %>
+- **API_URL comes from Expo config** - set in `app.json` > `extra.apiUrl`
+<% if (features.authentication.enabled) { %>
+- When adding a BetterAuth plugin, add it to both `plugins` array and destructured exports
+<% } %>

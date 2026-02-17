@@ -1,0 +1,211 @@
+<% const hasOAuth = features.authentication.providers.google || features.authentication.providers.apple || features.authentication.providers.github; %>
+# Component Best Practices
+
+Guidelines for organizing and implementing React components in the web app.
+
+## Directory Organization
+
+```
+components/
+<% if (features.authentication.enabled) { %>
+├── auth/           # Authentication-related components
+│   ├── login-form.tsx
+│   ├── register-form.tsx
+<% if (hasOAuth) { %>
+│   └── oauth-buttons.tsx
+<% } %>
+<% if (features.authentication.twoFactor) { %>
+├── settings/       # Settings page components
+│   ├── session-card.tsx
+│   ├── two-factor-setup.tsx
+│   └── two-factor-manage.tsx
+<% } %>
+<% } %>
+├── ui/             # Reusable UI primitives (shadcn/ui)
+│   ├── button.tsx
+│   ├── card.tsx
+│   ├── input.tsx
+│   └── ...
+├── providers/      # Context providers
+│   ├── theme-provider.tsx
+<% if (features.sessionManagement) { %>
+│   └── device-session-setup.tsx
+<% } %>
+└── theme-toggle.tsx  # Standalone components
+```
+
+## shadcn/ui Patterns
+
+### Installation
+
+Add new components via CLI:
+```bash
+npx shadcn@latest add button
+```
+
+This creates a component in `ui/` that you own and can customize.
+
+### Customization
+
+Modify shadcn components directly - they're not dependencies:
+
+```tsx
+// ui/button.tsx - add a new variant
+const buttonVariants = cva(
+  "...",
+  {
+    variants: {
+      variant: {
+        default: "...",
+        destructive: "...",
+        outline: "...",
+        // Add custom variants here
+        brand: "bg-brand-500 text-white hover:bg-brand-600",
+      },
+    },
+  }
+);
+```
+
+### Composition
+
+Build complex components from primitives:
+
+```tsx
+import { Card, CardHeader, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+
+export function SessionCard({ session, onRevoke }) {
+  return (
+    <Card>
+      <CardHeader>{session.device}</CardHeader>
+      <CardContent>
+        <Button variant="destructive" onClick={onRevoke}>
+          Revoke
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+```
+
+## Server vs Client Components
+
+### Default to Server Components
+
+Server Components are the default - no directive needed:
+
+```tsx
+// This is a Server Component
+export function UserProfile({ userId }) {
+  const user = await getUser(userId);
+  return <div>{user.name}</div>;
+}
+```
+
+### Use `"use client"` When Needed
+
+Add the directive only when using:
+- React hooks (`useState`, `useEffect`, etc.)
+- Event handlers (`onClick`, `onChange`, etc.)
+- Browser APIs (`window`, `localStorage`, etc.)
+- Third-party client libraries
+
+```tsx
+"use client";
+
+import { useState } from "react";
+
+export function Counter() {
+  const [count, setCount] = useState(0);
+  return <button onClick={() => setCount(c => c + 1)}>{count}</button>;
+}
+```
+
+### Hybrid Pattern
+
+Keep data fetching in Server Components, pass to Client Components:
+
+```tsx
+// page.tsx (Server Component)
+export default async function SettingsPage() {
+  const sessions = await getSessions();
+  return <SessionList sessions={sessions} />;
+}
+
+// session-list.tsx (Client Component)
+"use client";
+export function SessionList({ sessions }) {
+  const [selected, setSelected] = useState(null);
+  // Interactive logic here
+}
+```
+
+## Theming with Tailwind
+
+### Use CSS Variables
+
+Theme colors are defined as CSS variables in `globals.css`:
+
+```css
+:root {
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+}
+
+.dark {
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+}
+```
+
+### Reference in Components
+
+Use Tailwind classes that reference these variables:
+
+```tsx
+<div className="bg-background text-foreground">
+  <p className="text-muted-foreground">Secondary text</p>
+</div>
+```
+
+## Form Patterns
+
+### Use React Hook Form with Zod
+
+```tsx
+"use client";
+
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+
+const schema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+});
+
+export function LoginForm() {
+  const form = useForm({
+    resolver: zodResolver(schema),
+  });
+
+  const onSubmit = async (data) => {
+    // Handle submission
+  };
+
+  return (
+    <form onSubmit={form.handleSubmit(onSubmit)}>
+      {/* Form fields */}
+    </form>
+  );
+}
+```
+
+## Component Guidelines
+
+1. **One component per file** - Easier to find and maintain
+2. **Co-locate related files** - Tests, types, and styles together
+3. **Export named** - Prefer `export function X` over `export default`
+4. **Props interfaces** - Define explicit prop types
+5. **Avoid prop drilling** - Use stores or context for deep state
