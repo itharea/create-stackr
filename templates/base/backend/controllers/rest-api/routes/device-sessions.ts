@@ -11,10 +11,12 @@ import {
 import {
   createDeviceSession,
   validateDeviceSession,
-  updateDeviceSessionActivity,
   validateDeviceSessionMigrationEligibility,
-  deleteDeviceSession,
   cleanupExpiredDeviceSessions,
+} from "../../../domain/device-session/service";
+import {
+  updateDeviceSessionActivity,
+  deleteDeviceSession,
 } from "../../../domain/device-session/repository";
 import { Type } from "@sinclair/typebox";
 

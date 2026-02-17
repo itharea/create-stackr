@@ -1,12 +1,11 @@
 import { db } from "../../utils/db";
-import { auth } from "../../lib/auth";
 import { ErrorFactory } from "../../utils/errors";
-import type { SessionWithToken, RevokeSessionResponse } from "./schema";
+import type { SessionWithToken } from "./schema";
 
 /**
  * Session Repository (Prisma)
  *
- * Provides session management operations for the BFF pattern.
+ * Pure database operations only. Business logic belongs in service.ts.
  * Note: Session creation/authentication is handled by BetterAuth.
  */
 
@@ -44,28 +43,6 @@ export const findUserSessionById = async (
       operation: 'findUserSessionById',
       sessionId,
       userId,
-      originalError: error instanceof Error ? error.message : String(error),
-    });
-  }
-};
-
-/**
- * Revoke a session using Better Auth's native revocation
- */
-export const revokeSessionByToken = async (
-  token: string,
-  headers: Headers
-): Promise<RevokeSessionResponse> => {
-  try {
-    const response = await auth.api.revokeSession({
-      headers,
-      body: { token },
-    });
-
-    return response as RevokeSessionResponse;
-  } catch (error) {
-    throw ErrorFactory.databaseError({
-      operation: 'revokeSessionByToken',
       originalError: error instanceof Error ? error.message : String(error),
     });
   }

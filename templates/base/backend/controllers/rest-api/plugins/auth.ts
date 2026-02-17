@@ -6,7 +6,8 @@ import type {
 import { FastifyPluginAsync, FastifyRequest, FastifyReply } from "fastify";
 import fp from "fastify-plugin";
 import { auth, Session } from "../../../lib/auth";
-import { validateDeviceSession, updateDeviceSessionActivity } from "../../../domain/device-session/repository";
+import { validateDeviceSession } from "../../../domain/device-session/service";
+import { updateDeviceSessionActivity } from "../../../domain/device-session/repository";
 import { DeviceSession } from "../../../domain/device-session/schema";
 import { ErrorFactory, normalizeError } from "../../../utils/errors";
 
