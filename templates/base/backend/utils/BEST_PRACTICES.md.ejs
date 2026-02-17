@@ -1,0 +1,222 @@
+# Utils Best Practices
+
+Guidelines for utility modules in the backend.
+
+## Available Utilities
+
+### `errors.ts` - Error Handling
+
+Provides standardized error handling across the backend.
+
+#### ErrorFactory Usage
+
+Use factory methods instead of raw `throw`:
+
+```typescript
+import { ErrorFactory } from "./utils/errors";
+
+// Good - semantic error types
+throw ErrorFactory.unauthorized("Session expired");
+throw ErrorFactory.validationFailed({ email: "Invalid format" });
+throw ErrorFactory.resourceNotFound("user");
+
+// Bad - generic errors
+throw new Error("Unauthorized");
+throw new Error("Validation failed");
+```
+
+#### Available Factory Methods
+
+| Method | HTTP Status | Use Case |
+|--------|-------------|----------|
+| `unauthorized(msg?)` | 401 | Missing or invalid auth |
+| `tokenMissing()` | 401 | No token in request |
+| `tokenInvalid(details?)` | 401 | Token validation failed |
+| `tokenExpired()` | 401 | Token past expiry |
+| `userNotFound()` | 401 | User doesn't exist |
+| `invalidCredentials()` | 401 | Wrong email/password |
+| `permissionDenied()` | 403 | Insufficient permissions |
+| `sessionNotFound()` | 401 | Session doesn't exist |
+| `sessionExpired()` | 401 | Session past expiry |
+| `validationFailed(details)` | 400 | Request validation error |
+| `resourceNotFound(name?)` | 404 | Resource doesn't exist |
+| `databaseError(details?)` | 500 | DB operation failed |
+| `internalServerError(details?)` | 500 | Unexpected error |
+
+#### AppError Class
+
+For custom errors not covered by factory methods:
+
+```typescript
+import { AppError, ErrorCode, ErrorSeverity } from "./utils/errors";
+
+throw new AppError(
+  ErrorCode.VALIDATION_FAILED,
+  "Custom validation message",
+  400,                      // HTTP status
+  ErrorSeverity.LOW,        // Logging severity
+  { field: "value" },       // Optional details
+  true                      // isOperational (true = expected error)
+);
+```
+
+### `db.ts` - Database Client
+
+<% if (backend.orm === 'drizzle') { %>
+#### Drizzle ORM
+
+```typescript
+import { db, schema } from "./utils/db";
+
+// Query with schema inference
+const users = await db.query.user.findMany({
+  where: eq(schema.user.email, email),
+});
+
+// Transaction
+await db.transaction(async (tx) => {
+  const user = await tx.insert(schema.user).values({ ... }).returning();
+  await tx.insert(schema.session).values({ userId: user.id, ... });
+});
+```
+<% } %>
+<% if (backend.orm === 'prisma') { %>
+#### Prisma
+
+```typescript
+import { prisma } from "./utils/db";
+
+const user = await prisma.user.findUnique({
+  where: { email },
+  include: { sessions: true },
+});
+
+// Transaction
+await prisma.$transaction([
+  prisma.user.create({ data: { ... } }),
+  prisma.session.create({ data: { ... } }),
+]);
+```
+<% } %>
+
+#### Connection Handling
+
+The database utility handles connection pooling and graceful shutdown automatically. Don't create separate connections.
+
+### `redis.ts` - Redis Client
+<% if (platforms.includes('web')) { %>
+
+#### OAuth Store Helpers
+
+Use the typed helpers for OAuth operations:
+
+```typescript
+import { oauthStore, isRedisAvailable } from "./utils/redis";
+
+// Store OAuth state during flow initiation
+await oauthStore.storeOAuthState(state, {
+  code_challenge,
+  callback_url,
+  provider,
+});
+
+// Retrieve state during callback
+const data = await oauthStore.getOAuthState(state);
+if (!data) {
+  throw ErrorFactory.validationError("Invalid OAuth state");
+}
+
+// Clean up after use
+await oauthStore.deleteOAuthState(state);
+
+// Exchange tokens (atomic get-and-delete)
+const tokens = await oauthStore.consumeExchangeToken(exchangeToken);
+```
+<% } %>
+
+#### Development Fallback
+
+Redis falls back to in-memory store in development when unavailable:
+
+```typescript
+import { isUsingMemoryFallback } from "./utils/redis";
+
+if (isUsingMemoryFallback()) {
+  logger.warn("Using in-memory store - state won't persist across restarts");
+}
+```
+<% if (features.authentication.emailVerification || features.authentication.passwordReset) { %>
+
+### `email.ts` - Email Sending
+
+```typescript
+import { sendEmail } from "./utils/email";
+
+await sendEmail({
+  to: user.email,
+  subject: "Verify your email",
+  html: `<h1>Welcome!</h1><p>Your code is: ${otp}</p>`,
+});
+```
+<% } %>
+
+## Best Practices
+
+### 1. Always Use ErrorFactory
+
+Consistent error types enable:
+- Uniform API responses
+- Proper HTTP status codes
+- Centralized error logging
+- Client-side error handling
+
+### 2. Handle Database Errors
+
+```typescript
+try {
+  const result = await db.query.user.findFirst({ ... });
+} catch (error) {
+  logger.error("Database query failed", { error });
+  throw ErrorFactory.databaseError({ operation: "findUser" });
+}
+```
+
+### 3. Check Redis Availability
+
+For non-critical features, degrade gracefully:
+
+```typescript
+import { isRedisAvailable } from "./utils/redis";
+
+if (isRedisAvailable()) {
+  await cacheUserData(userId, data);
+} else {
+  // Skip caching, continue without error
+}
+```
+
+### 4. Environment Variables
+
+Access env vars safely:
+
+```typescript
+// In db.ts - validated at startup
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  console.error("DATABASE_URL not set");
+  process.exit(1);
+}
+```
+
+### 5. Connection Lifecycle
+
+Let utilities manage connections:
+
+```typescript
+// Good - use the singleton
+import { db } from "./utils/db";
+await db.query.user.findMany();
+
+// Bad - creating new connections
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+```

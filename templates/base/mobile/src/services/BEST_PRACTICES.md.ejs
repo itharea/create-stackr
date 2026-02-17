@@ -1,0 +1,110 @@
+# Services Best Practices
+
+## What Services Are
+
+Services are **singletons that own external resources**: API connections, storage, SDK integrations. They encapsulate side effects and provide a clean interface for the rest of the app.
+
+## Patterns
+
+### Singleton Pattern
+
+Every service uses the singleton pattern:
+
+```typescript
+class MyService {
+  private static instance: MyService;
+
+  private constructor() {
+    // Initialize resources
+  }
+
+  public static getInstance(): MyService {
+    if (!MyService.instance) {
+      MyService.instance = new MyService();
+    }
+    return MyService.instance;
+  }
+
+  // Public methods...
+}
+
+export const myService = MyService.getInstance();
+```
+
+**Why singleton?** Services manage resources that should only exist once (connections, intervals, caches).
+
+### Method Structure
+
+```typescript
+async doSomething(params: DoSomethingParams): Promise<DoSomethingResult> {
+  try {
+    logger.debug('MyService: Starting operation...', { params });
+
+    // Perform operation
+    const result = await api.post('/endpoint', params);
+
+    logger.info('MyService: Operation completed');
+    return result.data;
+
+  } catch (error) {
+    logger.error('MyService: Operation failed', { error, params });
+
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.error?.message || 'Operation failed');
+    }
+    throw new Error('Operation failed');
+  }
+}
+```
+
+### Logging
+
+Use the logger with service name prefix:
+
+```typescript
+logger.debug('ServiceName: Message', { context });  // Verbose details
+logger.info('ServiceName: Message', { context });   // Normal operations
+logger.warn('ServiceName: Message', { context });   // Recoverable issues
+logger.error('ServiceName: Message', { error });    // Failures
+```
+
+## Rules
+
+### DO
+
+- Use singleton pattern for all services
+- Keep services stateless (state belongs in stores)
+- Define clear TypeScript interfaces for params and returns
+- Log at appropriate levels (debug for details, info for operations, error for failures)
+- Handle errors and rethrow with clear messages
+- Use the shared `api` instance for HTTP calls (it handles auth headers)
+
+### DON'T
+
+- Store reactive state in services (use Zustand stores)
+- Create multiple instances of a service
+- Call stores from services (services are lower level)
+- Swallow errors silently - always log and rethrow or handle explicitly
+- Use `fetch` directly - use the `api` instance from `./api.ts`
+
+## Existing Services
+
+| Service | Purpose |
+|---------|---------|
+| `api.ts` | Axios instance with auth interceptors |
+<% if (features.sessionManagement) { %>
+| `device-session.ts` | Anonymous session management |
+<% } %>
+| `error-service.ts` | Error parsing and user-friendly messages |
+<% const hasAnySdk = integrations.revenueCat.enabled || integrations.adjust.enabled || integrations.scate.enabled; %>
+<% if (hasAnySdk) { %>
+| `sdk-initializer.ts` | Third-party SDK initialization |
+<% } %>
+
+## Adding a New Service
+
+1. Create `{service_name}.ts` in this folder
+2. Use singleton pattern (copy from existing service)
+3. Import and use the shared `api` instance
+4. Export both the class and the singleton instance
+5. Add entry to table above

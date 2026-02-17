@@ -1,0 +1,182 @@
+<% const hasOAuth = features.authentication.providers.google || features.authentication.providers.apple || features.authentication.providers.github; %>
+# Web Application Design
+
+This document describes the architectural design of the Next.js web application.
+
+## Overview
+
+The web app uses Next.js App Router with React Server Components (RSC) for server-side rendering and client-side interactivity. It communicates with the Fastify backend for<%= features.authentication.enabled ? ' authentication and' : '' %> data operations.
+
+## Directory Structure
+
+```
+web/
+├── src/
+│   ├── app/              # Next.js App Router pages
+<% if (features.authentication.enabled) { %>
+│   │   ├── (auth)/       # Public auth pages (login, register, etc.)
+│   │   ├── (protected)/  # Authenticated-only pages
+│   │   ├── auth/         # API-style routes (callbacks, redirects)
+<% } %>
+│   │   ├── layout.tsx    # Root layout
+│   │   └── page.tsx      # Home page
+│   ├── components/       # React components
+│   ├── hooks/            # Client-side hooks
+│   ├── lib/              # Utilities and configuration
+│   └── store/            # Zustand state management
+├── public/               # Static assets
+└── next.config.ts        # Next.js configuration
+```
+<% if (features.authentication.enabled) { %>
+
+## Route Group Structure
+
+### `(auth)/` - Public Authentication Pages
+
+Unauthenticated pages for sign-in flows:
+- `/login` - Sign in form
+- `/register` - Sign up form
+<% if (features.authentication.passwordReset) { %>
+- `/forgot-password` - Password reset request
+- `/reset-password` - Password reset with token
+<% } %>
+<% if (features.authentication.emailVerification) { %>
+- `/verify-email` - Email verification
+<% } %>
+<% if (features.authentication.twoFactor) { %>
+- `/login/two-factor` - 2FA verification
+<% } %>
+
+These pages share a centered card layout via `(auth)/layout.tsx`.
+
+### `(protected)/` - Authenticated Pages
+
+Pages requiring authentication:
+- `/dashboard` - Main authenticated view
+<% if (features.authentication.twoFactor) { %>
+- `/settings/security` - Security settings (password, 2FA)
+<% } %>
+- `/settings/sessions` - Active session management
+
+Protected by `(protected)/layout.tsx` which calls `getSession()` and redirects unauthenticated users.
+
+### `auth/` - API-style Routes (Route Handlers)
+
+Non-UI routes that handle redirects and callbacks:
+<% if (hasOAuth) { %>
+- `/auth/callback` - OAuth callback handler
+<% } %>
+- `/auth/session-expired` - Session expiry redirect (clears stale cookies)
+<% if (features.authentication.twoFactor) { %>
+- `/auth/two-factor-expired` - 2FA timeout redirect
+<% } %>
+<% } %>
+<% if (features.authentication.enabled) { %>
+
+## Authentication Flow
+
+### Session Management
+
+1. **Server Components**: Read session from cookies via `getSession()` server action
+2. **Protected Layouts**: Redirect unauthenticated users server-side
+3. **Server Actions**: Handle sign-in/sign-out with cookie management
+4. **Form Components**: Use `useActionState` and `useFormStatus` for pending/error states
+
+### Cookie-Based Auth
+
+```
+Browser                    Next.js                    Fastify Backend
+   │                          │                              │
+   │  Login form submit       │                              │
+   │─────────────────────────►│  Server action calls backend │
+   │                          │─────────────────────────────►│
+   │                          │  Set-Cookie: session_token   │
+   │                          │◄─────────────────────────────│
+   │  Cookie stored           │                              │
+   │◄─────────────────────────│                              │
+   │                          │                              │
+   │  Request protected page  │                              │
+   │─────────────────────────►│  Read cookie, validate      │
+   │                          │─────────────────────────────►│
+   │  Render with user data   │                              │
+   │◄─────────────────────────│                              │
+```
+<% if (hasOAuth) { %>
+
+### OAuth Flow (PKCE)
+
+1. User clicks OAuth button
+2. Generate PKCE code verifier/challenge
+3. Store verifier in cookie, redirect to provider
+4. Provider redirects to `/auth/callback` with code
+5. Exchange code + verifier for tokens via backend
+6. Backend sets session cookie, redirects to dashboard
+<% } %>
+<% } %>
+
+## Server vs Client Components
+
+### Server Components (Default)
+
+- Pages that fetch data
+- Layouts that read cookies
+- Components without interactivity
+
+### Client Components (`"use client"`)
+
+- Forms with state
+- Components using hooks
+- Interactive UI elements
+- Anything using browser APIs
+
+## State Management Philosophy
+
+**Server actions + revalidation** for server data (auth, CRUD):
+- `useActionState` for form submissions with pending/error state
+- `useFormStatus` for submit button loading states
+- `revalidatePath`/`revalidateTag` to refresh server data after mutations
+- No client-side cache duplication of server state
+
+**Zustand stores** only for client-side global state:
+<% if (features.sessionManagement) { %>
+- Device session (client-initiated, localStorage-based)
+<% } %>
+- UI state (modals, toasts, sidebar)
+- State that must persist across client navigations without server round-trips
+
+## Relationship to Backend
+
+The web app is a BFF (Backend for Frontend) that:
+
+1. **Proxies API calls**: Uses server actions to call Fastify backend
+2. **Manages cookies**: Handles session cookies that the backend sets
+3. **Server-renders**: Fetches user data server-side for initial render
+
+### Environment Variables
+
+```env
+NEXT_PUBLIC_APP_URL=http://localhost:3000     # Public web URL
+BACKEND_URL=http://localhost:8080             # Backend (server-to-server)
+```
+
+## Design Decisions
+
+### Why Route Groups?
+
+Route groups `(name)` organize routes without affecting URLs:
+- Shared layouts per section
+- Clear separation of public vs protected
+- Easier to reason about auth requirements
+<% if (features.authentication.enabled) { %>
+
+### Why Separate Auth Cookies?
+
+The web app maintains its own session cookie (synced with backend) because:
+- Enables server-side session validation in layouts
+<% if (hasOAuth) { %>
+- Supports OAuth flows with PKCE
+<% } %>
+<% if (features.sessionManagement) { %>
+- Allows device session tracking separate from user auth
+<% } %>
+<% } %>

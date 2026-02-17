@@ -1,0 +1,231 @@
+<% const hasOAuth = features.authentication.providers.google || features.authentication.providers.apple || features.authentication.providers.github; %>
+# Library Best Practices
+
+Guidelines for utility functions and configuration in the `lib/` directory.
+
+## Directory Organization
+
+```
+lib/
+<% if (features.authentication.enabled) { %>
+├── auth/           # Authentication utilities
+│   ├── actions.ts     # Server actions for auth operations
+│   ├── config.ts      # Auth configuration and constants
+│   ├── cookies.ts     # Cookie read/write utilities
+<% if (hasOAuth) { %>
+│   ├── oauth.ts       # OAuth flow helpers
+│   ├── pkce.ts        # PKCE code generation
+<% } %>
+│   ├── sessions.ts    # Session validation
+│   └── user-agent.ts  # Device detection
+<% } %>
+<% if (features.sessionManagement) { %>
+├── device/         # Device session utilities
+│   ├── actions.ts     # Device session server actions
+│   ├── id.ts          # Device ID generation
+│   └── types.ts       # TypeScript types
+<% } %>
+└── utils.ts        # General utilities (cn, etc.)
+```
+
+## Server vs Client Code
+
+### Server-Only Code
+
+Functions that should only run on the server:
+
+```tsx
+<% if (features.authentication.enabled) { %>
+// lib/auth/sessions.ts
+import "server-only";  // Build error if imported client-side
+import { cookies } from "next/headers";
+
+export async function getSession() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(COOKIE_NAMES.SESSION);
+  // Validate with backend...
+}
+<% } %>
+```
+
+### Client-Safe Code
+
+Code that can run anywhere (no server imports):
+
+```tsx
+// lib/utils.ts
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+```
+
+### Server Actions
+
+Functions called from client but executed on server:
+
+```tsx
+<% if (features.authentication.enabled) { %>
+// lib/auth/actions.ts
+"use server";
+
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+
+export async function signOut() {
+  const cookieStore = await cookies();
+  cookieStore.delete(COOKIE_NAMES.SESSION);
+  redirect("/login");
+}
+<% } %>
+```
+<% if (features.authentication.enabled) { %>
+
+## Auth Library Organization
+
+### `config.ts` - Constants and Configuration
+
+Centralize magic strings and configuration:
+
+```tsx
+export const AUTH_CONFIG = {
+  appUrl: process.env.NEXT_PUBLIC_APP_URL,
+  backendUrl: process.env.BACKEND_URL,
+  sessionMaxAge: 60 * 60 * 24 * 7,  // 7 days
+} as const;
+
+export const COOKIE_NAMES = {
+  SESSION: "session_token",
+<% if (features.sessionManagement) { %>
+  DEVICE_SESSION: "device_session_token",
+<% } %>
+<% if (hasOAuth) { %>
+  OAUTH_PKCE_VERIFIER: "oauth_pkce_verifier",
+<% } %>
+} as const;
+```
+
+### `cookies.ts` - Cookie Operations
+
+Abstract cookie handling:
+
+```tsx
+import { cookies } from "next/headers";
+import { COOKIE_NAMES, AUTH_CONFIG } from "./config";
+
+export async function setSessionCookie(token: string) {
+  const cookieStore = await cookies();
+  cookieStore.set(COOKIE_NAMES.SESSION, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: AUTH_CONFIG.sessionMaxAge,
+    path: "/",
+  });
+}
+
+export async function getSessionCookie() {
+  const cookieStore = await cookies();
+  return cookieStore.get(COOKIE_NAMES.SESSION)?.value;
+}
+```
+<% if (hasOAuth) { %>
+
+### `oauth.ts` - OAuth Flow Helpers
+
+Handle OAuth-specific logic:
+
+```tsx
+export function buildOAuthUrl(provider: string, codeChallenge: string) {
+  const params = new URLSearchParams({
+    provider,
+    code_challenge: codeChallenge,
+    code_challenge_method: "S256",
+    redirect_uri: `${AUTH_CONFIG.appUrl}/auth/callback`,
+  });
+
+  return `${AUTH_CONFIG.backendUrl}/api/auth/oauth?${params}`;
+}
+```
+
+### `pkce.ts` - PKCE Implementation
+
+Cryptographic utilities for OAuth:
+
+```tsx
+export function generateCodeVerifier(): string {
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  return base64UrlEncode(array);
+}
+
+export async function generateCodeChallenge(verifier: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(verifier);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  return base64UrlEncode(new Uint8Array(hash));
+}
+```
+<% } %>
+<% } %>
+
+## Best Practices
+
+### 1. Type Everything
+
+```tsx
+export interface DeviceSession {
+  id: string;
+  deviceId: string;
+  createdAt: string;
+  lastSeenAt: string;
+}
+```
+
+### 2. Handle Errors Consistently
+
+```tsx
+export async function fetchWithAuth<T>(url: string): Promise<T> {
+<% if (features.authentication.enabled) { %>
+  const token = await getSessionCookie();
+<% } %>
+
+  const response = await fetch(url, {
+<% if (features.authentication.enabled) { %>
+    headers: { Authorization: `Bearer ${token}` },
+<% } %>
+  });
+
+  if (!response.ok) {
+<% if (features.authentication.enabled) { %>
+    if (response.status === 401) {
+      redirect("/auth/session-expired");
+    }
+<% } %>
+    throw new Error(`API error: ${response.status}`);
+  }
+
+  return response.json();
+}
+```
+
+### 3. Use Environment Variables Safely
+
+```tsx
+export const getBackendUrl = () => {
+  const url = process.env.BACKEND_URL;
+  if (!url) throw new Error("BACKEND_URL not configured");
+  return url;
+};
+```
+
+### 4. Keep Functions Pure When Possible
+
+```tsx
+// Pure - easy to test
+export function isSessionExpired(expiresAt: string): boolean {
+  return new Date(expiresAt) < new Date();
+}
+```

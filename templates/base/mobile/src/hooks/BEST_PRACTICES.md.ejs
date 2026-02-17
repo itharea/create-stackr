@@ -1,0 +1,143 @@
+# Hooks Best Practices
+
+## What Hooks Are
+
+Hooks provide the **API that components consume**. They compose stores, services, and other hooks into a convenient interface. Components should use hooks, not services directly.
+
+## Patterns
+
+### Basic Structure
+
+```typescript
+export const useMyFeature = () => {
+  // External state (from stores or other hooks)
+  const { data, isLoading: externalLoading } = useExternalStore();
+
+  // Local UI state
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Actions wrapped with useCallback
+  const doAction = useCallback(async (params: ActionParams) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await myService.doAction(params);
+      return { success: true, data: result };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Action failed';
+      setError(message);
+      return { success: false, error: message };
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const clearError = useCallback(() => setError(null), []);
+
+  return {
+    // State
+    data,
+    isLoading: isLoading || externalLoading,
+    error,
+
+    // Actions
+    doAction,
+    clearError,
+  };
+};
+```
+
+### Return Type Convention
+
+Actions return a result object for easy handling:
+
+```typescript
+// In hook
+return { success: true, data: result };
+return { success: false, error: message };
+
+// In component
+const result = await doAction(params);
+if (result.success) {
+  // Handle success
+} else {
+  // result.error contains the message
+}
+```
+<% if (features.authentication.enabled) { %>
+
+### Wrapping External Hooks
+
+When wrapping external libraries (like BetterAuth):
+
+```typescript
+export const useAuth = () => {
+  // Get external state
+  const { data: session, isPending, error: sessionError } = useSession();
+
+  // Add local state for actions
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Compute derived values
+  const isAuthenticated = !!(session?.user && session?.session);
+  const user = session?.user ?? null;
+
+  // Wrap external actions with loading/error handling
+  const signIn = useCallback(async (credentials) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await authClient.signIn.email(credentials);
+      if (result.error) throw new Error(result.error.message);
+      return { success: true };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Sign in failed';
+      setError(message);
+      return { success: false, error: message };
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  return { user, isAuthenticated, isPending, isLoading, error, signIn };
+};
+```
+<% } %>
+
+## Rules
+
+### DO
+
+- Use `useCallback` for all action functions (prevents unnecessary re-renders)
+- Return `{ success, data?, error? }` objects from async actions
+- Provide a `clearError` function when you have error state
+- Compose multiple stores/services when needed
+- Keep hooks focused - one hook per feature/domain
+
+### DON'T
+
+- Call services directly from components (use hooks as the boundary)
+- Throw errors from async actions (return error objects instead)
+- Forget loading state for async operations
+- Create hooks that do too many unrelated things
+
+## Existing Hooks
+
+| Hook | Purpose |
+|------|---------|
+<% if (features.authentication.enabled) { %>
+| `auth.ts` | Authentication state and actions (wraps BetterAuth) |
+<% } %>
+<% if (features.authentication.twoFactor) { %>
+| `two-factor-timeout.ts` | 2FA session timeout tracking |
+<% } %>
+
+## Adding a New Hook
+
+1. Create `{feature_name}.ts` in this folder
+2. Follow the basic structure pattern above
+3. Use `useCallback` for all functions
+4. Return success/error objects from async actions
+5. Add entry to table above
