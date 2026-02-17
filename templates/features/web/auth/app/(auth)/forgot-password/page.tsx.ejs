@@ -1,39 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { requestPasswordReset } from "@/lib/auth/actions";
+import { SubmitButton } from "@/components/ui/submit-button";
+import { forgotPasswordAction, type FormActionState } from "@/lib/auth/actions";
 
 export default function ForgotPasswordPage() {
-  const [email, setEmail] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
+  const [formKey, setFormKey] = useState(0);
+  const [state, formAction] = useActionState<FormActionState, FormData>(forgotPasswordAction, { error: null });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setIsLoading(true);
-
-    try {
-      const result = await requestPasswordReset(email);
-
-      if (!result.success) {
-        setError(result.error || "Failed to send reset email");
-        return;
-      }
-
-      setIsSuccess(true);
-    } catch (err) {
-      setError("An unexpected error occurred");
-      console.error("Password reset request error:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  if (isSuccess) {
+  if (state.success) {
     return (
       <div className="space-y-6">
         <div className="space-y-2 text-center">
@@ -54,7 +31,7 @@ export default function ForgotPasswordPage() {
           </div>
           <h2 className="text-2xl font-bold">Check your email</h2>
           <p className="text-muted-foreground">
-            We&apos;ve sent a password reset link to <strong>{email}</strong>
+            We&apos;ve sent a password reset link to <strong>{state.email}</strong>
           </p>
         </div>
 
@@ -62,7 +39,7 @@ export default function ForgotPasswordPage() {
           <p className="text-sm text-muted-foreground text-center">
             Didn&apos;t receive the email? Check your spam folder or{" "}
             <button
-              onClick={() => setIsSuccess(false)}
+              onClick={() => setFormKey((k) => k + 1)}
               className="text-primary hover:underline"
             >
               try again
@@ -80,7 +57,7 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div key={formKey} className="space-y-6">
       <div className="space-y-2 text-center">
         <h2 className="text-2xl font-bold">Forgot password?</h2>
         <p className="text-muted-foreground">
@@ -88,32 +65,30 @@ export default function ForgotPasswordPage() {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form action={formAction} className="space-y-4">
         <div className="space-y-2">
           <label htmlFor="email" className="text-sm font-medium">
             Email
           </label>
           <input
             id="email"
+            name="email"
             type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
             required
-            disabled={isLoading}
             className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
           />
         </div>
 
-        {error && (
+        {state.error && (
           <div className="p-3 text-sm text-red-500 bg-red-50 dark:bg-red-950/20 rounded-md">
-            {error}
+            {state.error}
           </div>
         )}
 
-        <Button type="submit" className="w-full" disabled={isLoading}>
-          {isLoading ? "Sending..." : "Send reset link"}
-        </Button>
+        <SubmitButton className="w-full" pendingText="Sending...">
+          Send reset link
+        </SubmitButton>
       </form>
 
       <p className="text-center text-sm text-muted-foreground">

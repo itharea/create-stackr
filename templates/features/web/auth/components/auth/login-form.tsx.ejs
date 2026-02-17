@@ -1,77 +1,32 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useActionState } from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { signIn } from "@/lib/auth/actions";
-import { useAuthStore } from "@/store/auth.store";
+import { SubmitButton } from "@/components/ui/submit-button";
+import { loginAction, type FormActionState } from "@/lib/auth/actions";
 
 interface LoginFormProps {
   redirectTo?: string;
 }
 
 export function LoginForm({ redirectTo = "/dashboard" }: LoginFormProps) {
-  const router = useRouter();
-  const setSession = useAuthStore((s) => s.setSession);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setIsLoading(true);
-
-    try {
-      const result = await signIn(email, password);
-
-<% if (features.authentication.twoFactor) { %>
-      // Check if 2FA is required
-      if (result.requiresTwoFactor) {
-        router.push('/login/two-factor');
-        return;
-      }
-<% } %>
-
-<% if (features.authentication.emailVerification) { %>
-      // Check if email verification is needed (can happen on success)
-      if (result.needsEmailVerification) {
-        router.push(`/verify-email?email=${encodeURIComponent(email)}`);
-        return;
-      }
-<% } %>
-
-      if (!result.success) {
-        setError(result.error || "Failed to sign in");
-        return;
-      }
-
-      if (result.session) setSession(result.session);
-      router.push(redirectTo);
-      router.refresh();
-    } catch {
-      setError("An unexpected error occurred");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const [state, formAction, isPending] = useActionState<FormActionState, FormData>(loginAction, { error: null });
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
+    <form action={formAction} className="space-y-3">
+      <input type="hidden" name="redirectTo" value={redirectTo} />
+
       <div className="space-y-1.5">
         <Label htmlFor="email" className="text-sm">Email</Label>
         <Input
           id="email"
+          name="email"
           type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
           placeholder="you@example.com"
           required
-          disabled={isLoading}
+          disabled={isPending}
           autoComplete="email"
         />
       </div>
@@ -87,25 +42,24 @@ export function LoginForm({ redirectTo = "/dashboard" }: LoginFormProps) {
         </div>
         <Input
           id="password"
+          name="password"
           type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
           placeholder="Enter your password"
           required
-          disabled={isLoading}
+          disabled={isPending}
           autoComplete="current-password"
         />
       </div>
 
-      {error && (
+      {state.error && (
         <div className="p-2.5 text-sm text-destructive bg-destructive/10 rounded-lg border border-destructive/20">
-          {error}
+          {state.error}
         </div>
       )}
 
-      <Button type="submit" className="w-full" disabled={isLoading}>
-        {isLoading ? "Signing in..." : "Sign in"}
-      </Button>
+      <SubmitButton className="w-full" pendingText="Signing in...">
+        Sign in
+      </SubmitButton>
 
       <p className="text-center text-sm text-muted-foreground">
         Don&apos;t have an account?{" "}

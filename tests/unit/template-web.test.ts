@@ -265,6 +265,7 @@ describe('Web Template Utilities', () => {
         expect(shouldIncludeFile('base/web/src/components/ui/button.tsx', webOnlyConfig)).toBe(true);
         expect(shouldIncludeFile('base/web/src/components/ui/input.tsx', webOnlyConfig)).toBe(true);
         expect(shouldIncludeFile('base/web/src/components/ui/card.tsx', webOnlyConfig)).toBe(true);
+        expect(shouldIncludeFile('base/web/src/components/ui/submit-button.tsx', webOnlyConfig)).toBe(true);
       });
 
       it('includes Next.js config files when web selected', () => {
