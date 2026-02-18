@@ -1,8 +1,6 @@
 # Simplified Docker Compose for Production Deployment
 # Essential services with basic security practices
 
-version: '3.8'
-
 services:
 <% if (backend.eventQueue) { %>
   # =============================================================================
@@ -10,7 +8,7 @@ services:
   # =============================================================================
   redis:
     image: redis:7-alpine
-    container_name: auth_boilerplate_redis_prod
+    container_name: <%= projectName %>_redis_prod
     restart: always
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     environment:
@@ -37,18 +35,18 @@ services:
   # =============================================================================
   database:
     image: postgres:16-alpine
-    container_name: auth_boilerplate_db_prod
+    container_name: <%= projectName %>_db_prod
     restart: always
     environment:
       POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME:-auth_boilerplate}
+      POSTGRES_DB: ${DB_NAME:-<%= projectName.replace(/-/g, '_') %>}
     ports:
       - "127.0.0.1:5432:5432"  # Bind to localhost only
     volumes:
       - postgres_prod_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-auth_boilerplate}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-<%= projectName.replace(/-/g, '_') %>}"]
       interval: 30s
       timeout: 5s
       retries: 5
@@ -61,11 +59,11 @@ services:
       context: ./backend
       target: rest-api-prod
       dockerfile: Dockerfile
-    container_name: auth_boilerplate_rest_api_prod
+    container_name: <%= projectName %>_rest_api_prod
     restart: always
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD}@database:5432/${DB_NAME:-auth_boilerplate}?schema=public
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD}@database:5432/${DB_NAME:-<%= projectName.replace(/-/g, '_') %>}?schema=public
       JWT_SECRET: ${JWT_SECRET}
       API_HOST: 0.0.0.0
       API_PORT: 8080
@@ -91,11 +89,11 @@ services:
       context: ./backend
       target: event-queue-prod
       dockerfile: Dockerfile
-    container_name: auth_boilerplate_event_queue_prod
+    container_name: <%= projectName %>_event_queue_prod
     restart: always
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD}@database:5432/${DB_NAME:-auth_boilerplate}?schema=public
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD}@database:5432/${DB_NAME:-<%= projectName.replace(/-/g, '_') %>}?schema=public
       JWT_SECRET: ${JWT_SECRET}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       REDIS_HOST: redis

@@ -6,6 +6,7 @@ import { promptOnboarding } from './onboarding.js';
 import { promptPackageManager } from './packageManager.js';
 import { promptORM } from './orm.js';
 import { promptPlatforms } from './platform.js';
+import inquirer from 'inquirer';
 import { PRESETS } from '../config/presets.js';
 import type { ProjectConfig, CLIOptions } from '../types/index.js';
 import { deriveAppScheme } from '../types/index.js';
@@ -51,6 +52,11 @@ export async function collectConfiguration(
     config = await customizePreset(config);
   }
 
+  // Auto-enable ATT when Adjust is enabled (single source of truth)
+  if (config.integrations.adjust.enabled) {
+    config.integrations.att.enabled = true;
+  }
+
   // 6. Get package manager
   const packageManager = await promptPackageManager();
 
@@ -87,10 +93,15 @@ async function collectCustomConfiguration(): Promise<
     features.onboarding = { ...features.onboarding, ...onboardingConfig };
   }
 
-  // Auto-enable ATT if Adjust is enabled
-  if (integrations.adjust.enabled) {
-    integrations.att.enabled = true;
-  }
+  // Event queue selection
+  const { eventQueue } = await inquirer.prompt([
+    {
+      type: 'confirm',
+      name: 'eventQueue',
+      message: 'Include event queue (BullMQ + Redis)?',
+      default: true,
+    },
+  ]);
 
   return {
     platforms,
@@ -99,7 +110,7 @@ async function collectCustomConfiguration(): Promise<
     backend: {
       database: 'postgresql',
       orm,
-      eventQueue: true,
+      eventQueue,
       docker: true,
     },
     preset: 'custom',
@@ -140,8 +151,9 @@ async function loadPresetByName(
   );
 
   if (!preset) {
+    const available = PRESETS.map((p) => p.name.toLowerCase()).join(', ');
     throw new Error(
-      `Unknown preset: ${presetName}. Available: minimal, full-featured, analytics-focused`
+      `Unknown preset: ${presetName}. Available: ${available}`
     );
   }
 

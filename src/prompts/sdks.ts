@@ -1,6 +1,7 @@
 import inquirer from 'inquirer';
+import type { ProjectConfig } from '../types/index.js';
 
-export async function promptSDKs(): Promise<any> {
+export async function promptSDKs(): Promise<ProjectConfig['integrations']> {
   const answers = await inquirer.prompt([
     {
       type: 'checkbox',
@@ -23,9 +24,6 @@ export async function promptSDKs(): Promise<any> {
     },
   ]);
 
-  // Auto-enable ATT if Adjust is selected
-  const attEnabled = answers.sdks.includes('adjust');
-
   return {
     revenueCat: {
       enabled: answers.sdks.includes('revenueCat'),
@@ -42,7 +40,7 @@ export async function promptSDKs(): Promise<any> {
       apiKey: 'YOUR_SCATE_API_KEY_HERE',
     },
     att: {
-      enabled: attEnabled,
+      enabled: false,
     },
   };
 }

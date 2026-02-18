@@ -28,7 +28,7 @@ try {
 function displayWelcome() {
   console.log(
     boxen(
-      chalk.bold.cyan('Welcome to create-fullstack-app!\n\n') +
+      chalk.bold.cyan('Welcome to create-stackr!\n\n') +
         chalk.white('Create a production-ready full-stack mobile app\n') +
         chalk.white('with backend infrastructure in minutes.'),
       {
@@ -43,7 +43,7 @@ function displayWelcome() {
 
 // Configure CLI
 program
-  .name('create-fullstack-app')
+  .name('create-stackr')
   .description('Create a production-ready full-stack mobile app')
   .version(packageJson.version)
   .argument('[project-name]', 'Name of the project')
@@ -69,12 +69,12 @@ program.addHelpText(
   `
 
 Examples:
-  $ npx create-fullstack-app my-app
-  $ npx create-fullstack-app my-app --template minimal
-  $ npx create-fullstack-app my-app --defaults
+  $ npx create-stackr my-app
+  $ npx create-stackr my-app --template minimal
+  $ npx create-stackr my-app --defaults
 
 For more information, visit:
-  https://docs.create-fullstack-app.dev
+  https://stackr.sh/docs
 `
 );
 

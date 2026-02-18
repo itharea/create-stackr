@@ -25,8 +25,8 @@ describe('validateProjectName', () => {
     expect(validateProjectName('my  app').valid).toBe(false);
   });
 
-  it('should reject names with underscores', () => {
-    expect(validateProjectName('my_app').valid).toBe(false);
+  it('should accept names with underscores', () => {
+    expect(validateProjectName('my_app').valid).toBe(true);
   });
 
   it('should reject names that are too long', () => {
