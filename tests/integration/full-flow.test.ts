@@ -20,8 +20,10 @@ describe('Integration Tests - Prompt Flows', () => {
 
   describe('--template flag behavior', () => {
     it('should load minimal preset with --template minimal', async () => {
-      // Mock package manager prompt only
-      inquirer.prompt.mockResolvedValueOnce({ packageManager: 'npm' });
+      // Mock AI tools + package manager prompts
+      inquirer.prompt
+        .mockResolvedValueOnce({ aiTools: ['codex'] }) // AI tools
+        .mockResolvedValueOnce({ packageManager: 'npm' }); // Package manager
 
       const options: CLIOptions = { template: 'minimal' };
       const config = await collectConfiguration('test-app', options);
@@ -35,7 +37,9 @@ describe('Integration Tests - Prompt Flows', () => {
     });
 
     it('should load full-featured preset with --template full-featured', async () => {
-      inquirer.prompt.mockResolvedValueOnce({ packageManager: 'yarn' });
+      inquirer.prompt
+        .mockResolvedValueOnce({ aiTools: [] })
+        .mockResolvedValueOnce({ packageManager: 'yarn' });
 
       const options: CLIOptions = { template: 'full-featured' };
       const config = await collectConfiguration('my-app', options);
@@ -53,7 +57,9 @@ describe('Integration Tests - Prompt Flows', () => {
     });
 
     it('should load analytics-focused preset with --template analytics-focused', async () => {
-      inquirer.prompt.mockResolvedValueOnce({ packageManager: 'bun' });
+      inquirer.prompt
+        .mockResolvedValueOnce({ aiTools: ['claude'] })
+        .mockResolvedValueOnce({ packageManager: 'bun' });
 
       const options: CLIOptions = { template: 'analytics-focused' };
       const config = await collectConfiguration('analytics-app', options);
@@ -107,6 +113,7 @@ describe('Integration Tests - Prompt Flows', () => {
       inquirer.prompt
         .mockResolvedValueOnce({ preset: 'Minimal' }) // Select preset
         .mockResolvedValueOnce({ customize: false }) // Don't customize
+        .mockResolvedValueOnce({ aiTools: ['codex'] }) // AI tools
         .mockResolvedValueOnce({ packageManager: 'npm' }); // Package manager
 
       const options: CLIOptions = {};
@@ -132,6 +139,7 @@ describe('Integration Tests - Prompt Flows', () => {
           scate: false,
           oauthProviders: ['google', 'apple'], // OAuth provider selection
         })
+        .mockResolvedValueOnce({ aiTools: ['claude', 'cursor'] }) // AI tools
         .mockResolvedValueOnce({ packageManager: 'npm' }); // Package manager
 
       const options: CLIOptions = {};
@@ -179,6 +187,7 @@ describe('Integration Tests - Prompt Flows', () => {
           showPaywall: true,
         })
         .mockResolvedValueOnce({ eventQueue: true }) // Event queue
+        .mockResolvedValueOnce({ aiTools: ['codex'] }) // AI tools
         .mockResolvedValueOnce({ packageManager: 'yarn' }); // Package manager
 
       const options: CLIOptions = {};
@@ -216,6 +225,7 @@ describe('Integration Tests - Prompt Flows', () => {
         })
         .mockResolvedValueOnce({ sdks: [] })
         .mockResolvedValueOnce({ eventQueue: false }) // Event queue
+        .mockResolvedValueOnce({ aiTools: [] }) // AI tools
         .mockResolvedValueOnce({ packageManager: 'npm' });
 
       const options: CLIOptions = {};
@@ -224,8 +234,8 @@ describe('Integration Tests - Prompt Flows', () => {
       expect(config.features.onboarding.enabled).toBe(false);
       expect(config.backend.orm).toBe('drizzle');
       expect(config.backend.eventQueue).toBe(false);
-      // custom, platforms, orm, features, auth details, sdks, eventQueue, package manager = 8
-      expect(inquirer.prompt).toHaveBeenCalledTimes(8);
+      // custom, platforms, orm, features, auth details, sdks, eventQueue, aiTools, package manager = 9
+      expect(inquirer.prompt).toHaveBeenCalledTimes(9);
     });
 
     it('should auto-enable ATT when Adjust is selected', async () => {
@@ -241,6 +251,7 @@ describe('Integration Tests - Prompt Flows', () => {
         })
         .mockResolvedValueOnce({ sdks: ['adjust', 'scate'] })
         .mockResolvedValueOnce({ eventQueue: true }) // Event queue
+        .mockResolvedValueOnce({ aiTools: ['codex'] }) // AI tools
         .mockResolvedValueOnce({ packageManager: 'npm' });
 
       const options: CLIOptions = {};
@@ -263,6 +274,7 @@ describe('Integration Tests - Prompt Flows', () => {
     it('should prompt for project name if not provided', async () => {
       inquirer.prompt
         .mockResolvedValueOnce({ projectName: 'prompted-name' })
+        .mockResolvedValueOnce({ aiTools: [] })
         .mockResolvedValueOnce({ packageManager: 'npm' });
 
       const options: CLIOptions = { template: 'minimal' };
@@ -282,6 +294,7 @@ describe('Integration Tests - Prompt Flows', () => {
         .mockResolvedValueOnce({ features: [] })
         .mockResolvedValueOnce({ sdks: [] })
         .mockResolvedValueOnce({ eventQueue: true }) // Event queue
+        .mockResolvedValueOnce({ aiTools: ['codex'] }) // AI tools
         .mockResolvedValueOnce({ packageManager: 'npm' });
 
       const options: CLIOptions = {};
@@ -301,6 +314,7 @@ describe('Integration Tests - Prompt Flows', () => {
         .mockResolvedValueOnce({ features: [] })
         .mockResolvedValueOnce({ sdks: [] })
         .mockResolvedValueOnce({ eventQueue: true }) // Event queue
+        .mockResolvedValueOnce({ aiTools: ['windsurf'] }) // AI tools
         .mockResolvedValueOnce({ packageManager: 'npm' });
 
       const options: CLIOptions = {};

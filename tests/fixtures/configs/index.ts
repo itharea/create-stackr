@@ -82,5 +82,6 @@ export function createTestConfig(
       ...minimalConfig.backend,
       ...overrides.backend,
     },
+    aiTools: overrides.aiTools ?? [...minimalConfig.aiTools],
   };
 }

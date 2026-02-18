@@ -65,6 +65,7 @@ describe('E2E: Full Project Generation', () => {
       },
       preset: 'minimal',
       customized: false,
+      aiTools: ['codex'],
     };
 
     const generator = new ProjectGenerator(config);
@@ -140,6 +141,7 @@ describe('E2E: Full Project Generation', () => {
       },
       preset: 'full-featured',
       customized: false,
+      aiTools: ['codex'],
     };
 
     const generator = new ProjectGenerator(config);
@@ -226,6 +228,7 @@ describe('E2E: Full Project Generation', () => {
       },
       preset: 'minimal',
       customized: false,
+      aiTools: ['codex'],
     };
 
     const generator = new ProjectGenerator(config);
@@ -288,6 +291,7 @@ describe('E2E: Full Project Generation', () => {
       },
       preset: 'custom',
       customized: false,
+      aiTools: ['codex'],
     };
 
     const generator = new ProjectGenerator(config);
@@ -355,6 +359,7 @@ describe('E2E: Full Project Generation', () => {
         },
         preset: 'custom',
         customized: false,
+        aiTools: ['codex'],
       };
 
       const generator = new ProjectGenerator(config);
@@ -422,6 +427,7 @@ describe('E2E: Full Project Generation', () => {
         },
         preset: 'minimal',
         customized: false,
+        aiTools: ['codex'],
       };
 
       const generator = new ProjectGenerator(config);
@@ -478,6 +484,7 @@ describe('E2E: Full Project Generation', () => {
         },
         preset: 'custom',
         customized: true,
+        aiTools: ['codex'],
       };
 
       const generator = new ProjectGenerator(config);
@@ -549,6 +556,7 @@ describe('E2E: Full Project Generation', () => {
         },
         preset: 'minimal',
         customized: false,
+        aiTools: ['codex'],
       };
 
       const generator = new ProjectGenerator(config);
@@ -608,6 +616,7 @@ describe('E2E: Full Project Generation', () => {
         },
         preset: 'minimal',
         customized: false,
+        aiTools: ['codex'],
       };
 
       const generator = new ProjectGenerator(config);

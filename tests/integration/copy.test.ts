@@ -44,6 +44,7 @@ describe('Copy Utils', () => {
     },
     preset: 'minimal',
     customized: false,
+    aiTools: ['codex'],
   };
 
   beforeEach(async () => {

@@ -61,6 +61,7 @@ describe('Integration: Web Template Generation', () => {
         },
         preset: 'minimal',
         customized: false,
+        aiTools: ['codex'],
       };
 
       const generator = new ProjectGenerator(config);
@@ -110,6 +111,7 @@ describe('Integration: Web Template Generation', () => {
         },
         preset: 'minimal',
         customized: false,
+        aiTools: ['codex'],
       };
 
       const generator = new ProjectGenerator(config);
@@ -156,6 +158,7 @@ describe('Integration: Web Template Generation', () => {
         },
         preset: 'minimal',
         customized: false,
+        aiTools: ['codex'],
       };
 
       const generator = new ProjectGenerator(config);
@@ -216,6 +219,7 @@ describe('Integration: Web Template Generation', () => {
         },
         preset: 'minimal',
         customized: false,
+        aiTools: ['codex'],
       };
 
       const generator = new ProjectGenerator(config);
@@ -260,6 +264,7 @@ describe('Integration: Web Template Generation', () => {
         },
         preset: 'minimal',
         customized: false,
+        aiTools: ['codex'],
       };
 
       const generator = new ProjectGenerator(config);
@@ -307,6 +312,7 @@ describe('Integration: Web Template Generation', () => {
         },
         preset: 'minimal',
         customized: false,
+        aiTools: ['codex'],
       };
 
       const generator = new ProjectGenerator(config);
@@ -353,6 +359,7 @@ describe('Integration: Web Template Generation', () => {
         },
         preset: 'minimal',
         customized: false,
+        aiTools: ['codex'],
       };
 
       const generator = new ProjectGenerator(config);
@@ -408,6 +415,7 @@ describe('Integration: Web Template Generation', () => {
         },
         preset: 'custom',
         customized: true,
+        aiTools: ['codex'],
       };
 
       const generator = new ProjectGenerator(config);
@@ -456,6 +464,7 @@ describe('Integration: Web Template Generation', () => {
         },
         preset: 'minimal',
         customized: false,
+        aiTools: ['codex'],
       };
 
       const generator = new ProjectGenerator(config);
@@ -502,6 +511,7 @@ describe('Integration: Web Template Generation', () => {
         },
         preset: 'custom',
         customized: true,
+        aiTools: ['codex'],
       };
 
       const generator = new ProjectGenerator(config);
@@ -555,6 +565,7 @@ describe('Integration: Web Template Generation', () => {
         },
         preset: 'minimal',
         customized: false,
+        aiTools: ['codex'],
       };
 
       const generator = new ProjectGenerator(config);
@@ -597,6 +608,7 @@ describe('Integration: Web Template Generation', () => {
         },
         preset: 'minimal',
         customized: false,
+        aiTools: ['codex'],
       };
 
       const generator = new ProjectGenerator(config);
@@ -641,6 +653,7 @@ describe('Integration: Web Template Generation', () => {
         },
         preset: 'minimal',
         customized: false,
+        aiTools: ['codex'],
       };
 
       const generator = new ProjectGenerator(config);
@@ -695,6 +708,7 @@ describe('Integration: Web Template Generation', () => {
         },
         preset: 'minimal',
         customized: false,
+        aiTools: ['codex'],
       };
 
       const generator = new ProjectGenerator(config);
@@ -745,6 +759,7 @@ describe('Integration: Web Template Generation', () => {
         },
         preset: 'minimal',
         customized: false,
+        aiTools: ['codex'],
       };
 
       const generator = new ProjectGenerator(config);

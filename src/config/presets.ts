@@ -56,6 +56,7 @@ export const PRESETS: PresetDefinition[] = [
       },
       preset: 'minimal',
       customized: false,
+      aiTools: ['codex'],
     },
   },
   {
@@ -113,6 +114,7 @@ export const PRESETS: PresetDefinition[] = [
       },
       preset: 'full-featured',
       customized: false,
+      aiTools: ['codex'],
     },
   },
   {
@@ -170,6 +172,7 @@ export const PRESETS: PresetDefinition[] = [
       },
       preset: 'analytics-focused',
       customized: false,
+      aiTools: ['codex'],
     },
   },
 ];

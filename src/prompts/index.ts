@@ -6,6 +6,7 @@ import { promptOnboarding } from './onboarding.js';
 import { promptPackageManager } from './packageManager.js';
 import { promptORM } from './orm.js';
 import { promptPlatforms } from './platform.js';
+import { promptAITools } from './aiTools.js';
 import inquirer from 'inquirer';
 import { PRESETS } from '../config/presets.js';
 import type { ProjectConfig, CLIOptions } from '../types/index.js';
@@ -21,12 +22,14 @@ export async function collectConfiguration(
   // 2. If --template flag is provided, load that preset
   if (options.template) {
     const config = await loadPresetByName(options.template);
+    const aiTools = await promptAITools();
     const packageManager = await promptPackageManager();
     return {
       ...config,
       projectName: name,
       appScheme: deriveAppScheme(name),
       packageManager,
+      aiTools,
     };
   }
 
@@ -57,7 +60,10 @@ export async function collectConfiguration(
     config.integrations.att.enabled = true;
   }
 
-  // 6. Get package manager
+  // 6. Get AI coding tools preference
+  const aiTools = await promptAITools();
+
+  // 7. Get package manager
   const packageManager = await promptPackageManager();
 
   return {
@@ -65,6 +71,7 @@ export async function collectConfiguration(
     projectName: name,
     appScheme: deriveAppScheme(name),
     packageManager,
+    aiTools,
   };
 }
 
@@ -115,6 +122,7 @@ async function collectCustomConfiguration(): Promise<
     },
     preset: 'custom',
     customized: false,
+    aiTools: [],
   };
 }
 

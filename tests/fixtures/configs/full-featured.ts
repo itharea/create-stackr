@@ -36,4 +36,5 @@ export const fullFeaturedConfig: Readonly<ProjectConfig> = {
   },
   preset: 'full-featured',
   customized: false,
+  aiTools: ['codex'],
 } as const;

@@ -36,4 +36,5 @@ export const analyticsFocusedConfig: Readonly<ProjectConfig> = {
   },
   preset: 'analytics-focused',
   customized: false,
+  aiTools: ['codex'],
 } as const;

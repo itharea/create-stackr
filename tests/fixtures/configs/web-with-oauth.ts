@@ -36,4 +36,5 @@ export const webWithOAuthConfig: Readonly<ProjectConfig> = {
   },
   preset: 'custom',
   customized: true,
+  aiTools: ['codex'],
 } as const;

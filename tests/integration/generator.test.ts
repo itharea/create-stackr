@@ -68,6 +68,7 @@ describe('ProjectGenerator', () => {
       },
       preset: 'minimal',
       customized: false,
+      aiTools: ['codex'],
     };
 
     const generator = new ProjectGenerator(config);
@@ -117,6 +118,7 @@ describe('ProjectGenerator', () => {
       },
       preset: 'custom',
       customized: false,
+      aiTools: ['codex'],
     };
 
     const generator = new ProjectGenerator(config);
@@ -160,6 +162,7 @@ describe('ProjectGenerator', () => {
       },
       preset: 'full-featured',
       customized: false,
+      aiTools: ['codex'],
     };
 
     const generator = new ProjectGenerator(config);
@@ -207,6 +210,7 @@ describe('ProjectGenerator', () => {
       },
       preset: 'minimal',
       customized: false,
+      aiTools: ['codex'],
     };
 
     const projectDir = path.join(tempDir, 'test-exists');
@@ -218,5 +222,92 @@ describe('ProjectGenerator', () => {
 
     // Should throw error
     await expect(generator.generate(projectDir)).rejects.toThrow('already exists');
+  });
+
+  describe('AI tool file generation', () => {
+    const createBaseConfig = (aiTools: ProjectConfig['aiTools']): ProjectConfig => ({
+      projectName: 'test-ai-tools',
+      packageManager: 'npm',
+      appScheme: 'testaitools',
+      platforms: ['mobile', 'web'],
+      features: {
+        onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
+        authentication: createAuthConfig(true),
+        paywall: false,
+        sessionManagement: true,
+      },
+      integrations: {
+        revenueCat: { enabled: false, iosKey: '', androidKey: '' },
+        adjust: { enabled: false, appToken: '', environment: 'sandbox' },
+        scate: { enabled: false, apiKey: '' },
+        att: { enabled: false },
+      },
+      backend: {
+        database: 'postgresql',
+        orm: 'prisma',
+        eventQueue: false,
+        docker: true,
+      },
+      preset: 'minimal',
+      customized: false,
+      aiTools,
+    });
+
+    it('should generate AGENTS.md when codex is selected', async () => {
+      const config = createBaseConfig(['codex']);
+      const generator = new ProjectGenerator(config);
+      const projectDir = path.join(tempDir, 'test-ai-tools-codex');
+      await generator.generate(projectDir);
+
+      expect(await fs.pathExists(path.join(projectDir, 'AGENTS.md'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'CLAUDE.md'))).toBe(false);
+      expect(await fs.pathExists(path.join(projectDir, '.cursorrules'))).toBe(false);
+
+      const content = await fs.readFile(path.join(projectDir, 'AGENTS.md'), 'utf-8');
+      expect(content).toContain('AGENTS.md');
+      expect(content).not.toContain('<%');
+    });
+
+    it('should generate multiple guideline files when multiple tools selected', async () => {
+      const config = createBaseConfig(['claude', 'cursor']);
+      const generator = new ProjectGenerator(config);
+      const projectDir = path.join(tempDir, 'test-ai-tools-multi');
+      await generator.generate(projectDir);
+
+      expect(await fs.pathExists(path.join(projectDir, 'CLAUDE.md'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, '.cursorrules'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'AGENTS.md'))).toBe(false);
+
+      // Each file should reference its own filename
+      const claudeContent = await fs.readFile(path.join(projectDir, 'CLAUDE.md'), 'utf-8');
+      expect(claudeContent).toContain('CLAUDE.md');
+
+      const cursorContent = await fs.readFile(path.join(projectDir, '.cursorrules'), 'utf-8');
+      expect(cursorContent).toContain('.cursorrules');
+    });
+
+    it('should generate no guideline files when no tools selected', async () => {
+      const config = createBaseConfig([]);
+      const generator = new ProjectGenerator(config);
+      const projectDir = path.join(tempDir, 'test-ai-tools-none');
+      await generator.generate(projectDir);
+
+      expect(await fs.pathExists(path.join(projectDir, 'AGENTS.md'))).toBe(false);
+      expect(await fs.pathExists(path.join(projectDir, 'CLAUDE.md'))).toBe(false);
+      expect(await fs.pathExists(path.join(projectDir, '.cursorrules'))).toBe(false);
+      expect(await fs.pathExists(path.join(projectDir, '.windsurfrules'))).toBe(false);
+    });
+
+    it('should generate all four guideline files when all tools selected', async () => {
+      const config = createBaseConfig(['claude', 'codex', 'cursor', 'windsurf']);
+      const generator = new ProjectGenerator(config);
+      const projectDir = path.join(tempDir, 'test-ai-tools-all');
+      await generator.generate(projectDir);
+
+      expect(await fs.pathExists(path.join(projectDir, 'CLAUDE.md'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'AGENTS.md'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, '.cursorrules'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, '.windsurfrules'))).toBe(true);
+    });
   });
 });

@@ -36,4 +36,5 @@ export const webOnlyConfig: Readonly<ProjectConfig> = {
   },
   preset: 'minimal',
   customized: false,
+  aiTools: ['codex'],
 } as const;

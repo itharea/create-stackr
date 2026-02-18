@@ -25,6 +25,7 @@ describe('Package Utils', () => {
     },
     preset: 'minimal',
     customized: false,
+    aiTools: ['codex'],
   };
 
   describe('buildMobilePackageJson', () => {
