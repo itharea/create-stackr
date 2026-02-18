@@ -25,7 +25,7 @@ describe('Smoke Tests', () => {
     });
 
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain('create-fullstack-app');
+    expect(result.stdout).toContain('create-stackr');
     expect(result.stdout).toContain('options');
   }, 10000);
 
