@@ -51,6 +51,7 @@ import { promptProjectName } from '../../src/prompts/project.js';
 import { selectPreset } from '../../src/prompts/preset.js';
 import { promptPackageManager } from '../../src/prompts/packageManager.js';
 import { collectConfiguration } from '../../src/prompts/index.js';
+import inquirerMock from 'inquirer';
 
 describe('Conditional Prompts', () => {
   beforeEach(() => {
@@ -61,6 +62,8 @@ describe('Conditional Prompts', () => {
     vi.mocked(promptPackageManager).mockResolvedValue('npm');
     // Return null from selectPreset to trigger custom configuration flow
     vi.mocked(selectPreset).mockResolvedValue(null);
+    // Mock the eventQueue prompt (called directly via inquirer in collectCustomConfiguration)
+    vi.mocked(inquirerMock.prompt).mockResolvedValue({ eventQueue: true });
   });
 
   describe('promptFeatures with platform awareness', () => {

@@ -1,8 +1,6 @@
 # Simplified Docker Compose for Backend Development
 # Clean setup with database and microservices
 
-version: '3.8'
-
 services:
 <% if (backend.eventQueue) { %>
   # =============================================================================
@@ -10,7 +8,7 @@ services:
   # =============================================================================
   redis:
     image: redis:7-alpine
-    container_name: auth_boilerplate_redis
+    container_name: <%= projectName %>_redis
     restart: unless-stopped
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis-password}
     environment:
@@ -31,7 +29,7 @@ services:
   # =============================================================================
   database:
     image: postgres:16-alpine
-    container_name: auth_boilerplate_db
+    container_name: <%= projectName %>_db
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USER}
@@ -55,7 +53,7 @@ services:
       context: ./backend
       target: rest-api-dev
       dockerfile: Dockerfile
-    container_name: auth_boilerplate_rest_api
+    container_name: <%= projectName %>_rest_api
     restart: unless-stopped
     environment:
       NODE_ENV: development
@@ -90,7 +88,7 @@ services:
       context: ./backend
       target: event-queue-dev
       dockerfile: Dockerfile
-    container_name: auth_boilerplate_event_queue
+    container_name: <%= projectName %>_event_queue
     restart: unless-stopped
     environment:
       NODE_ENV: development

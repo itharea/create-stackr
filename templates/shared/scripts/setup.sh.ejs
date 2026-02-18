@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Full-Stack Auth Boilerplate Setup Script
+# <%= projectName %> Setup Script
 # This script sets up the development environment
 
 set -e  # Exit on any error
 
-echo "🚀 Setting up Full-Stack Auth Boilerplate..."
+echo "🚀 Setting up <%= projectName %>..."
 echo "================================================"
 
 # Colors for output
@@ -123,7 +123,7 @@ collect_configuration() {
     echo "🗄️  Database Configuration:"
     DB_CONFIG_USER=$(prompt_with_default "Database username" "postgres")
     DB_CONFIG_PASSWORD=$(prompt_with_default "Database password" "$default_db_password" "secure")
-    DB_CONFIG_NAME=$(prompt_with_default "Database name" "auth_boilerplate")
+    DB_CONFIG_NAME=$(prompt_with_default "Database name" "<%= projectName.replace(/-/g, '_') %>")
 
     # Validate database password
     while ! validate_password "$DB_CONFIG_PASSWORD"; do
@@ -280,7 +280,7 @@ load_existing_credentials() {
     # Map to our expected variable names
     DB_CONFIG_USER="${DB_USER:-postgres}"
     DB_CONFIG_PASSWORD="${DB_PASSWORD}"
-    DB_CONFIG_NAME="${DB_NAME:-auth_boilerplate}"
+    DB_CONFIG_NAME="${DB_NAME:-<%= projectName.replace(/-/g, '_') %>}"
 <% if (backend.eventQueue) { %>
     REDIS_CONFIG_PASSWORD="${REDIS_PASSWORD}"
 <% } %>
@@ -799,7 +799,7 @@ main() {
                         print_info "Now generating new credentials..."
                         DB_CONFIG_USER="postgres"
                         DB_CONFIG_PASSWORD=$(generate_password 12)
-                        DB_CONFIG_NAME="auth_boilerplate"
+                        DB_CONFIG_NAME="<%= projectName.replace(/-/g, '_') %>"
 <% if (backend.eventQueue) { %>
                         REDIS_CONFIG_PASSWORD=$(generate_password 16)
 <% } %>
@@ -834,7 +834,7 @@ main() {
                         print_info "Now generating new credentials..."
                         DB_CONFIG_USER="postgres"
                         DB_CONFIG_PASSWORD=$(generate_password 12)
-                        DB_CONFIG_NAME="auth_boilerplate"
+                        DB_CONFIG_NAME="<%= projectName.replace(/-/g, '_') %>"
 <% if (backend.eventQueue) { %>
                         REDIS_CONFIG_PASSWORD=$(generate_password 16)
 <% } %>
@@ -878,7 +878,7 @@ main() {
                     print_info "Generating new secure auto-generated credentials..."
                     DB_CONFIG_USER="postgres"
                     DB_CONFIG_PASSWORD=$(generate_password 12)
-                    DB_CONFIG_NAME="auth_boilerplate"
+                    DB_CONFIG_NAME="<%= projectName.replace(/-/g, '_') %>"
 <% if (backend.eventQueue) { %>
                     REDIS_CONFIG_PASSWORD=$(generate_password 16)
 <% } %>
@@ -929,7 +929,7 @@ main() {
             # Generate secure defaults without prompts
             DB_CONFIG_USER="postgres"
             DB_CONFIG_PASSWORD=$(generate_password 12)
-            DB_CONFIG_NAME="auth_boilerplate"
+            DB_CONFIG_NAME="<%= projectName.replace(/-/g, '_') %>"
 <% if (backend.eventQueue) { %>
             REDIS_CONFIG_PASSWORD=$(generate_password 16)
 <% } %>

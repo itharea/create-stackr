@@ -178,6 +178,7 @@ describe('Integration Tests - Prompt Flows', () => {
           skipButton: true,
           showPaywall: true,
         })
+        .mockResolvedValueOnce({ eventQueue: true }) // Event queue
         .mockResolvedValueOnce({ packageManager: 'yarn' }); // Package manager
 
       const options: CLIOptions = {};
@@ -197,6 +198,7 @@ describe('Integration Tests - Prompt Flows', () => {
       expect(config.integrations.scate.enabled).toBe(false);
       expect(config.integrations.att.enabled).toBe(true); // Auto-enabled with Adjust
       expect(config.backend.orm).toBe('prisma');
+      expect(config.backend.eventQueue).toBe(true);
     });
 
     it('should skip onboarding config when onboarding not selected', async () => {
@@ -213,6 +215,7 @@ describe('Integration Tests - Prompt Flows', () => {
           authFeatures: ['passwordReset'],
         })
         .mockResolvedValueOnce({ sdks: [] })
+        .mockResolvedValueOnce({ eventQueue: false }) // Event queue
         .mockResolvedValueOnce({ packageManager: 'npm' });
 
       const options: CLIOptions = {};
@@ -220,9 +223,9 @@ describe('Integration Tests - Prompt Flows', () => {
 
       expect(config.features.onboarding.enabled).toBe(false);
       expect(config.backend.orm).toBe('drizzle');
-      // Should only call prompt 6 times (custom, orm, features, auth details, sdks, package manager)
-      // Not calling onboarding config prompt (6 prompts + 1 for platforms = 7)
-      expect(inquirer.prompt).toHaveBeenCalledTimes(7);
+      expect(config.backend.eventQueue).toBe(false);
+      // custom, platforms, orm, features, auth details, sdks, eventQueue, package manager = 8
+      expect(inquirer.prompt).toHaveBeenCalledTimes(8);
     });
 
     it('should auto-enable ATT when Adjust is selected', async () => {
@@ -237,6 +240,7 @@ describe('Integration Tests - Prompt Flows', () => {
           authFeatures: ['passwordReset'],
         })
         .mockResolvedValueOnce({ sdks: ['adjust', 'scate'] })
+        .mockResolvedValueOnce({ eventQueue: true }) // Event queue
         .mockResolvedValueOnce({ packageManager: 'npm' });
 
       const options: CLIOptions = {};
@@ -277,6 +281,7 @@ describe('Integration Tests - Prompt Flows', () => {
         .mockResolvedValueOnce({ orm: 'prisma' }) // ORM selection
         .mockResolvedValueOnce({ features: [] })
         .mockResolvedValueOnce({ sdks: [] })
+        .mockResolvedValueOnce({ eventQueue: true }) // Event queue
         .mockResolvedValueOnce({ packageManager: 'npm' });
 
       const options: CLIOptions = {};
@@ -295,6 +300,7 @@ describe('Integration Tests - Prompt Flows', () => {
         .mockResolvedValueOnce({ orm: 'drizzle' }) // ORM selection
         .mockResolvedValueOnce({ features: [] })
         .mockResolvedValueOnce({ sdks: [] })
+        .mockResolvedValueOnce({ eventQueue: true }) // Event queue
         .mockResolvedValueOnce({ packageManager: 'npm' });
 
       const options: CLIOptions = {};

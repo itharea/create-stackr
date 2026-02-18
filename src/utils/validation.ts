@@ -28,21 +28,6 @@ export function validateProjectName(name: string): ValidationResult {
     };
   }
 
-  // Additional checks
-  if (name.length > 214) {
-    return {
-      valid: false,
-      error: 'Project name must be less than 214 characters',
-    };
-  }
-
-  if (!/^[a-z0-9-]+$/.test(name)) {
-    return {
-      valid: false,
-      error: 'Project name must contain only lowercase letters, numbers, and hyphens',
-    };
-  }
-
   return { valid: true };
 }
 

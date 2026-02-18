@@ -156,7 +156,15 @@ export async function customizePreset(
     ],
   });
 
-  const answers: any = await inquirer.prompt(questions);
+  const answers = await inquirer.prompt(questions) as {
+    onboarding?: boolean;
+    onboardingPages?: number;
+    paywall?: boolean;
+    revenueCat?: boolean;
+    adjust?: boolean;
+    scate?: boolean;
+    oauthProviders?: string[];
+  };
 
   return {
     ...config,
@@ -196,7 +204,6 @@ export async function customizePreset(
       },
       att: {
         ...config.integrations.att,
-        enabled: hasMobile && answers.adjust, // Auto-enable ATT with Adjust
       },
     },
     customized: true,
