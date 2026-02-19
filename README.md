@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/node/v/create-stackr)](https://nodejs.org)
 
-> **v0.3**: Now with Two-Factor Authentication, enhanced security headers, and improved CLI UX. Feedback welcome!
+> **v0.4**: Now with AI coding tool selection, architectural documentation in generated projects, React 19 patterns, and clean backend layers. Feedback welcome!
 
 Create production-ready fullstack apps with Expo (mobile), Next.js (web), and Node.js backend in minutes.
 
@@ -559,6 +559,13 @@ A: Yes, Next.js App Router uses React Server Components by default. Client compo
 
 ## Roadmap
 
+### Completed in v0.4.0
+- [x] AI coding tool selection (Claude Code, Codex, Cursor, Windsurf)
+- [x] Architectural documentation (DESIGN.md, BEST_PRACTICES.md) in generated projects
+- [x] Backend repository/service layer separation
+- [x] React 19 patterns in web templates (useActionState)
+- [x] Docker naming, type safety, and DRY improvements
+
 ### Completed in v0.3.0
 - [x] Two-Factor Authentication for mobile and web
 - [x] Enhanced security headers for Next.js
@@ -575,7 +582,7 @@ A: Yes, Next.js App Router uses React Server Components by default. Client compo
 - [x] Email verification & password reset
 
 ### Upcoming
-- [ ] v0.4.0: More SDK integrations (Firebase, Supabase)
+- [ ] v0.5.0: More SDK integrations (Firebase, Supabase)
 - [ ] v1.0.0: Stable API, production-ready
 
 ## Technology Stack
