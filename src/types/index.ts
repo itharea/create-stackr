@@ -4,6 +4,17 @@ export type ORMChoice = 'prisma' | 'drizzle';
 // Platform choices (mobile = Expo, web = Next.js)
 export type Platform = 'mobile' | 'web';
 
+// AI coding tool choices
+export type AITool = 'claude' | 'codex' | 'cursor' | 'windsurf';
+
+// Maps each AI tool to its convention filename
+export const AI_TOOL_FILES: Record<AITool, string> = {
+  claude: 'CLAUDE.md',
+  codex: 'AGENTS.md',
+  cursor: '.cursorrules',
+  windsurf: '.windsurfrules',
+};
+
 export interface ProjectConfig {
   // Project metadata
   projectName: string;
@@ -71,6 +82,9 @@ export interface ProjectConfig {
   // Preset information
   preset?: 'minimal' | 'full-featured' | 'analytics-focused' | 'custom';
   customized: boolean;
+
+  // AI coding tools (determines which guideline files are generated)
+  aiTools: AITool[];
 }
 
 export interface PresetDefinition {

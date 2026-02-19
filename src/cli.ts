@@ -8,6 +8,7 @@ import { ProjectGenerator } from './generators/index.js';
 import { displaySuccess, errors } from './utils/errors.js';
 import { validatePackageManager } from './utils/system-validation.js';
 import type { ProjectConfig, CLIOptions } from './types/index.js';
+import { AI_TOOL_FILES } from './types/index.js';
 
 export async function runCLI(
   projectName: string | undefined,
@@ -128,6 +129,11 @@ function displayConfigSummary(config: ProjectConfig): void {
   console.log(`  ${chalk.bold('Integrations:')} ${integrations}`);
 
   console.log(`  ${chalk.bold('Package Manager:')} ${config.packageManager}`);
+
+  const aiToolsDisplay = config.aiTools.length
+    ? config.aiTools.map(t => AI_TOOL_FILES[t]).join(', ')
+    : 'None';
+  console.log(`  ${chalk.bold('AI Tools:')} ${aiToolsDisplay}`);
   console.log();
 }
 

@@ -40,6 +40,11 @@ export function shouldIncludeFile(
     return false;
   }
 
+  // Skip AGENTS.md - AI tool guideline files are generated dynamically
+  if (filePath.includes('shared/AGENTS.md')) {
+    return false;
+  }
+
   // ==========================================================================
   // Platform-based filtering (consistent architecture)
   // ==========================================================================

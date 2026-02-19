@@ -39,6 +39,7 @@ describe('Template Utils', () => {
     },
     preset: 'custom',
     customized: false,
+    aiTools: ['codex'],
   };
 
   describe('shouldIncludeFile', () => {
@@ -103,6 +104,10 @@ describe('Template Utils', () => {
     it('should always exclude .gitkeep files', () => {
       expect(shouldIncludeFile('base/mobile/src/.gitkeep', mockConfig)).toBe(false);
       expect(shouldIncludeFile('features/mobile/auth/.gitkeep', mockConfig)).toBe(false);
+    });
+
+    it('should exclude shared/AGENTS.md.ejs (generated dynamically)', () => {
+      expect(shouldIncludeFile('shared/AGENTS.md.ejs', mockConfig)).toBe(false);
     });
   });
 

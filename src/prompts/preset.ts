@@ -2,6 +2,7 @@ import inquirer from 'inquirer';
 import chalk from 'chalk';
 import { PRESETS } from '../config/presets.js';
 import type { ProjectConfig } from '../types/index.js';
+import { AI_TOOL_FILES } from '../types/index.js';
 
 export async function selectPreset(): Promise<
   Omit<ProjectConfig, 'projectName' | 'packageManager' | 'appScheme'> | null
@@ -245,5 +246,9 @@ function displayPresetSummary(
   console.log(
     chalk.gray(`  • GitHub OAuth: ${config.features.authentication.providers.github ? 'Yes' : 'No'}`)
   );
+  const aiToolsDisplay = config.aiTools?.length
+    ? config.aiTools.map(t => AI_TOOL_FILES[t]).join(', ')
+    : 'None';
+  console.log(chalk.gray(`  • AI Tools: ${aiToolsDisplay}`));
   console.log();
 }

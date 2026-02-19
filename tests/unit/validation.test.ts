@@ -106,6 +106,7 @@ describe('validateConfiguration', () => {
     },
     preset: 'minimal',
     customized: false,
+    aiTools: ['codex'] as const,
   });
 
   it('should accept valid configuration', () => {

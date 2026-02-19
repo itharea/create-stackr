@@ -38,4 +38,5 @@ export const drizzleConfig: Omit<ProjectConfig, 'projectName' | 'packageManager'
   },
   preset: 'custom',
   customized: false,
+  aiTools: ['codex'],
 };

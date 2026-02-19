@@ -1,12 +1,15 @@
+import ejs from 'ejs';
 import fs from 'fs-extra';
 import path from 'path';
 import chalk from 'chalk';
 import ora from 'ora';
 import { copyTemplateFiles } from '../utils/copy.js';
+import { TEMPLATE_DIR } from '../utils/template.js';
 import { generateOnboardingPages } from './onboarding.js';
 import { initializeGit } from '../utils/git.js';
 import { cleanup } from '../utils/cleanup.js';
 import type { ProjectConfig } from '../types/index.js';
+import { AI_TOOL_FILES } from '../types/index.js';
 
 interface GeneratorConfig extends ProjectConfig {
   verbose?: boolean;
@@ -39,13 +42,16 @@ export class ProjectGenerator {
       // Step 3: Copy and process all template files
       await this.copyTemplateFiles();
 
-      // Step 4: Generate dynamic files (onboarding pages 4-5 if needed)
+      // Step 4: Generate AI tool guideline files
+      await this.generateAIToolFiles();
+
+      // Step 5: Generate dynamic files (onboarding pages 4-5 if needed)
       await this.generateDynamicFiles();
 
-      // Step 5: Make setup script executable
+      // Step 6: Make setup script executable
       await this.makeSetupScriptExecutable();
 
-      // Step 6: Initialize git repository
+      // Step 7: Initialize git repository
       await this.initializeGit();
     } catch (error) {
       // Handle error and cleanup
@@ -73,6 +79,27 @@ export class ProjectGenerator {
     } catch (error) {
       spinner.fail('Failed to copy template files');
       throw error;
+    }
+  }
+
+  /**
+   * Generate AI tool guideline files based on user selection
+   */
+  private async generateAIToolFiles(): Promise<void> {
+    if (!this.config.aiTools || this.config.aiTools.length === 0) {
+      return;
+    }
+
+    const templatePath = path.join(TEMPLATE_DIR, 'shared/AGENTS.md.ejs');
+    const templateContent = await fs.readFile(templatePath, 'utf-8');
+
+    for (const tool of this.config.aiTools) {
+      const fileName = AI_TOOL_FILES[tool];
+      const rendered = ejs.render(templateContent, {
+        ...this.config,
+        guidelineFileName: fileName,
+      });
+      await fs.writeFile(path.join(this.targetDir, fileName), rendered);
     }
   }
 

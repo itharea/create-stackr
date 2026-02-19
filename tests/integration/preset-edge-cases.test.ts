@@ -69,6 +69,7 @@ describe('Preset Edge Cases', () => {
       },
       preset: 'minimal',
       customized: false,
+      aiTools: ['codex'],
     };
 
     it('should validate onboarding pages range (too low)', async () => {

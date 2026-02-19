@@ -48,6 +48,7 @@ describe('Onboarding Generator', () => {
       },
       preset: 'minimal',
       customized: false,
+      aiTools: ['codex'],
     };
 
     await generateOnboardingPages(config, tempDir);
@@ -88,6 +89,7 @@ describe('Onboarding Generator', () => {
       },
       preset: 'custom',
       customized: false,
+      aiTools: ['codex'],
     };
 
     await generateOnboardingPages(config, tempDir);
@@ -129,6 +131,7 @@ describe('Onboarding Generator', () => {
       },
       preset: 'custom',
       customized: false,
+      aiTools: ['codex'],
     };
 
     await generateOnboardingPages(config, tempDir);
@@ -184,6 +187,7 @@ describe('Onboarding Generator', () => {
       },
       preset: 'custom',
       customized: false,
+      aiTools: ['codex'],
     };
 
     await generateOnboardingPages(config, tempDir);
@@ -229,6 +233,7 @@ describe('Onboarding Generator', () => {
       },
       preset: 'custom',
       customized: false,
+      aiTools: ['codex'],
     };
 
     await generateOnboardingPages(config, tempDir);
@@ -273,6 +278,7 @@ describe('Onboarding Generator', () => {
       },
       preset: 'custom',
       customized: false,
+      aiTools: ['codex'],
     };
 
     await generateOnboardingPages(config, tempDir);
