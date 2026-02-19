@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-02-19
+
+### Added
+
+- **AI Coding Tool Selection**: Multi-select prompt for choosing AI coding tools (Claude Code, Codex, Cursor, Windsurf) — generates the correct convention file (`CLAUDE.md`, `AGENTS.md`, `.cursorrules`, `.windsurfrules`) at the project root
+- **Architectural Documentation**: Generated projects now include DESIGN.md and BEST_PRACTICES.md files describing architecture, design decisions, and coding conventions for each layer
+
+### Changed
+
+- **Backend Architecture**: Separated repository and service layers in backend templates for cleaner separation of concerns
+- **React 19 Patterns**: Adopted `useActionState` in web templates, removed Zustand auth store in favor of React 19 idioms
+
+### Fixed
+
+- Docker container names now use `projectName` instead of hardcoded values, preventing collisions when running multiple generated projects
+- Improved type safety: `promptSDKs` returns typed integrations, preset customization answers explicitly typed
+- Centralized ATT auto-enable logic (single source of truth)
+- Removed deprecated `version: '3.8'` from docker-compose templates
+- CLI branding consistently says `create-stackr` with correct docs URL
+
 ## [0.3.1] - 2026-01-20
 
 ### Fixed
@@ -139,6 +159,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Docker required for backend development
 - PostgreSQL and Redis required for full features
 
+[0.4.0]: https://github.com/itharea/create-stackr/releases/tag/v0.4.0
 [0.3.1]: https://github.com/itharea/create-stackr/releases/tag/v0.3.1
 [0.3.0]: https://github.com/itharea/create-stackr/releases/tag/v0.3.0
 [0.2.0]: https://github.com/itharea/create-stackr/releases/tag/v0.2.0
