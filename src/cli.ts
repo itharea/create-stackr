@@ -4,89 +4,98 @@ import path from 'path';
 import fs from 'fs-extra';
 import { collectConfiguration } from './prompts/index.js';
 import { validateProjectName, validateConfiguration } from './utils/validation.js';
-import { ProjectGenerator } from './generators/index.js';
+import { MonorepoGenerator } from './generators/monorepo.js';
 import { displaySuccess, errors } from './utils/errors.js';
 import { validatePackageManager } from './utils/system-validation.js';
-import type { ProjectConfig, CLIOptions } from './types/index.js';
+import type { InitConfig, CLIOptions } from './types/index.js';
 import { AI_TOOL_FILES } from './types/index.js';
 
-export async function runCLI(
+/**
+ * Phase 2 entry point for the `create-stackr` binary.
+ *
+ * Collects the `InitConfig`, validates it, confirms with the user, and
+ * hands off to `MonorepoGenerator`. The success message enumerates every
+ * service with its backend port.
+ */
+export async function runCreateFlow(
   projectName: string | undefined,
   options: CLIOptions
 ): Promise<void> {
-  console.log(chalk.cyan("\n🚀 Let's create your full-stack app!\n"));
+  console.log(chalk.cyan("\n🚀 Let's create your multi-service monorepo!\n"));
 
-  // Step 1: Collect configuration through prompts
+  // Collect configuration (preset / defaults / interactive)
   const config = await collectConfiguration(projectName, options);
 
-  // Step 2: Validate project name
+  // Validate project name
   const nameValidation = validateProjectName(config.projectName);
   if (!nameValidation.valid) {
     throw errors.invalidProjectName(config.projectName, nameValidation.error || 'Invalid name');
   }
 
-  // Step 3: Validate configuration
+  // Validate full config (service names, auth consistency, port uniqueness)
   const configValidation = validateConfiguration(config);
   if (!configValidation.valid) {
     throw errors.configValidationFailed([configValidation.error || 'Invalid configuration']);
   }
 
-  // Step 4: Validate package manager availability
+  // Validate package manager availability
   await validatePackageManager(config.packageManager);
 
-  // Step 5: Display final configuration summary
+  // Display final configuration summary
   displayConfigSummary(config);
 
-  // Step 6: Check if directory exists
+  // Check if directory exists
   const targetDir = path.resolve(process.cwd(), config.projectName);
   if (await fs.pathExists(targetDir)) {
     throw errors.directoryExists(config.projectName);
   }
 
-  // Step 7: Confirm with user
-  const confirmed = await confirmGeneration();
+  // Confirm
+  const confirmed = await confirmGeneration(options);
   if (!confirmed) {
     console.log(chalk.yellow('\n⚠️  Project creation cancelled.\n'));
     process.exit(0);
   }
 
-  // Step 8: Generate project
-  console.log(chalk.cyan('\n📦 Creating your project...\n'));
-  const generator = new ProjectGenerator({ ...config, verbose: options.verbose });
+  // Generate
+  console.log(chalk.cyan('\n📦 Creating your monorepo...\n'));
+  const generator = new MonorepoGenerator(config, { verbose: options.verbose });
   await generator.generate(targetDir);
 
-  // Step 9: Show success message with setup instructions
-  const nextSteps = [
+  // Success
+  const nextSteps: string[] = [
     `📂 Location: ${targetDir}`,
+    '',
+    chalk.bold('Services:'),
+  ];
+  for (const svc of config.services) {
+    const label = svc.kind === 'auth' ? 'auth' : `base (${svc.name})`;
+    nextSteps.push(
+      `  • ${chalk.cyan(svc.name)} — ${label} @ ${chalk.bold(String(svc.backend.port))}${svc.web?.enabled ? ` / web @ ${svc.web.port}` : ''}${svc.mobile?.enabled ? ' / mobile' : ''}`
+    );
+  }
+  nextSteps.push(
     '',
     chalk.bold('Next steps:'),
     '',
     `  ${chalk.cyan('1.')} cd ${config.projectName}`,
     `  ${chalk.cyan('2.')} ./scripts/setup.sh`,
+    `  ${chalk.cyan('3.')} docker compose up -d`,
     '',
-    chalk.gray('The setup script will:'),
-    chalk.gray('  • Create .env files with secure credentials'),
-    chalk.gray('  • Install dependencies'),
-    chalk.gray('  • Set up the database'),
-  ];
+    chalk.gray('The setup script will create per-service .env files and install dependencies.')
+  );
 
-  // Add platform-specific next steps
-  if (config.platforms.includes('mobile') || config.platforms.includes('web')) {
-    nextSteps.push('');
-    nextSteps.push(chalk.bold('Start development:'));
-  }
-  if (config.platforms.includes('mobile')) {
-    nextSteps.push(chalk.gray(`  • Mobile: cd mobile && ${config.packageManager} start`));
-  }
-  if (config.platforms.includes('web')) {
-    nextSteps.push(chalk.gray(`  • Web: cd web && ${config.packageManager} run dev`));
-  }
-  nextSteps.push(chalk.gray(`  • Backend: cd backend && ${config.packageManager} run dev:rest-api`));
-
-  displaySuccess('Project created successfully!', nextSteps);
+  displaySuccess('Monorepo created successfully!', nextSteps);
 }
 
-async function confirmGeneration(): Promise<boolean> {
+/**
+ * @deprecated Legacy name for `runCreateFlow`. Kept for one release so
+ * existing imports compile.
+ */
+export const runCLI = runCreateFlow;
+
+async function confirmGeneration(options: CLIOptions): Promise<boolean> {
+  if (options.defaults) return true;
   const { confirmed } = await inquirer.prompt([
     {
       type: 'confirm',
@@ -98,42 +107,25 @@ async function confirmGeneration(): Promise<boolean> {
   return confirmed;
 }
 
-function displayConfigSummary(config: ProjectConfig): void {
+function displayConfigSummary(config: InitConfig): void {
   console.log(chalk.cyan('\n📋 Project Configuration:\n'));
   console.log(`  ${chalk.bold('Project:')} ${config.projectName}`);
-
-  // Display platforms
-  const platformLabels = {
-    mobile: 'Mobile (Expo)',
-    web: 'Web (Next.js)',
-  };
-  const platformsDisplay = config.platforms
-    .map(p => platformLabels[p])
-    .join(', ');
-  console.log(`  ${chalk.bold('Platforms:')} ${platformsDisplay}`);
-
-  const features = Object.entries(config.features)
-    .filter(([_, value]) => {
-      if (typeof value === 'boolean') return value;
-      if (typeof value === 'object' && 'enabled' in value) return value.enabled;
-      return false;
-    })
-    .map(([key]) => key)
-    .join(', ') || 'None';
-  console.log(`  ${chalk.bold('Features:')} ${features}`);
-
-  const integrations = Object.entries(config.integrations)
-    .filter(([_, value]) => value.enabled)
-    .map(([key]) => key)
-    .join(', ') || 'None';
-  console.log(`  ${chalk.bold('Integrations:')} ${integrations}`);
-
+  console.log(`  ${chalk.bold('ORM:')} ${config.orm}`);
   console.log(`  ${chalk.bold('Package Manager:')} ${config.packageManager}`);
 
+  console.log(`  ${chalk.bold('Services:')}`);
+  for (const svc of config.services) {
+    const kindLabel = svc.kind === 'auth' ? chalk.yellow('[auth]') : chalk.green('[base]');
+    const platformPieces: string[] = [`:${svc.backend.port}`];
+    if (svc.web?.enabled) platformPieces.push(`web:${svc.web.port}`);
+    if (svc.mobile?.enabled) platformPieces.push('mobile');
+    if (svc.backend.eventQueue) platformPieces.push('event-queue');
+    console.log(`    ${kindLabel} ${chalk.cyan(svc.name)} — ${platformPieces.join(' ')}`);
+  }
+
   const aiToolsDisplay = config.aiTools.length
-    ? config.aiTools.map(t => AI_TOOL_FILES[t]).join(', ')
+    ? config.aiTools.map((t) => AI_TOOL_FILES[t]).join(', ')
     : 'None';
   console.log(`  ${chalk.bold('AI Tools:')} ${aiToolsDisplay}`);
   console.log();
 }
-

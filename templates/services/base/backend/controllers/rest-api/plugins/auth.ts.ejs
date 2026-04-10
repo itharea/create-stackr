@@ -1,0 +1,386 @@
+<% /*
+  Three-flavor auth plugin template for base services.
+  Flavors (selected by `service.backend.authMiddleware`):
+    - 'standard'    — cookie-forwarding `requireAuth` decorator only
+    - 'role-gated'  — cookie-forwarding + role check
+    - 'flexible'    — cookie-forwarding + device-session support
+  All three read `process.env.AUTH_SERVICE_URL` with the auth service port
+  fallback. The `AuthUser` interface is intentionally duplicated
+  (see meta_phases.md §8 — no shared types package).
+*/ -%>
+<% const flavor = service.backend.authMiddleware; -%>
+<% const rolesList = service.backend.roles || []; -%>
+<% const serviceCap = service.name.charAt(0).toUpperCase() + service.name.slice(1).replace(/-([a-z])/g, (_, c) => c.toUpperCase()); -%>
+<% if (flavor === 'flexible') { -%>
+import type {
+  AuthFastifyRequest,
+  DeviceSessionFastifyRequest,
+  AuthOrDeviceSessionFastifyRequest,
+} from "fastify";
+import { FastifyPluginAsync, FastifyRequest, FastifyReply } from "fastify";
+import fp from "fastify-plugin";
+import { validateDeviceSession } from "../../../domain/device-session/service";
+import { updateDeviceSessionActivity } from "../../../domain/device-session/repository";
+import { DeviceSession } from "../../../domain/device-session/schema";
+import { ErrorFactory, normalizeError } from "../../../utils/errors";
+
+const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://localhost:<%= authServicePort || 8082 %>';
+
+interface AuthUser {
+  id: string;
+  email: string;
+  name: string | null;
+  role: string;
+  image: string | null;
+  emailVerified: boolean;
+  has<%= serviceCap %>Account: boolean;
+  createdAt: string;
+  updatedAt: string;
+  twoFactorEnabled?: boolean;
+}
+
+interface AuthSession {
+  id: string;
+  expiresAt: string;
+  token: string;
+  userId: string;
+}
+
+/**
+ * Provision a <%= service.name %> record for a user who doesn't have one yet.
+ * Called once per user on their first authenticated API call.
+ */
+async function provision<%= serviceCap %>(user: AuthUser, cookie: string): Promise<void> {
+  // TODO: insert a per-service record for the user (e.g., a domain entity
+  // keyed by user.id). Left as a stub so generated code compiles without
+  // depending on a specific domain schema.
+
+  // Tell the auth service this user now has a <%= service.name %> account.
+  await fetch(`${AUTH_SERVICE_URL}/api/auth/provision`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      cookie,
+    },
+    body: JSON.stringify({ app: '<%= service.name %>' }),
+  });
+}
+
+const authPlugin: FastifyPluginAsync = async (server) => {
+  server.decorate(
+    "requireAuth",
+    async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+      try {
+        const res = await fetch(`${AUTH_SERVICE_URL}/api/auth/get-session`, {
+          method: 'GET',
+          headers: {
+            cookie: request.headers.cookie || '',
+          },
+        });
+
+        if (!res.ok) {
+          throw ErrorFactory.unauthorized();
+        }
+
+        const data = (await res.json()) as { user: AuthUser; session: AuthSession } | null;
+
+        if (!data || !data.user) {
+          throw ErrorFactory.unauthorized();
+        }
+
+        if (!data.user.has<%= serviceCap %>Account) {
+          try {
+            await provision<%= serviceCap %>(data.user, request.headers.cookie || '');
+          } catch (err) {
+            request.log.error({ err }, 'Failed to provision <%= service.name %> account');
+          }
+        }
+
+        (request as AuthFastifyRequest).user = data.user;
+        (request as AuthFastifyRequest).session = data.session;
+      } catch (error) {
+        if (error instanceof TypeError && error.message.includes('fetch')) {
+          const appError = ErrorFactory.externalServiceError('auth');
+          return reply.status(appError.statusCode).send(appError.toApiResponse(request.id, request.url));
+        }
+        const appError = normalizeError(error);
+        const response = appError.toApiResponse(request.id, request.url);
+        return reply.status(appError.statusCode).send(response);
+      }
+    }
+  );
+
+  server.decorate(
+    "requireDeviceSession",
+    async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+      try {
+        const sessionTokenHeader = request.headers["x-device-session-token"] as string;
+        if (!sessionTokenHeader) {
+          throw ErrorFactory.tokenMissing();
+        }
+
+        const deviceSession = await validateDeviceSession(sessionTokenHeader);
+        if (!deviceSession) {
+          throw ErrorFactory.sessionNotFound();
+        }
+
+        await updateDeviceSessionActivity(sessionTokenHeader);
+
+        (request as DeviceSessionFastifyRequest).deviceSession = deviceSession;
+        (request as DeviceSessionFastifyRequest).sessionToken = sessionTokenHeader;
+      } catch (error) {
+        const appError = normalizeError(error);
+        const response = appError.toApiResponse(request.id, request.url);
+        return reply.status(appError.statusCode).send(response);
+      }
+    }
+  );
+
+  server.decorate(
+    "requireAuthOrDeviceSession",
+    async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+      try {
+        try {
+          const res = await fetch(`${AUTH_SERVICE_URL}/api/auth/get-session`, {
+            method: 'GET',
+            headers: {
+              cookie: request.headers.cookie || '',
+            },
+          });
+
+          if (res.ok) {
+            const data = (await res.json()) as { user: AuthUser; session: AuthSession } | null;
+            if (data && data.user) {
+              if (!data.user.has<%= serviceCap %>Account) {
+                try {
+                  await provision<%= serviceCap %>(data.user, request.headers.cookie || '');
+                } catch (err) {
+                  request.log.error({ err }, 'Failed to provision <%= service.name %> account');
+                }
+              }
+              (request as AuthOrDeviceSessionFastifyRequest).user = data.user;
+              (request as AuthOrDeviceSessionFastifyRequest).session = data.session;
+              (request as AuthOrDeviceSessionFastifyRequest).authType = "user";
+              return;
+            }
+          }
+        } catch {
+          // Auth service session not found, try device session
+        }
+
+        const sessionTokenHeader = request.headers["x-device-session-token"] as string;
+        if (sessionTokenHeader) {
+          const deviceSession = await validateDeviceSession(sessionTokenHeader);
+          if (deviceSession) {
+            await updateDeviceSessionActivity(sessionTokenHeader);
+            (request as AuthOrDeviceSessionFastifyRequest).deviceSession = deviceSession;
+            (request as AuthOrDeviceSessionFastifyRequest).sessionToken = sessionTokenHeader;
+            (request as AuthOrDeviceSessionFastifyRequest).authType = "device";
+            return;
+          }
+        }
+
+        throw ErrorFactory.unauthorized();
+      } catch (error) {
+        const appError = normalizeError(error);
+        const response = appError.toApiResponse(request.id, request.url);
+        return reply.status(appError.statusCode).send(response);
+      }
+    }
+  );
+};
+
+declare module "fastify" {
+  export interface AuthFastifyRequest extends FastifyRequest {
+    user: AuthUser;
+    session: AuthSession;
+  }
+
+  export interface DeviceSessionFastifyRequest extends FastifyRequest {
+    deviceSession: DeviceSession;
+    sessionToken: string;
+  }
+
+  export interface AuthOrDeviceSessionFastifyRequest extends FastifyRequest {
+    user?: AuthUser;
+    session?: AuthSession;
+    deviceSession?: DeviceSession;
+    sessionToken?: string;
+    authType: "user" | "device";
+  }
+
+  interface FastifyInstance {
+    requireAuth: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    requireDeviceSession: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    requireAuthOrDeviceSession: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+  }
+}
+
+export default fp(authPlugin);
+<% } else if (flavor === 'role-gated') { -%>
+import fp from "fastify-plugin";
+import { FastifyPluginAsync, FastifyRequest, FastifyReply } from "fastify";
+import { ErrorFactory, normalizeError } from "../../../utils/errors";
+
+const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://localhost:<%= authServicePort || 8082 %>';
+const ALLOWED_ROLES = [<%- rolesList.map((r) => `'${r}'`).join(', ') %>];
+
+interface AuthUser {
+  id: string;
+  email: string;
+  name: string | null;
+  role: string;
+  image: string | null;
+  emailVerified: boolean;
+  has<%= serviceCap %>Account: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface AuthSession {
+  id: string;
+  expiresAt: string;
+  token: string;
+  userId: string;
+}
+
+const authPlugin: FastifyPluginAsync = async (server) => {
+  server.decorate(
+    "requireAuth",
+    async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+      try {
+        const res = await fetch(`${AUTH_SERVICE_URL}/api/auth/get-session`, {
+          method: 'GET',
+          headers: {
+            cookie: request.headers.cookie || '',
+          },
+        });
+
+        if (!res.ok) {
+          throw ErrorFactory.unauthorized();
+        }
+
+        const data = (await res.json()) as { user: AuthUser; session: AuthSession } | null;
+
+        if (!data || !data.user) {
+          throw ErrorFactory.unauthorized();
+        }
+
+        if (ALLOWED_ROLES.length > 0 && !ALLOWED_ROLES.includes(data.user.role) && data.user.role !== 'admin') {
+          throw ErrorFactory.permissionDenied();
+        }
+
+        (request as AuthFastifyRequest).user = data.user;
+        (request as AuthFastifyRequest).session = data.session;
+      } catch (error) {
+        if (error instanceof TypeError && error.message.includes('fetch')) {
+          const appError = ErrorFactory.externalServiceError('auth');
+          return reply.status(appError.statusCode).send(appError.toApiResponse(request.id, request.url));
+        }
+        const appError = normalizeError(error);
+        const response = appError.toApiResponse(request.id, request.url);
+        return reply.status(appError.statusCode).send(response);
+      }
+    }
+  );
+};
+
+declare module "fastify" {
+  export interface AuthFastifyRequest extends FastifyRequest {
+    user: AuthUser;
+    session: AuthSession;
+  }
+
+  interface FastifyInstance {
+    requireAuth: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+  }
+}
+
+export default fp(authPlugin);
+<% } else if (flavor === 'standard') { -%>
+import fp from "fastify-plugin";
+import { FastifyPluginAsync, FastifyRequest, FastifyReply } from "fastify";
+import { ErrorFactory, normalizeError } from "../../../utils/errors";
+
+const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://localhost:<%= authServicePort || 8082 %>';
+
+interface AuthUser {
+  id: string;
+  email: string;
+  name: string | null;
+  role: string;
+  image: string | null;
+  emailVerified: boolean;
+  has<%= serviceCap %>Account: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface AuthSession {
+  id: string;
+  expiresAt: string;
+  token: string;
+  userId: string;
+}
+
+const authPlugin: FastifyPluginAsync = async (server) => {
+  server.decorate(
+    "requireAuth",
+    async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+      try {
+        const res = await fetch(`${AUTH_SERVICE_URL}/api/auth/get-session`, {
+          method: 'GET',
+          headers: {
+            cookie: request.headers.cookie || '',
+          },
+        });
+
+        if (!res.ok) {
+          throw ErrorFactory.unauthorized();
+        }
+
+        const data = (await res.json()) as { user: AuthUser; session: AuthSession } | null;
+
+        if (!data || !data.user) {
+          throw ErrorFactory.unauthorized();
+        }
+
+        (request as AuthFastifyRequest).user = data.user;
+        (request as AuthFastifyRequest).session = data.session;
+      } catch (error) {
+        if (error instanceof TypeError && error.message.includes('fetch')) {
+          const appError = ErrorFactory.externalServiceError('auth');
+          return reply.status(appError.statusCode).send(appError.toApiResponse(request.id, request.url));
+        }
+        const appError = normalizeError(error);
+        const response = appError.toApiResponse(request.id, request.url);
+        return reply.status(appError.statusCode).send(response);
+      }
+    }
+  );
+};
+
+declare module "fastify" {
+  export interface AuthFastifyRequest extends FastifyRequest {
+    user: AuthUser;
+    session: AuthSession;
+  }
+
+  interface FastifyInstance {
+    requireAuth: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+  }
+}
+
+export default fp(authPlugin);
+<% } else { -%>
+// authMiddleware === 'none': no plugin body. Export a no-op so the server
+// bootstrap can still import it unconditionally.
+import fp from "fastify-plugin";
+import { FastifyPluginAsync } from "fastify";
+
+const authPlugin: FastifyPluginAsync = async (_server) => {
+  // no-op: this service does not require authentication.
+};
+
+export default fp(authPlugin);
+<% } -%>

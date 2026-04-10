@@ -15,83 +15,196 @@ export const AI_TOOL_FILES: Record<AITool, string> = {
   windsurf: '.windsurfrules',
 };
 
-export interface ProjectConfig {
-  // Project metadata
+/**
+ * ---------------------------------------------------------------------------
+ * Phase 2 — multi-service init shapes
+ * ---------------------------------------------------------------------------
+ *
+ * `InitConfig` replaces the legacy `ProjectConfig` as the top-level input to
+ * the generator. It carries monorepo-wide knobs plus a `services[]` array.
+ *
+ * Each `ServiceConfig` is the runtime shape for a single service and carries
+ * everything the templates need to render (including API keys for
+ * integrations). When persisted to `stackr.config.json`, the keys are
+ * stripped so the serialized `ServiceEntry` only stores `{ enabled }` toggles.
+ *
+ * `ServiceRenderContext` is passed to EJS at render time for every file
+ * inside a service subtree. It exposes the per-service `service` object plus
+ * legacy top-level `features` / `integrations` / `backend` / `platforms`
+ * fields so pre-phase-2 EJS templates that read them continue to work
+ * unchanged — the shim is computed from `service` in `buildServiceContext`.
+ */
+
+export interface AuthProvidersConfig {
+  emailPassword: boolean;
+  google: boolean;
+  apple: boolean;
+  github: boolean;
+}
+
+export interface AuthAdditionalUserField {
+  name: string;
+  type: 'string' | 'boolean' | 'number';
+  default: unknown;
+}
+
+/**
+ * Runtime config block describing how the auth service should be built.
+ * Only populated on the service whose `kind === 'auth'`.
+ */
+export interface AuthServiceConfig {
+  providers: AuthProvidersConfig;
+  emailVerification: boolean;
+  passwordReset: boolean;
+  twoFactor: boolean;
+  adminDashboard: boolean;
+  additionalUserFields: AuthAdditionalUserField[];
+  /**
+   * Names of the other services that this auth service provisions accounts
+   * for. `stackr add service` appends to this list; init time derives it
+   * from `initConfig.services` minus the auth entry itself.
+   */
+  provisioningTargets: string[];
+}
+
+/**
+ * Runtime integration shape for a service. Carries API keys so templates
+ * can embed them at render time; the serializer in `buildStackrConfig` strips
+ * everything except `enabled` before persisting.
+ */
+export interface ServiceIntegrationsRuntime {
+  revenueCat: { enabled: boolean; iosKey: string; androidKey: string };
+  adjust: { enabled: boolean; appToken: string; environment: 'sandbox' | 'production' };
+  scate: { enabled: boolean; apiKey: string };
+  att: { enabled: boolean };
+}
+
+/**
+ * Runtime shape for a single service inside `InitConfig.services`. Mirrors
+ * `ServiceEntry` in `src/types/config-file.ts` but keeps secrets / runtime-
+ * only fields that must never be serialized.
+ */
+export interface ServiceConfig {
+  name: string;
+  kind: 'auth' | 'base';
+
+  backend: {
+    port: number;
+    eventQueue: boolean;
+    imageUploads: boolean;
+    authMiddleware: 'none' | 'standard' | 'role-gated' | 'flexible';
+    roles?: string[];
+  };
+
+  web: { enabled: boolean; port: number } | null;
+  mobile: { enabled: boolean } | null;
+
+  /** Only populated when `kind === 'auth'`. */
+  authConfig?: AuthServiceConfig;
+
+  integrations: ServiceIntegrationsRuntime;
+}
+
+/**
+ * Top-level runtime config assembled by the prompt layer (or by presets /
+ * `--defaults`) and passed to the `MonorepoGenerator`.
+ */
+export interface InitConfig {
   projectName: string;
   packageManager: 'npm' | 'yarn' | 'bun';
-
-  // Deep link scheme for OAuth callbacks (derived from projectName)
+  orm: ORMChoice;
   appScheme: string;
-
-  // Platforms to generate (mobile = Expo, web = Next.js)
-  platforms: Platform[];
-
-  // Feature flags
-  features: {
-    onboarding: {
-      enabled: boolean;
-      pages: number; // 1-5
-      skipButton: boolean;
-      showPaywall: boolean;
-    };
-    authentication: {
-      enabled: boolean;
-      providers: {
-        emailPassword: boolean; // Always true when auth enabled
-        google: boolean;
-        apple: boolean;
-        github: boolean;
-      };
-      emailVerification: boolean;
-      passwordReset: boolean;
-      twoFactor: boolean;
-    };
-    paywall: boolean;
-    sessionManagement: boolean;
-  };
-
-  // SDK integrations
-  integrations: {
-    revenueCat: {
-      enabled: boolean;
-      iosKey: string;
-      androidKey: string;
-    };
-    adjust: {
-      enabled: boolean;
-      appToken: string;
-      environment: 'sandbox' | 'production';
-    };
-    scate: {
-      enabled: boolean;
-      apiKey: string;
-    };
-    att: {
-      enabled: boolean;
-    };
-  };
-
-  // Backend configuration
-  backend: {
-    database: 'postgresql';
-    orm: ORMChoice;
-    eventQueue: boolean;
-    docker: boolean;
-  };
-
-  // Preset information
+  aiTools: AITool[];
+  services: ServiceConfig[];
   preset?: 'minimal' | 'full-featured' | 'analytics-focused' | 'custom';
   customized: boolean;
-
-  // AI coding tools (determines which guideline files are generated)
-  aiTools: AITool[];
 }
+
+/**
+ * Render context passed to every EJS template inside a service subtree.
+ *
+ * The `service` field is the primary per-service accessor for new templates.
+ * The legacy top-level fields (`platforms`, `features`, `integrations`,
+ * `backend`, `projectName`, `packageManager`, `aiTools`, `appScheme`) are a
+ * **backwards-compat shim** so existing phase-1 EJS files that read e.g.
+ * `backend.eventQueue` or `features.authentication.twoFactor` continue to
+ * render without rewriting every template in this phase.
+ *
+ * `buildServiceContext` computes the shim by mapping from `service`.
+ */
+export interface ServiceRenderContext {
+  // Monorepo-wide
+  projectName: string;
+  packageManager: 'npm' | 'yarn' | 'bun';
+  orm: ORMChoice;
+  appScheme: string;
+  aiTools: AITool[];
+
+  // Auth-service awareness (for HTTP-forwarding plugins, etc.)
+  hasAuthService: boolean;
+  authServiceName: string | null;
+  authServicePort: number | null;
+  authServiceUrl: string | null;
+  /** Populated only on the auth service itself. */
+  provisioningTargets: string[];
+  /** Web ports of every peer service (for auth's `trustedOrigins`). */
+  peerWebPorts: number[];
+  /** Other services' names (non-auth) — used by auth templates. */
+  peerServiceNames: string[];
+
+  // Primary per-service accessor
+  service: ServiceConfig;
+
+  // --- Backwards-compat shim fields (mirror ProjectConfig) ---
+  platforms: Platform[];
+  features: LegacyFeaturesShim;
+  integrations: ServiceIntegrationsRuntime;
+  backend: LegacyBackendShim;
+}
+
+/**
+ * Legacy feature shape derived from the service's own configuration + the
+ * monorepo auth service. Exists only so pre-phase-2 EJS templates that read
+ * `features.authentication.twoFactor` etc. continue to render.
+ */
+export interface LegacyFeaturesShim {
+  onboarding: {
+    enabled: boolean;
+    pages: number;
+    skipButton: boolean;
+    showPaywall: boolean;
+  };
+  authentication: {
+    enabled: boolean;
+    providers: AuthProvidersConfig;
+    emailVerification: boolean;
+    passwordReset: boolean;
+    twoFactor: boolean;
+  };
+  paywall: boolean;
+  sessionManagement: boolean;
+}
+
+export interface LegacyBackendShim {
+  database: 'postgresql';
+  orm: ORMChoice;
+  eventQueue: boolean;
+  docker: boolean;
+}
+
+/**
+ * @deprecated Alias for `InitConfig`. Kept for one release so downstream
+ * tests / fixtures that import `ProjectConfig` continue to compile. Will be
+ * removed in v0.6. New code should use `InitConfig` directly.
+ */
+export type ProjectConfig = InitConfig;
 
 export interface PresetDefinition {
   name: string;
   description: string;
   icon: string;
-  config: Omit<ProjectConfig, 'projectName' | 'packageManager' | 'appScheme'>;
+  /** Everything except the fields set at invocation time. */
+  config: Omit<InitConfig, 'projectName' | 'packageManager' | 'appScheme'>;
 }
 
 /**
@@ -102,20 +215,16 @@ export interface PresetDefinition {
  * - Falls back to "app" if result is empty
  */
 export function deriveAppScheme(projectName: string): string {
-  // Handle undefined or empty project name
   if (!projectName) {
     return 'app';
   }
 
-  // Remove non-alphanumeric characters and convert to lowercase
   let scheme = projectName.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-  // URL schemes must start with a letter
   if (scheme && !/^[a-z]/.test(scheme)) {
     scheme = 'app' + scheme;
   }
 
-  // Fallback if empty
   if (!scheme) {
     scheme = 'app';
   }
@@ -127,4 +236,7 @@ export interface CLIOptions {
   template?: string;
   defaults?: boolean;
   verbose?: boolean;
+  serviceName?: string;
+  auth?: boolean; // Commander's --no-auth flips this to false
+  withServices?: string;
 }

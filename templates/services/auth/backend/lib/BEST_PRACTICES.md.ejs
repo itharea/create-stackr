@@ -1,0 +1,286 @@
+# Lib Best Practices
+
+Guidelines for library configuration and setup modules.
+
+## Available Libraries
+<% if (features.authentication.enabled) { %>
+
+### `auth.ts` - BetterAuth Configuration
+
+The auth library configures BetterAuth for the Fastify backend.
+
+#### Configuration Structure
+
+```typescript
+import { betterAuth } from "better-auth";
+<% if (backend.orm === 'drizzle') { %>
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
+<% } %>
+<% if (backend.orm === 'prisma') { %>
+import { prismaAdapter } from "better-auth/adapters/prisma";
+<% } %>
+<% if (platforms.includes('mobile')) { %>
+import { expo } from "@better-auth/expo";
+<% } %>
+
+export const auth = betterAuth({
+  // Database adapter
+<% if (backend.orm === 'drizzle') { %>
+  database: drizzleAdapter(db, {
+    provider: "pg",
+    schema: { ... },
+  }),
+<% } %>
+<% if (backend.orm === 'prisma') { %>
+  database: prismaAdapter(prisma, { provider: "postgresql" }),
+<% } %>
+
+  // Base path for all auth endpoints
+  basePath: "/api/auth",
+
+  // Email/password config
+  emailAndPassword: {
+    enabled: true,
+<% if (features.authentication.emailVerification) { %>
+    requireEmailVerification: true,
+<% } %>
+  },
+<% const hasOAuth = features.authentication.providers.google || features.authentication.providers.apple || features.authentication.providers.github; %>
+<% if (hasOAuth) { %>
+
+  // OAuth providers
+  socialProviders: {
+<% if (features.authentication.providers.google) { %>
+    google: { clientId: "...", clientSecret: "..." },
+<% } %>
+<% if (features.authentication.providers.apple) { %>
+    apple: { clientId: "...", clientSecret: "...", appBundleIdentifier: "..." },
+<% } %>
+<% if (features.authentication.providers.github) { %>
+    github: { clientId: "...", clientSecret: "..." },
+<% } %>
+  },
+<% } %>
+
+  // Plugins
+  plugins: [
+<% if (platforms.includes('mobile')) { %>
+    expo(),      // Required for React Native
+<% } %>
+<% if (features.authentication.twoFactor) { %>
+    twoFactor(), // 2FA support
+<% } %>
+  ],
+
+  // Session config
+  session: {
+    expiresIn: 60 * 60 * 24 * 7,  // 7 days
+    updateAge: 60 * 60 * 24,       // Refresh daily
+  },
+
+  // CORS / allowed origins
+  trustedOrigins: [
+<% if (platforms.includes('web')) { %>
+    "http://localhost:3000",
+<% } %>
+<% if (platforms.includes('mobile')) { %>
+    "<%= appScheme %>://",
+<% } %>
+  ],
+});
+```
+<% } %>
+
+### `constants.ts` - Application Constants
+
+Centralized constants used across the backend:
+
+```typescript
+// Redis key prefixes
+export const REDIS_KEYS = {
+<% if (platforms.includes('web')) { %>
+  OAUTH_WEB_STATE: "oauth:web:state:",
+  OAUTH_EXCHANGE: "oauth:exchange:",
+<% } %>
+  RATE_LIMIT: "rate_limit:",
+} as const;
+
+// TTL values (seconds)
+export const TTL = {
+<% if (platforms.includes('web')) { %>
+  OAUTH_STATE: 600,      // 10 minutes
+  EXCHANGE_TOKEN: 60,    // 1 minute
+<% } %>
+  SESSION: 604800,       // 7 days
+} as const;
+```
+<% if (features.authentication.enabled) { %>
+
+## BetterAuth Plugin Setup
+<% if (platforms.includes('mobile')) { %>
+
+### Expo Plugin (Required for Mobile)
+
+Always include for React Native support:
+
+```typescript
+import { expo } from "@better-auth/expo";
+
+plugins: [
+  expo(), // Handles deep link callbacks
+],
+```
+<% } %>
+<% if (features.authentication.twoFactor) { %>
+
+### Two-Factor Plugin
+
+```typescript
+import { twoFactor } from "better-auth/plugins";
+
+plugins: [
+  twoFactor({
+    // Optional config
+  }),
+],
+```
+<% } %>
+<% if (features.authentication.emailVerification) { %>
+
+### Email OTP Plugin
+
+For email verification:
+
+```typescript
+import { emailOTP } from "better-auth/plugins";
+
+plugins: [
+  emailOTP({
+    otpLength: 6,
+    expiresIn: 300, // 5 minutes
+    sendVerificationOnSignUp: true,
+    async sendVerificationOTP({ email, otp, type }) {
+      await sendEmail({
+        to: email,
+        subject: "Your verification code",
+        html: `Your code is: ${otp}`,
+      });
+    },
+  }),
+],
+```
+<% } %>
+<% if (features.authentication.providers.google) { %>
+
+## OAuth Provider Setup
+
+### Google
+
+```typescript
+socialProviders: {
+  google: {
+    clientId: process.env.GOOGLE_WEB_CLIENT_ID!,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+  },
+},
+```
+
+Required env vars: `GOOGLE_WEB_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
+<% } %>
+<% if (features.authentication.providers.apple) { %>
+
+### Apple
+
+```typescript
+socialProviders: {
+  apple: {
+    clientId: process.env.APPLE_SERVICE_ID!,
+    clientSecret: process.env.APPLE_CLIENT_SECRET!,
+    appBundleIdentifier: process.env.APPLE_BUNDLE_ID!,
+  },
+},
+```
+
+Required env vars: `APPLE_SERVICE_ID`, `APPLE_CLIENT_SECRET`, `APPLE_BUNDLE_ID`
+<% } %>
+<% if (features.authentication.providers.github) { %>
+
+### GitHub
+
+```typescript
+socialProviders: {
+  github: {
+    clientId: process.env.GITHUB_CLIENT_ID!,
+    clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+  },
+},
+```
+<% } %>
+<% } %>
+
+## Best Practices
+
+### 1. Environment Variable Validation
+
+Fail fast if required config is missing:
+
+```typescript
+const googleClientId = process.env.GOOGLE_WEB_CLIENT_ID;
+if (!googleClientId) {
+  throw new Error("GOOGLE_WEB_CLIENT_ID is required");
+}
+```
+
+### 2. Use Constants for Magic Values
+
+```typescript
+// Good
+await redis.setex(key, TTL.OAUTH_STATE, value);
+
+// Bad
+await redis.setex(key, 600, value);
+```
+<% if (features.authentication.enabled) { %>
+
+### 3. Schema Mapping
+
+Ensure database schema matches BetterAuth expectations:
+
+```typescript
+<% if (backend.orm === 'drizzle') { %>
+database: drizzleAdapter(db, {
+  schema: {
+    user: schema.user,
+    session: schema.session,
+    account: schema.account,
+    verification: schema.verification,
+<% if (features.authentication.twoFactor) { %>
+    twoFactor: schema.twoFactor,
+<% } %>
+  },
+}),
+<% } %>
+<% if (backend.orm === 'prisma') { %>
+database: prismaAdapter(prisma, { provider: "postgresql" }),
+// Prisma schema must include BetterAuth models (user, session, account, verification)
+<% } %>
+```
+
+### 4. Type Exports
+
+Export session types for use elsewhere:
+
+```typescript
+export type Session = typeof auth.$Infer.Session;
+```
+<% } %>
+
+### 5. Development vs Production
+
+Handle environment differences:
+
+```typescript
+emailAndPassword: {
+  requireEmailVerification: process.env.NODE_ENV === "production",
+},
+```

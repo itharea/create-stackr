@@ -1,147 +1,105 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { copyTemplateFiles, copyFile } from '../../src/utils/copy.js';
-import type { ProjectConfig } from '../../src/types/index.js';
 import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
-import { TEMPLATE_DIR } from '../../src/utils/template.js';
+import { copyServiceTemplateFiles } from '../../src/utils/copy.js';
+import { buildServiceContext } from '../../src/generators/service-context.js';
+import { minimalConfig } from '../fixtures/configs/minimal.js';
+import { drizzleConfig } from '../fixtures/configs/drizzle-config.js';
 
-describe('Copy Utils', () => {
-  let tempDir: string;
-  const mockConfig: ProjectConfig = {
-    projectName: 'test-app',
-    packageManager: 'npm',
-    appScheme: 'testapp',
-    platforms: ['mobile', 'web'],
-    features: {
-      onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
-      authentication: {
-        enabled: true,
-        providers: {
-          emailPassword: true,
-          google: false,
-          apple: false,
-          github: false,
-        },
-        emailVerification: false,
-        passwordReset: true,
-        twoFactor: false,
-      },
-      paywall: false,
-      sessionManagement: true,
-    },
-    integrations: {
-      revenueCat: { enabled: false, iosKey: '', androidKey: '' },
-      adjust: { enabled: false, appToken: '', environment: 'sandbox' },
-      scate: { enabled: false, apiKey: '' },
-      att: { enabled: false },
-    },
-    backend: {
-      database: 'postgresql',
-      orm: 'prisma',
-      eventQueue: false,
-      docker: true,
-    },
-    preset: 'minimal',
-    customized: false,
-    aiTools: ['codex'],
-  };
+/**
+ * Unit-ish test of the copy helper used by the per-service generator.
+ * Asserts that files land under `<service.name>/backend/`, EJS is
+ * rendered, and the prisma/drizzle split is honored.
+ */
+describe('copyServiceTemplateFiles', () => {
+  let targetDir: string;
 
   beforeEach(async () => {
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'test-'));
+    targetDir = await fs.mkdtemp(path.join(os.tmpdir(), 'copy-test-'));
   });
 
   afterEach(async () => {
-    await fs.remove(tempDir);
+    await fs.remove(targetDir);
   });
 
-  describe('copyTemplateFiles', () => {
-    it('should copy template files to target directory', async () => {
-      await copyTemplateFiles(tempDir, mockConfig);
+  it('copies backend files to <service.name>/backend/ and renders EJS', async () => {
+    const core = minimalConfig.services.find((s) => s.name === 'core')!;
+    const ctx = buildServiceContext(minimalConfig, core);
+    await copyServiceTemplateFiles(targetDir, ctx, 'services/base/backend');
 
-      // Check that basic structure exists (at least some files should be copied)
-      // Phase 1: generator output is nested under core/
-      const mobileDir = path.join(tempDir, 'core/mobile');
-      const backendDir = path.join(tempDir, 'core/backend');
+    const pkgPath = path.join(targetDir, 'core/backend/package.json');
+    expect(await fs.pathExists(pkgPath)).toBe(true);
 
-      // These paths should exist if templates are copied
-      const mobileDirExists = await fs.pathExists(mobileDir);
-      const backendDirExists = await fs.pathExists(backendDir);
+    const raw = await fs.readFile(pkgPath, 'utf-8');
+    // Fully-rendered: must not contain unreplaced EJS tokens
+    expect(raw).not.toMatch(/<%[=_-]?/);
+    expect(raw).not.toMatch(/%>/);
 
-      expect(mobileDirExists || backendDirExists).toBe(true);
-    });
-
-    it('should not copy onboarding files when disabled', async () => {
-      await copyTemplateFiles(tempDir, mockConfig);
-
-      // Onboarding directory should NOT exist since it's disabled
-      const onboardingDir = path.join(tempDir, 'core/mobile/app/(onboarding)');
-      const exists = await fs.pathExists(onboardingDir);
-
-      expect(exists).toBe(false);
-    });
-
-    it('should skip directories during file iteration', async () => {
-      // This test implicitly verifies the directory skip logic is working
-      // If it wasn't working, the function would error on trying to copy directories
-      await copyTemplateFiles(tempDir, mockConfig);
-
-      // Verify files were copied (not directories)
-      const files = await fs.readdir(tempDir, { recursive: true });
-      expect(files.length).toBeGreaterThan(0);
-    });
+    const pkg = JSON.parse(raw);
+    expect(pkg.name).toBe('test-minimal-core-backend');
   });
 
-  describe('copyFile', () => {
-    it('should copy a static file without config', async () => {
-      const sourceFile = path.join(TEMPLATE_DIR, 'services/base/mobile/src/constants/Theme.ts');
-      const destFile = path.join(tempDir, 'Theme.ts');
+  it('maps by different service names on successive calls', async () => {
+    const core = minimalConfig.services.find((s) => s.name === 'core')!;
+    const ctx = buildServiceContext(minimalConfig, core);
 
-      await copyFile(sourceFile, destFile);
+    // Write `core` subtree
+    await copyServiceTemplateFiles(targetDir, ctx, 'services/base/backend');
+    expect(await fs.pathExists(path.join(targetDir, 'core/backend/package.json'))).toBe(true);
 
-      const exists = await fs.pathExists(destFile);
-      expect(exists).toBe(true);
+    // Now write a second service's subtree by aliasing through a cloned
+    // context with a different service name.
+    const renamed = { ...ctx, service: { ...ctx.service, name: 'scout' } };
+    await copyServiceTemplateFiles(targetDir, renamed, 'services/base/backend');
+    expect(await fs.pathExists(path.join(targetDir, 'scout/backend/package.json'))).toBe(true);
+  });
 
-      const content = await fs.readFile(destFile, 'utf-8');
-      expect(content.length).toBeGreaterThan(0);
+  it('honors prisma ORM filtering — drizzle files are excluded in prisma mode', async () => {
+    const core = minimalConfig.services.find((s) => s.name === 'core')!;
+    const ctx = buildServiceContext(minimalConfig, core);
+    await copyServiceTemplateFiles(targetDir, ctx, 'services/base/backend');
+
+    // Prisma files land, drizzle doesn't
+    expect(await fs.pathExists(path.join(targetDir, 'core/backend/prisma'))).toBe(true);
+    expect(await fs.pathExists(path.join(targetDir, 'core/backend/drizzle'))).toBe(false);
+  });
+
+  it('honors drizzle ORM filtering — prisma files are excluded in drizzle mode', async () => {
+    const core = drizzleConfig.services.find((s) => s.name === 'core')!;
+    const ctx = buildServiceContext(drizzleConfig, core);
+    await copyServiceTemplateFiles(targetDir, ctx, 'services/base/backend');
+
+    expect(await fs.pathExists(path.join(targetDir, 'core/backend/drizzle'))).toBe(true);
+    expect(await fs.pathExists(path.join(targetDir, 'core/backend/prisma'))).toBe(false);
+  });
+
+  it('no-ops silently when the subtree does not exist', async () => {
+    const core = minimalConfig.services.find((s) => s.name === 'core')!;
+    const ctx = buildServiceContext(minimalConfig, core);
+    await expect(
+      copyServiceTemplateFiles(targetDir, ctx, 'services/does-not-exist')
+    ).resolves.toBeUndefined();
+  });
+
+  it('does NOT emit any file containing an unrendered EJS token', async () => {
+    const core = minimalConfig.services.find((s) => s.name === 'core')!;
+    const ctx = buildServiceContext(minimalConfig, core);
+    await copyServiceTemplateFiles(targetDir, ctx, 'services/base/backend');
+
+    const { globby } = await import('globby');
+    const files = await globby('core/backend/**/*', {
+      cwd: targetDir,
+      onlyFiles: true,
+      dot: true,
     });
 
-    it('should render EJS template when config provided', async () => {
-      const sourceFile = 'services/base/mobile/package.json.ejs';
-      const destFile = path.join(tempDir, 'package.json');
-
-      await copyFile(sourceFile, destFile, mockConfig);
-
-      const exists = await fs.pathExists(destFile);
-      expect(exists).toBe(true);
-
-      const content = await fs.readFile(destFile, 'utf-8');
-      const parsed = JSON.parse(content);
-      expect(parsed.name).toBe('test-app-mobile');
-    });
-
-    it('should copy EJS file as-is when no config provided', async () => {
-      const sourceFile = path.join(TEMPLATE_DIR, 'services/base/mobile/package.json.ejs');
-      const destFile = path.join(tempDir, 'package.json.ejs');
-
-      await copyFile(sourceFile, destFile);
-
-      const exists = await fs.pathExists(destFile);
-      expect(exists).toBe(true);
-
-      const content = await fs.readFile(destFile, 'utf-8');
-      // Should contain EJS syntax since not rendered
-      expect(content).toContain('<%');
-    });
-
-    it('should create parent directories if they dont exist', async () => {
-      const sourceFile = path.join(TEMPLATE_DIR, 'services/base/mobile/src/constants/Theme.ts');
-      const destFile = path.join(tempDir, 'deeply/nested/path/Theme.ts');
-
-      await copyFile(sourceFile, destFile);
-
-      const exists = await fs.pathExists(destFile);
-      expect(exists).toBe(true);
-    });
+    for (const rel of files) {
+      const contents = await fs.readFile(path.join(targetDir, rel), 'utf-8');
+      // binary-ish files might contain arbitrary bytes; skip if not printable
+      if (/<%[=_-]?/.test(contents) || /%>/.test(contents)) {
+        throw new Error(`Unrendered EJS token left in ${rel}`);
+      }
+    }
   });
 });

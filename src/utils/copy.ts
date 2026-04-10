@@ -8,64 +8,71 @@ import {
   isTemplate,
   getDestinationPath,
 } from './template.js';
-import type { ProjectConfig } from '../types/index.js';
+import type { ServiceRenderContext } from '../types/index.js';
 
 /**
- * Copy all template files to target directory
+ * Copy a subtree of templates into `<targetDir>/<service.name>/...`,
+ * honouring `shouldIncludeFile(ctx)` and rendering EJS with the supplied
+ * `ServiceRenderContext`.
+ *
+ * This is the generic service-scoped copy helper used by the phase-2
+ * generators. Phase 1 had a single flat `copyTemplateFiles(ctx, targetDir)`
+ * that walked every template at once; phase 2 calls this per subtree
+ * (backend / mobile / web) with the same context.
  */
-export async function copyTemplateFiles(
+export async function copyServiceTemplateFiles(
   targetDir: string,
-  config: ProjectConfig
+  ctx: ServiceRenderContext,
+  subtreeRelativePath: string
 ): Promise<void> {
-  // Get all files from templates directory
-  const files = await globby('**/*', {
+  const subtreeAbsolute = path.join(TEMPLATE_DIR, subtreeRelativePath);
+  if (!(await fs.pathExists(subtreeAbsolute))) {
+    return;
+  }
+
+  const files = await globby(`${subtreeRelativePath}/**/*`, {
     cwd: TEMPLATE_DIR,
     dot: true,
+    onlyFiles: true,
     ignore: ['**/node_modules/**'],
   });
 
   for (const file of files) {
-    const fullPath = path.join(TEMPLATE_DIR, file);
-    const stats = await fs.stat(fullPath);
-
-    // Skip directories
-    if (stats.isDirectory()) {
+    if (!shouldIncludeFile(file, ctx)) {
       continue;
     }
 
-    // Check if file should be included
-    if (!shouldIncludeFile(file, config)) {
-      continue;
-    }
+    const destPath = getDestinationPath(file, targetDir, {
+      serviceName: ctx.service.name,
+    });
 
-    // Get destination path
-    const destPath = getDestinationPath(file, targetDir);
-
-    // Ensure destination directory exists
     await fs.ensureDir(path.dirname(destPath));
 
-    // Process template or copy static file
     if (isTemplate(file)) {
-      const rendered = await renderTemplate(file, config);
+      const rendered = await renderTemplate(file, ctx as unknown as Record<string, unknown>);
       await fs.writeFile(destPath, rendered);
     } else {
-      await fs.copy(fullPath, destPath);
+      const fullSrc = path.join(TEMPLATE_DIR, file);
+      await fs.copy(fullSrc, destPath);
     }
   }
 }
 
 /**
- * Copy a single file or directory
+ * Copy a single file or directory (optionally rendering EJS).
+ *
+ * Retained for single-file copies (e.g., AGENTS.md); pass `undefined` as
+ * the context when no templating is desired.
  */
 export async function copyFile(
   src: string,
   dest: string,
-  config?: ProjectConfig
+  ctx?: ServiceRenderContext | Record<string, unknown>
 ): Promise<void> {
   await fs.ensureDir(path.dirname(dest));
 
-  if (config && isTemplate(src)) {
-    const rendered = await renderTemplate(src, config);
+  if (ctx && isTemplate(src)) {
+    const rendered = await renderTemplate(src, ctx as Record<string, unknown>);
     await fs.writeFile(dest, rendered);
   } else {
     await fs.copy(src, dest);

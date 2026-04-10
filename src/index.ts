@@ -3,7 +3,7 @@
 import { program } from 'commander';
 import chalk from 'chalk';
 import boxen from 'boxen';
-import { runCLI } from './cli.js';
+import { runCreateFlow } from './cli.js';
 import { displayError } from './utils/errors.js';
 import { validateNodeVersion } from './utils/system-validation.js';
 import { readFileSync } from 'fs';
@@ -29,8 +29,8 @@ function displayWelcome() {
   console.log(
     boxen(
       chalk.bold.cyan('Welcome to create-stackr!\n\n') +
-        chalk.white('Create a production-ready full-stack mobile app\n') +
-        chalk.white('with backend infrastructure in minutes.'),
+        chalk.white('Scaffold a production-ready multi-microservice monorepo\n') +
+        chalk.white('with isolated auth, base services, Docker, and more.'),
       {
         padding: 1,
         margin: 1,
@@ -44,7 +44,7 @@ function displayWelcome() {
 // Configure CLI
 program
   .name('create-stackr')
-  .description('Create a production-ready full-stack mobile app')
+  .description('Create a production-ready multi-microservice monorepo')
   .version(packageJson.version)
   .argument('[project-name]', 'Name of the project')
   .option(
@@ -53,10 +53,23 @@ program
   )
   .option('--defaults', 'Use default configuration without prompts')
   .option('--verbose', 'Show detailed output')
+  .option('--service-name <name>', 'Override the default initial base service name (default: "core")')
+  .option('--no-auth', 'Skip scaffolding the auth/ service')
+  .option(
+    '--with-services <list>',
+    'Comma-separated list of extra base services to scaffold (e.g. scout,manage)'
+  )
   .action(async (projectName: string | undefined, options: any) => {
     try {
       displayWelcome();
-      await runCLI(projectName, options);
+      await runCreateFlow(projectName, {
+        template: options.template,
+        defaults: options.defaults,
+        verbose: options.verbose,
+        serviceName: options.serviceName,
+        auth: options.auth,
+        withServices: options.withServices,
+      });
     } catch (error) {
       displayError(error as Error);
       process.exit(1);
@@ -70,8 +83,9 @@ program.addHelpText(
 
 Examples:
   $ npx create-stackr my-app
-  $ npx create-stackr my-app --template minimal
   $ npx create-stackr my-app --defaults
+  $ npx create-stackr my-app --defaults --with-services scout,manage
+  $ npx create-stackr my-app --no-auth --service-name api
 
 For more information, visit:
   https://stackr.sh/docs

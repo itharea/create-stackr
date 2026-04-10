@@ -3,7 +3,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import type { ProjectConfig } from '../types/index.js';
+import type { ServiceRenderContext } from '../types/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -12,11 +12,11 @@ const __dirname = dirname(__filename);
 export const TEMPLATE_DIR = path.join(__dirname, '../../templates');
 
 /**
- * Render an EJS template with configuration
+ * Render an EJS template with the given render context.
  */
 export async function renderTemplate(
   templatePath: string,
-  config: ProjectConfig
+  ctx: ServiceRenderContext | Record<string, unknown>
 ): Promise<string> {
   const fullPath = path.join(TEMPLATE_DIR, templatePath);
 
@@ -25,145 +25,143 @@ export async function renderTemplate(
   }
 
   const content = await fs.readFile(fullPath, 'utf-8');
-  return ejs.render(content, config);
+  return ejs.render(content, ctx);
 }
 
 /**
- * Check if a file should be included based on configuration
+ * Check if a file should be included based on the service render context.
+ *
+ * Reads exclusively from the per-service `ctx` — the legacy shim fields
+ * (`ctx.platforms`, `ctx.features`, `ctx.integrations`, `ctx.backend`) are
+ * populated by `buildServiceContext` so this function can continue using the
+ * pre-phase-2 predicates that already cover every conditional template.
  */
 export function shouldIncludeFile(
   filePath: string,
-  config: ProjectConfig
+  ctx: ServiceRenderContext
 ): boolean {
-  // Skip .gitkeep files - they are only for version control
+  // Skip .gitkeep files — version-control only
   if (filePath.endsWith('.gitkeep')) {
     return false;
   }
 
-  // Skip AGENTS.md - AI tool guideline files are generated dynamically
+  // Skip AGENTS.md — rendered separately by the monorepo root pass
   if (filePath.includes('shared/AGENTS.md')) {
+    return false;
+  }
+
+  // Only the auth service should consume templates/services/auth/**
+  if (filePath.includes('services/auth/') && ctx.service.kind !== 'auth') {
+    return false;
+  }
+  // Symmetrically, non-auth services don't render auth-specific trees
+  if (filePath.includes('services/base/') && ctx.service.kind === 'auth') {
     return false;
   }
 
   // ==========================================================================
   // Platform-based filtering (consistent architecture)
   // ==========================================================================
-  // All platform-specific content lives under /mobile/ or /web/ subdirectories:
-  // - services/base/mobile/, features/mobile/, integrations/mobile/ → mobile platform
-  // - services/base/web/, features/web/, integrations/web/ → web platform
-  // - services/base/backend/, shared/ → always included (platform-agnostic)
-
-  // Exclude mobile-specific content when mobile platform not selected
-  if (filePath.includes('/mobile/') && !config.platforms.includes('mobile')) {
+  if (filePath.includes('/mobile/') && !ctx.platforms.includes('mobile')) {
     return false;
   }
 
-  // Exclude web-specific content when web platform not selected
-  if (filePath.includes('/web/') && !config.platforms.includes('web')) {
+  if (filePath.includes('/web/') && !ctx.platforms.includes('web')) {
     return false;
   }
 
-  // Check if file is in a conditional directory
-  if (filePath.includes('features/mobile/onboarding') && !config.features.onboarding.enabled) {
+  // Feature-gated mobile templates
+  if (filePath.includes('features/mobile/onboarding') && !ctx.features.onboarding.enabled) {
     return false;
   }
 
-  // Auth check updated for new structure (mobile)
-  if (filePath.includes('features/mobile/auth') && !config.features.authentication.enabled) {
+  if (filePath.includes('features/mobile/auth') && !ctx.features.authentication.enabled) {
     return false;
   }
 
-  // Web auth check (mirrors mobile auth check)
-  if (filePath.includes('features/web/auth') && !config.features.authentication.enabled) {
+  if (filePath.includes('features/web/auth') && !ctx.features.authentication.enabled) {
     return false;
   }
 
-  // Email verification screens
-  if (filePath.includes('verify-email') && !config.features.authentication.emailVerification) {
+  if (filePath.includes('verify-email') && !ctx.features.authentication.emailVerification) {
     return false;
   }
 
-  // Password reset screens
   if (
     (filePath.includes('forgot-password') || filePath.includes('reset-password')) &&
-    !config.features.authentication.passwordReset
+    !ctx.features.authentication.passwordReset
   ) {
     return false;
   }
 
-  // Two-factor screens (future scope)
-  if (filePath.includes('two-factor') && !config.features.authentication.twoFactor) {
+  if (filePath.includes('two-factor') && !ctx.features.authentication.twoFactor) {
     return false;
   }
 
-  if (filePath.includes('features/mobile/paywall') && !config.features.paywall) {
+  if (filePath.includes('features/mobile/paywall') && !ctx.features.paywall) {
     return false;
   }
 
-  // Note: Tabs templates are always included (not conditional)
-
-  if (filePath.includes('integrations/mobile/revenuecat') && !config.integrations.revenueCat.enabled) {
+  if (filePath.includes('integrations/mobile/revenuecat') && !ctx.integrations.revenueCat.enabled) {
     return false;
   }
 
-  if (filePath.includes('integrations/mobile/adjust') && !config.integrations.adjust.enabled) {
+  if (filePath.includes('integrations/mobile/adjust') && !ctx.integrations.adjust.enabled) {
     return false;
   }
 
-  if (filePath.includes('integrations/mobile/scate') && !config.integrations.scate.enabled) {
+  if (filePath.includes('integrations/mobile/scate') && !ctx.integrations.scate.enabled) {
     return false;
   }
 
-  if (filePath.includes('integrations/mobile/att') && !config.integrations.att.enabled) {
+  if (filePath.includes('integrations/mobile/att') && !ctx.integrations.att.enabled) {
     return false;
   }
 
-  // Only include SDK initializer if at least one SDK integration is enabled
+  // SDK initializer only if any SDK is enabled
   if (filePath.includes('services/sdkInitializer')) {
     const hasAnySdk =
-      config.integrations.revenueCat.enabled ||
-      config.integrations.adjust.enabled ||
-      config.integrations.scate.enabled;
+      ctx.integrations.revenueCat.enabled ||
+      ctx.integrations.adjust.enabled ||
+      ctx.integrations.scate.enabled;
     return hasAnySdk;
   }
 
   // Backend conditional files
-  if (filePath.includes('controllers/event-queue') && !config.backend.eventQueue) {
+  if (filePath.includes('controllers/event-queue') && !ctx.backend.eventQueue) {
     return false;
   }
 
-  // Email service - only include when email verification or password reset is enabled
-  if (filePath.includes('utils/email') &&
-      !config.features.authentication.emailVerification &&
-      !config.features.authentication.passwordReset) {
+  // Email service — only include when email verification or password reset is enabled
+  if (
+    filePath.includes('utils/email') &&
+    !ctx.features.authentication.emailVerification &&
+    !ctx.features.authentication.passwordReset
+  ) {
+    return false;
+  }
+
+  // Device session is an auth-specific feature: only include in the auth
+  // service subtree. Base services don't manage device sessions anymore
+  // (auth service owns them).
+  if (filePath.includes('domain/device-session') && ctx.service.kind !== 'auth') {
+    return false;
+  }
+  if (filePath.includes('controllers/rest-api/routes/device-sessions') && ctx.service.kind !== 'auth') {
     return false;
   }
 
   // ORM-specific file filtering
-  const orm = config.backend.orm;
+  const orm = ctx.backend.orm;
 
-  // Prisma-specific: filter entire prisma/ directory and .prisma.ts suffix files
   if (orm !== 'prisma') {
-    // Matches: prisma/schema.prisma.ejs, prisma/generated/*, prisma/migrations/*, etc.
-    if (filePath.includes('/prisma/')) {
-      return false;
-    }
-    // Matches: db.prisma.ts, auth.prisma.ts.ejs, prisma.config.prisma.ts, etc.
-    if (filePath.includes('.prisma.ts')) {
-      return false;
-    }
+    if (filePath.includes('/prisma/')) return false;
+    if (filePath.includes('.prisma.ts')) return false;
   }
 
-  // Drizzle-specific: filter entire drizzle/ directory and .drizzle.ts suffix files
   if (orm !== 'drizzle') {
-    // Matches: drizzle/schema.drizzle.ts, drizzle/migrations/*, etc.
-    if (filePath.includes('/drizzle/')) {
-      return false;
-    }
-    // Matches: db.drizzle.ts, auth.drizzle.ts.ejs, drizzle.config.drizzle.ts, etc.
-    if (filePath.includes('.drizzle.ts')) {
-      return false;
-    }
+    if (filePath.includes('/drizzle/')) return false;
+    if (filePath.includes('.drizzle.ts')) return false;
   }
 
   return true;
@@ -177,25 +175,29 @@ export function isTemplate(filePath: string): boolean {
 }
 
 /**
- * Simple prefix-swap mapping table — covers the cases where a template path
- * maps to a destination path purely by swapping a prefix. Features and
- * integrations are NOT in this table because they fan out to several
- * different subpaths depending on the rest of the path; they stay imperative
- * in the switch below.
+ * Prefix-swap mapping table — covers cases where a template path maps to a
+ * destination purely by swapping a prefix. Features and integrations still
+ * fan out to multiple subpaths based on the rest of the path, so they stay
+ * imperative in the switch below.
  *
- * Phase 2 extends this table (not the imperative branches) when it needs to
- * map additional service template subtrees — `services/auth/backend/*`,
- * `monorepo-root/*`, etc. Keeping the contract here means phase 2 only
- * touches the table and one per-service prefix computation, not the EJS
- * fan-out logic.
+ * Phase 2: each mapping is parameterized by `serviceName` at call time so
+ * the same table works for `core/`, `auth/`, `scout/`, etc.
  */
-const SIMPLE_PATH_MAPPINGS: readonly { from: string; to: string }[] = [
-  { from: 'services/base/backend/', to: 'core/backend/' },
-  { from: 'services/base/mobile/', to: 'core/mobile/' },
-  { from: 'services/base/web/', to: 'core/web/' },
-  // shared/* lives at the monorepo root — no core/ prefix.
-  { from: 'shared/', to: '' },
+const SIMPLE_PATH_MAPPINGS: readonly { from: string; to: (serviceName: string) => string }[] = [
+  { from: 'services/base/backend/', to: (svc) => `${svc}/backend/` },
+  { from: 'services/base/mobile/', to: (svc) => `${svc}/mobile/` },
+  { from: 'services/base/web/', to: (svc) => `${svc}/web/` },
+  { from: 'services/auth/backend/', to: (svc) => `${svc}/backend/` },
+  { from: 'services/auth/web/', to: (svc) => `${svc}/web/` },
+  // shared/* lives at the monorepo root — no service prefix.
+  { from: 'shared/', to: () => '' },
+  // project/* maps to project root directly (project-shell templates).
+  { from: 'project/', to: () => '' },
 ];
+
+export interface GetDestinationPathOptions {
+  serviceName: string;
+}
 
 /**
  * Get destination path for a template file
@@ -203,8 +205,10 @@ const SIMPLE_PATH_MAPPINGS: readonly { from: string; to: string }[] = [
  */
 export function getDestinationPath(
   templatePath: string,
-  targetDir: string
+  targetDir: string,
+  opts: GetDestinationPathOptions
 ): string {
+  const serviceName = opts.serviceName;
   let relativePath = templatePath;
 
   // Remove templates/ prefix
@@ -213,28 +217,22 @@ export function getDestinationPath(
   }
 
   // ==========================================================================
-  // Simple prefix swaps (services/base/*, shared/)
+  // Simple prefix swaps
   // ==========================================================================
   let mapped = false;
   for (const mapping of SIMPLE_PATH_MAPPINGS) {
     if (relativePath.startsWith(mapping.from)) {
-      relativePath = mapping.to + relativePath.substring(mapping.from.length);
+      relativePath = mapping.to(serviceName) + relativePath.substring(mapping.from.length);
       mapped = true;
       break;
     }
   }
 
   // ==========================================================================
-  // Mobile features and integrations (under /mobile/ subdirectory)
-  //
-  // Phase 1: features and integrations are still scoped to `core/*`. Phase 2
-  // will rescope them per service. Each branch computes the conceptual
-  // mobile/web subpath exactly as in v0.4, then prepends `core/` to the
-  // result — the ORM suffix strip and `.ejs` strip below operate on the
-  // already-prefixed path without needing to change.
+  // Mobile features and integrations (rescoped per-service in phase 2)
   // ==========================================================================
   if (!mapped) {
-    // features/mobile/*/app/* → core/mobile/app/*
+    // features/mobile/*/app/* → <service>/mobile/app/*
     if (relativePath.startsWith('features/mobile/')) {
       const featurePath = relativePath.substring('features/mobile/'.length);
       const restOfPath = featurePath.substring(featurePath.indexOf('/') + 1);
@@ -248,10 +246,10 @@ export function getDestinationPath(
         subpath = `mobile/${restOfPath}`;
       }
 
-      relativePath = `core/${subpath}`;
+      relativePath = `${serviceName}/${subpath}`;
     }
 
-    // integrations/mobile/*/services/* → core/mobile/src/services/*
+    // integrations/mobile/*/services/* → <service>/mobile/src/services/*
     else if (relativePath.startsWith('integrations/mobile/')) {
       const integrationPath = relativePath.substring('integrations/mobile/'.length);
       const restOfPath = integrationPath.substring(integrationPath.indexOf('/') + 1);
@@ -263,18 +261,14 @@ export function getDestinationPath(
         subpath = `mobile/${restOfPath}`;
       }
 
-      relativePath = `core/${subpath}`;
+      relativePath = `${serviceName}/${subpath}`;
     }
 
-    // ==========================================================================
-    // Web features and integrations (future - placeholder for consistency)
-    // ==========================================================================
-    // features/web/*/app/* → core/web/src/app/*
+    // features/web/*/app/* → <service>/web/src/app/*
     else if (relativePath.startsWith('features/web/')) {
       const featurePath = relativePath.substring('features/web/'.length);
       const restOfPath = featurePath.substring(featurePath.indexOf('/') + 1);
 
-      // Map to web directory structure (Next.js App Router)
       let subpath: string;
       if (restOfPath.startsWith('app/') || restOfPath === 'app') {
         subpath = `web/src/${restOfPath}`;
@@ -284,26 +278,19 @@ export function getDestinationPath(
         subpath = `web/${restOfPath}`;
       }
 
-      relativePath = `core/${subpath}`;
+      relativePath = `${serviceName}/${subpath}`;
     }
 
-    // integrations/web/* → core/web/src/*
+    // integrations/web/* → <service>/web/src/*
     else if (relativePath.startsWith('integrations/web/')) {
       const integrationPath = relativePath.substring('integrations/web/'.length);
       const restOfPath = integrationPath.substring(integrationPath.indexOf('/') + 1);
 
-      relativePath = `core/web/src/${restOfPath}`;
+      relativePath = `${serviceName}/web/src/${restOfPath}`;
     }
   }
 
   // Remove ORM suffix from file names (.prisma.ts → .ts, .drizzle.ts → .ts)
-  // This handles:
-  //   - db.prisma.ts → db.ts
-  //   - db.drizzle.ts → db.ts
-  //   - auth.prisma.ts.ejs → auth.ts.ejs (then .ejs removed later)
-  //   - prisma.config.prisma.ts → prisma.config.ts
-  //   - drizzle.config.drizzle.ts → drizzle.config.ts
-  //   - drizzle/schema.drizzle.ts → drizzle/schema.ts
   relativePath = relativePath.replace(/\.prisma\.ts/, '.ts');
   relativePath = relativePath.replace(/\.drizzle\.ts/, '.ts');
 

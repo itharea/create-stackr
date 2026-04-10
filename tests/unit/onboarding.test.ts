@@ -1,293 +1,148 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { generateOnboardingPages } from '../../src/generators/onboarding.js';
-import type { ProjectConfig } from '../../src/types/index.js';
 import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
+import { generateOnboardingPages } from '../../src/generators/onboarding.js';
+import { buildServiceContext } from '../../src/generators/service-context.js';
+import { fullFeaturedConfig } from '../fixtures/configs/full-featured.js';
+import { cloneInitConfig } from '../fixtures/configs/index.js';
 
-describe('Onboarding Generator', () => {
-  let tempDir: string;
+describe('generateOnboardingPages', () => {
+  let tmpDir: string;
 
   beforeEach(async () => {
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'test-onboarding-'));
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'onboarding-test-'));
   });
 
   afterEach(async () => {
-    await fs.remove(tempDir);
+    await fs.remove(tmpDir);
   });
 
-  it('should not generate pages if onboarding is disabled', async () => {
-    const config: ProjectConfig = {
-      projectName: 'test-app',
-      packageManager: 'npm',
-      appScheme: 'testapp',
-      platforms: ['mobile'],
-      features: {
-        onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
-        authentication: {
-          enabled: true,
-          providers: { emailPassword: true, google: false, apple: false, github: false },
-          emailVerification: false,
-          passwordReset: true,
-          twoFactor: false,
-        },
-        paywall: false,
-        sessionManagement: true,
-      },
-      integrations: {
-        revenueCat: { enabled: false, iosKey: '', androidKey: '' },
-        adjust: { enabled: false, appToken: '', environment: 'sandbox' },
-        scate: { enabled: false, apiKey: '' },
-        att: { enabled: false },
-      },
-      backend: {
-        database: 'postgresql',
-        orm: 'prisma',
-        eventQueue: false,
-        docker: true,
-      },
-      preset: 'minimal',
-      customized: false,
-      aiTools: ['codex'],
-    };
+  it('no-ops when service has no mobile platform', async () => {
+    const cloned = cloneInitConfig(fullFeaturedConfig);
+    const core = cloned.services.find((s) => s.name === 'core')!;
+    core.mobile = null;
 
-    await generateOnboardingPages(config, tempDir);
+    const ctx = buildServiceContext(cloned, core);
+    // Shim always returns onboarding disabled today — regardless, nothing
+    // should be written for a non-mobile service.
+    const serviceRoot = path.join(tmpDir, 'core');
+    await generateOnboardingPages(ctx, serviceRoot);
 
-    const onboardingDir = path.join(tempDir, 'core/mobile/app/(onboarding)');
+    const onboardingDir = path.join(serviceRoot, 'mobile/app/(onboarding)');
     expect(await fs.pathExists(onboardingDir)).toBe(false);
   });
 
-  it('should not generate pages for 1-3 pages (handled by templates)', async () => {
-    const config: ProjectConfig = {
-      projectName: 'test-app',
-      packageManager: 'npm',
-      appScheme: 'testapp',
-      platforms: ['mobile'],
-      features: {
-        onboarding: { enabled: true, pages: 3, skipButton: true, showPaywall: false },
-        authentication: {
-          enabled: true,
-          providers: { emailPassword: true, google: false, apple: false, github: false },
-          emailVerification: false,
-          passwordReset: true,
-          twoFactor: false,
-        },
-        paywall: false,
-        sessionManagement: true,
-      },
-      integrations: {
-        revenueCat: { enabled: false, iosKey: '', androidKey: '' },
-        adjust: { enabled: false, appToken: '', environment: 'sandbox' },
-        scate: { enabled: false, apiKey: '' },
-        att: { enabled: false },
-      },
-      backend: {
-        database: 'postgresql',
-        orm: 'prisma',
-        eventQueue: false,
-        docker: true,
-      },
-      preset: 'custom',
-      customized: false,
-      aiTools: ['codex'],
-    };
+  it('no-ops when features.onboarding.enabled is false', async () => {
+    const cloned = cloneInitConfig(fullFeaturedConfig);
+    const core = cloned.services.find((s) => s.name === 'core')!;
 
-    await generateOnboardingPages(config, tempDir);
+    const ctx = buildServiceContext(cloned, core);
+    // Shim currently always disables onboarding; verify this is a no-op.
+    expect(ctx.features.onboarding.enabled).toBe(false);
 
-    // Should not generate any files (templates handle 1-3)
-    const onboardingDir = path.join(tempDir, 'core/mobile/app/(onboarding)');
+    const serviceRoot = path.join(tmpDir, 'core');
+    await generateOnboardingPages(ctx, serviceRoot);
+
+    const onboardingDir = path.join(serviceRoot, 'mobile/app/(onboarding)');
     expect(await fs.pathExists(onboardingDir)).toBe(false);
   });
 
-  it('should generate pages 4-5 when needed', async () => {
-    const config: ProjectConfig = {
-      projectName: 'test-app',
-      packageManager: 'npm',
-      appScheme: 'testapp',
-      platforms: ['mobile'],
-      features: {
-        onboarding: { enabled: true, pages: 5, skipButton: true, showPaywall: false },
-        authentication: {
-          enabled: true,
-          providers: { emailPassword: true, google: false, apple: false, github: false },
-          emailVerification: false,
-          passwordReset: true,
-          twoFactor: false,
-        },
-        paywall: false,
-        sessionManagement: true,
-      },
-      integrations: {
-        revenueCat: { enabled: false, iosKey: '', androidKey: '' },
-        adjust: { enabled: false, appToken: '', environment: 'sandbox' },
-        scate: { enabled: false, apiKey: '' },
-        att: { enabled: false },
-      },
-      backend: {
-        database: 'postgresql',
-        orm: 'prisma',
-        eventQueue: false,
-        docker: true,
-      },
-      preset: 'custom',
-      customized: false,
-      aiTools: ['codex'],
+  it('no-ops when pages <= 3', async () => {
+    const cloned = cloneInitConfig(fullFeaturedConfig);
+    const core = cloned.services.find((s) => s.name === 'core')!;
+
+    const ctx = buildServiceContext(cloned, core);
+    // Manually enable onboarding on the shim for this test (the shim is a
+    // derivation, but the function only reads from ctx.features).
+    ctx.features.onboarding = {
+      enabled: true,
+      pages: 3,
+      skipButton: false,
+      showPaywall: false,
     };
 
-    await generateOnboardingPages(config, tempDir);
+    const serviceRoot = path.join(tmpDir, 'core');
+    await generateOnboardingPages(ctx, serviceRoot);
 
-    const onboardingDir = path.join(tempDir, 'core/mobile/app/(onboarding)');
-    expect(await fs.pathExists(onboardingDir)).toBe(true);
-
-    // Should have generated pages 4 and 5
-    expect(await fs.pathExists(path.join(onboardingDir, 'page-4.tsx'))).toBe(true);
-    expect(await fs.pathExists(path.join(onboardingDir, 'page-5.tsx'))).toBe(true);
-
-    // Should have updated _layout.tsx
-    expect(await fs.pathExists(path.join(onboardingDir, '_layout.tsx'))).toBe(true);
-
-    // Verify layout includes all pages
-    const layoutContent = await fs.readFile(path.join(onboardingDir, '_layout.tsx'), 'utf-8');
-    expect(layoutContent).toContain('page-1');
-    expect(layoutContent).toContain('page-2');
-    expect(layoutContent).toContain('page-3');
-    expect(layoutContent).toContain('page-4');
-    expect(layoutContent).toContain('page-5');
+    const page4 = path.join(serviceRoot, 'mobile/app/(onboarding)/page-4.tsx');
+    expect(await fs.pathExists(page4)).toBe(false);
   });
 
-  it('should include skip button when enabled', async () => {
-    const config: ProjectConfig = {
-      projectName: 'test-app',
-      packageManager: 'npm',
-      appScheme: 'testapp',
-      platforms: ['mobile'],
-      features: {
-        onboarding: { enabled: true, pages: 4, skipButton: true, showPaywall: false },
-        authentication: {
-          enabled: true,
-          providers: { emailPassword: true, google: false, apple: false, github: false },
-          emailVerification: false,
-          passwordReset: true,
-          twoFactor: false,
-        },
-        paywall: false,
-        sessionManagement: true,
-      },
-      integrations: {
-        revenueCat: { enabled: false, iosKey: '', androidKey: '' },
-        adjust: { enabled: false, appToken: '', environment: 'sandbox' },
-        scate: { enabled: false, apiKey: '' },
-        att: { enabled: false },
-      },
-      backend: {
-        database: 'postgresql',
-        orm: 'prisma',
-        eventQueue: false,
-        docker: true,
-      },
-      preset: 'custom',
-      customized: false,
-      aiTools: ['codex'],
+  it('writes page-4 and page-5 under <serviceRoot>/mobile/app/(onboarding)/ when pages = 5', async () => {
+    const cloned = cloneInitConfig(fullFeaturedConfig);
+    const core = cloned.services.find((s) => s.name === 'core')!;
+
+    const ctx = buildServiceContext(cloned, core);
+    ctx.features.onboarding = {
+      enabled: true,
+      pages: 5,
+      skipButton: true,
+      showPaywall: false,
     };
 
-    await generateOnboardingPages(config, tempDir);
+    const serviceRoot = path.join(tmpDir, 'core');
+    await generateOnboardingPages(ctx, serviceRoot);
 
-    const pageContent = await fs.readFile(
-      path.join(tempDir, 'core/mobile/app/(onboarding)/page-4.tsx'),
-      'utf-8'
-    );
+    const onboardingDir = path.join(serviceRoot, 'mobile/app/(onboarding)');
+    const page4 = path.join(onboardingDir, 'page-4.tsx');
+    const page5 = path.join(onboardingDir, 'page-5.tsx');
+    expect(await fs.pathExists(page4)).toBe(true);
+    expect(await fs.pathExists(page5)).toBe(true);
 
-    expect(pageContent).toContain('handleSkip');
-    expect(pageContent).toContain('onSkip');
+    const page4Contents = await fs.readFile(page4, 'utf-8');
+    expect(page4Contents).toContain('OnboardingPage4');
+    expect(page4Contents).toContain('/(onboarding)/page-5');
+
+    const page5Contents = await fs.readFile(page5, 'utf-8');
+    expect(page5Contents).toContain('OnboardingPage5');
+    // Last page navigates into the tabs root (no paywall in this fixture).
+    expect(page5Contents).toContain('/(tabs)');
   });
 
-  it('should navigate to paywall on last page when enabled', async () => {
-    const config: ProjectConfig = {
-      projectName: 'test-app',
-      packageManager: 'npm',
-      appScheme: 'testapp',
-      platforms: ['mobile'],
-      features: {
-        onboarding: { enabled: true, pages: 4, skipButton: false, showPaywall: true },
-        authentication: {
-          enabled: true,
-          providers: { emailPassword: true, google: false, apple: false, github: false },
-          emailVerification: false,
-          passwordReset: true,
-          twoFactor: false,
-        },
-        paywall: true,
-        sessionManagement: true,
-      },
-      integrations: {
-        revenueCat: { enabled: true, iosKey: 'test-key', androidKey: 'test-key' },
-        adjust: { enabled: false, appToken: '', environment: 'sandbox' },
-        scate: { enabled: false, apiKey: '' },
-        att: { enabled: false },
-      },
-      backend: {
-        database: 'postgresql',
-        orm: 'prisma',
-        eventQueue: false,
-        docker: true,
-      },
-      preset: 'custom',
-      customized: false,
-      aiTools: ['codex'],
+  it('updates _layout.tsx to include every page', async () => {
+    const cloned = cloneInitConfig(fullFeaturedConfig);
+    const core = cloned.services.find((s) => s.name === 'core')!;
+
+    const ctx = buildServiceContext(cloned, core);
+    ctx.features.onboarding = {
+      enabled: true,
+      pages: 5,
+      skipButton: false,
+      showPaywall: false,
     };
 
-    await generateOnboardingPages(config, tempDir);
+    const serviceRoot = path.join(tmpDir, 'core');
+    await generateOnboardingPages(ctx, serviceRoot);
 
-    const lastPageContent = await fs.readFile(
-      path.join(tempDir, 'core/mobile/app/(onboarding)/page-4.tsx'),
-      'utf-8'
-    );
+    const layoutPath = path.join(serviceRoot, 'mobile/app/(onboarding)/_layout.tsx');
+    expect(await fs.pathExists(layoutPath)).toBe(true);
 
-    expect(lastPageContent).toContain("router.replace('/paywall')");
+    const layout = await fs.readFile(layoutPath, 'utf-8');
+    expect(layout).toContain('page-1');
+    expect(layout).toContain('page-2');
+    expect(layout).toContain('page-3');
+    expect(layout).toContain('page-4');
+    expect(layout).toContain('page-5');
   });
 
-  it('should navigate to tabs on last page when paywall disabled', async () => {
-    const config: ProjectConfig = {
-      projectName: 'test-app',
-      packageManager: 'npm',
-      appScheme: 'testapp',
-      platforms: ['mobile'],
-      features: {
-        onboarding: { enabled: true, pages: 4, skipButton: false, showPaywall: false },
-        authentication: {
-          enabled: true,
-          providers: { emailPassword: true, google: false, apple: false, github: false },
-          emailVerification: false,
-          passwordReset: true,
-          twoFactor: false,
-        },
-        paywall: false,
-        sessionManagement: true,
-      },
-      integrations: {
-        revenueCat: { enabled: false, iosKey: '', androidKey: '' },
-        adjust: { enabled: false, appToken: '', environment: 'sandbox' },
-        scate: { enabled: false, apiKey: '' },
-        att: { enabled: false },
-      },
-      backend: {
-        database: 'postgresql',
-        orm: 'prisma',
-        eventQueue: false,
-        docker: true,
-      },
-      preset: 'custom',
-      customized: false,
-      aiTools: ['codex'],
+  it('routes last page to paywall when showPaywall is true', async () => {
+    const cloned = cloneInitConfig(fullFeaturedConfig);
+    const core = cloned.services.find((s) => s.name === 'core')!;
+
+    const ctx = buildServiceContext(cloned, core);
+    ctx.features.onboarding = {
+      enabled: true,
+      pages: 4,
+      skipButton: false,
+      showPaywall: true,
     };
 
-    await generateOnboardingPages(config, tempDir);
+    const serviceRoot = path.join(tmpDir, 'core');
+    await generateOnboardingPages(ctx, serviceRoot);
 
-    const lastPageContent = await fs.readFile(
-      path.join(tempDir, 'core/mobile/app/(onboarding)/page-4.tsx'),
-      'utf-8'
-    );
-
-    expect(lastPageContent).toContain("router.replace('/(tabs)')");
+    const page4 = path.join(serviceRoot, 'mobile/app/(onboarding)/page-4.tsx');
+    const contents = await fs.readFile(page4, 'utf-8');
+    expect(contents).toContain('/paywall');
   });
 });

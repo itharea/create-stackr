@@ -1,0 +1,98 @@
+// Prisma schema for the <%= service.name %> service (BetterAuth tables).
+//
+// See https://www.better-auth.com/docs/adapters/prisma
+
+generator client {
+  provider = "prisma-client"
+  output   = "./generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+<% const authConf = service.authConfig; -%>
+
+model User {
+  id               String    @id @default(cuid())
+  email            String    @unique
+  emailVerified    Boolean   @default(false)
+  name             String?
+  image            String?
+  role             String    @default("user")
+<% provisioningTargets.forEach((target) => { const cap = target.charAt(0).toUpperCase() + target.slice(1).replace(/-([a-z])/g, (_, c) => c.toUpperCase()); -%>
+  has<%= cap %>Account Boolean @default(false)
+<% }); -%>
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+<% if (authConf.twoFactor) { -%>
+  twoFactorEnabled Boolean   @default(false)
+<% } -%>
+
+  sessions         Session[]
+  accounts         Account[]
+<% if (authConf.twoFactor) { -%>
+  twoFactor        TwoFactor[]
+<% } -%>
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  userId                String
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  idToken               String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("verification")
+}
+
+<% if (authConf.twoFactor) { -%>
+model TwoFactor {
+  id          String  @id @default(cuid())
+  userId      String
+  secret      String?
+  backupCodes String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("two_factor")
+}
+<% } -%>

@@ -1,15 +1,9 @@
 {
-  "name": "<%= projectName %>-backend",
+  "name": "<%= projectName %>-<%= service.name %>-backend",
   "version": "1.0.0",
-  "description": "Backend API for <%= projectName %>",
+  "description": "Backend API for <%= projectName %> / <%= service.name %>",
   "type": "module",
   "main": "controllers/rest-api/index.ts",
-  "overrides": {
-    "expo-network": "npm:empty-npm-package@1.0.0",
-    "expo-secure-store": "npm:empty-npm-package@1.0.0",
-    "@react-native-async-storage/async-storage": "npm:empty-npm-package@1.0.0",
-    "react-native": "npm:empty-npm-package@1.0.0"
-  },
   "scripts": {
     "dev:rest-api": "bun --watch ./controllers/rest-api/index.ts | pino-pretty --colorize",<% if (backend.eventQueue) { %>
     "dev:event-queue": "bun --watch ./controllers/event-queue/index.ts | pino-pretty --colorize",<% } %>
@@ -34,15 +28,12 @@
     "pg": "~8.13.0",<% } %>
     "@sinclair/typebox": "~0.34.33",
     "ajv": "~8.17.1",
-    "better-auth": "~1.4.5",
-    "@better-auth/expo": "~1.4.5",
     "dotenv": "~16.5.0",
     "fastify": "~5.3.3",
     "fastify-plugin": "~5.0.1",
     "ioredis": "~5.4.1",
     "pino-pretty": "~13.0.0"<% if (backend.eventQueue) { %>,
-    "bullmq": "~5.40.3"<% } %><% if (features.authentication.emailVerification || features.authentication.passwordReset) { %>,
-    "nodemailer": "~6.9.0"<% } %>
+    "bullmq": "~5.40.3"<% } %>
   },
   "devDependencies": {
     "@types/node": "~24.0.0",<% if (backend.orm === 'prisma') { %>
@@ -50,7 +41,6 @@
     "drizzle-kit": "~0.30.0",
     "@types/pg": "~8.11.0",<% } %>
     "tsx": "~4.20.1",
-    "typescript": "~5.8.3"<% if (features.authentication.emailVerification || features.authentication.passwordReset) { %>,
-    "@types/nodemailer": "~6.4.0"<% } %>
+    "typescript": "~5.8.3"
   }
 }

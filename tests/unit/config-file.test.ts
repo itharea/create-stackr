@@ -16,8 +16,9 @@ import {
   STACKR_CONFIG_VERSION,
   type StackrConfigFile,
 } from '../../src/types/config-file.js';
-import { ProjectGenerator } from '../../src/generators/index.js';
-import type { ProjectConfig } from '../../src/types/index.js';
+import { MonorepoGenerator } from '../../src/generators/monorepo.js';
+import type { InitConfig } from '../../src/types/index.js';
+import { authEntry, coreEntry } from '../../src/config/presets.js';
 import { vi } from 'vitest';
 
 vi.mock('execa', () => ({
@@ -202,50 +203,52 @@ describe('config-file utils', () => {
    */
   describe('secret leak guard', () => {
     it('never writes integration API keys into stackr.config.json', async () => {
-      const config: ProjectConfig = {
+      const config: InitConfig = {
         projectName: 'leak-test',
         packageManager: 'npm',
         appScheme: 'leaktest',
-        platforms: ['mobile', 'web'],
-        features: {
-          onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
-          authentication: {
-            enabled: true,
-            providers: { emailPassword: true, google: false, apple: false, github: false },
-            emailVerification: false,
-            passwordReset: true,
-            twoFactor: false,
-          },
-          paywall: false,
-          sessionManagement: true,
-        },
-        integrations: {
-          revenueCat: {
-            enabled: true,
-            iosKey: 'SECRET_IOS_KEY_abc123',
-            androidKey: 'SECRET_ANDROID_KEY_xyz789',
-          },
-          adjust: {
-            enabled: true,
-            appToken: 'SECRET_ADJUST_TOKEN_qqq',
-            environment: 'production',
-          },
-          scate: { enabled: true, apiKey: 'SECRET_SCATE_KEY_ppp' },
-          att: { enabled: true },
-        },
-        backend: {
-          database: 'postgresql',
-          orm: 'prisma',
-          eventQueue: false,
-          docker: true,
-        },
+        orm: 'prisma',
+        aiTools: ['codex'],
         preset: 'full-featured',
         customized: false,
-        aiTools: ['codex'],
+        services: [
+          authEntry({
+            providers: { emailPassword: true, google: true, apple: true, github: false },
+            emailVerification: true,
+            passwordReset: true,
+            adminDashboard: true,
+            provisioningTargets: ['core'],
+          }),
+          coreEntry({
+            name: 'core',
+            backend: {
+              port: 8080,
+              eventQueue: false,
+              imageUploads: false,
+              authMiddleware: 'standard',
+            },
+            web: { enabled: true, port: 3000 },
+            mobile: { enabled: true },
+            integrations: {
+              revenueCat: {
+                enabled: true,
+                iosKey: 'SECRET_IOS_KEY_abc123',
+                androidKey: 'SECRET_ANDROID_KEY_xyz789',
+              },
+              adjust: {
+                enabled: true,
+                appToken: 'SECRET_ADJUST_TOKEN_qqq',
+                environment: 'production',
+              },
+              scate: { enabled: true, apiKey: 'SECRET_SCATE_KEY_ppp' },
+              att: { enabled: true },
+            },
+          }),
+        ],
       };
 
       const projectDir = path.join(tempDir, 'leak-test');
-      const generator = new ProjectGenerator(config);
+      const generator = new MonorepoGenerator(config);
       await generator.generate(projectDir);
 
       const raw = await fs.readFile(
@@ -253,24 +256,23 @@ describe('config-file utils', () => {
         'utf-8'
       );
 
-      // None of the literal secret values should appear.
       expect(raw).not.toContain('SECRET_IOS_KEY_abc123');
       expect(raw).not.toContain('SECRET_ANDROID_KEY_xyz789');
       expect(raw).not.toContain('SECRET_ADJUST_TOKEN_qqq');
       expect(raw).not.toContain('SECRET_SCATE_KEY_ppp');
 
-      // Belt-and-suspenders: no key-like field names from the live shape.
       expect(raw).not.toMatch(/"iosKey"/);
       expect(raw).not.toMatch(/"androidKey"/);
       expect(raw).not.toMatch(/"appToken"/);
       expect(raw).not.toMatch(/"apiKey"/);
 
-      // Sanity: the parsed file still records which integrations are enabled.
       const parsed: StackrConfigFile = JSON.parse(raw);
-      expect(parsed.services[0].integrations?.revenueCat.enabled).toBe(true);
-      expect(parsed.services[0].integrations?.adjust.enabled).toBe(true);
-      expect(parsed.services[0].integrations?.scate.enabled).toBe(true);
-      expect(parsed.services[0].integrations?.att.enabled).toBe(true);
+      const coreService = parsed.services.find((s) => s.name === 'core');
+      expect(coreService).toBeDefined();
+      expect(coreService!.integrations?.revenueCat.enabled).toBe(true);
+      expect(coreService!.integrations?.adjust.enabled).toBe(true);
+      expect(coreService!.integrations?.scate.enabled).toBe(true);
+      expect(coreService!.integrations?.att.enabled).toBe(true);
     });
   });
 });

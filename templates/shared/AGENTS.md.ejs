@@ -1,106 +1,168 @@
 # Agent Guidelines
 
-This project uses a documentation system to guide AI agents working on the codebase. This file explains how to use it.
+This <%= projectName %> monorepo uses a documentation system to guide AI
+agents working on the codebase. This file explains how to use it.
 
-## Documentation Hierarchy
+## Documentation hierarchy
 
 ### DESIGN.md (Architecture)
-- Located at **significant architectural nodes** (project root, app roots, major subsystems)
-- Describes system design, architectural decisions, and how components interact
-- **Read these when entering a new area** to understand the big picture
-- Agents should read parent DESIGN.md files when working in subdirectories
+- Located at **significant architectural nodes**: the project root,
+  each service root, and major subsystems inside each service
+  (`<service>/backend/`, routing, event-queue workers, etc.).
+- Describes system design, architectural decisions, and how
+  components interact.
+- **Read these when entering a new area** to understand the big
+  picture.
+- Agents should **read parent DESIGN.md files when working in
+  subdirectories** — the context for a cross-cutting change often
+  lives several levels above the file you're editing.
 
 ### BEST_PRACTICES.md (Conventions)
-- Located in **implementation folders** (services, hooks, components, routes)
-- Describes coding conventions, patterns, and anti-patterns for that folder
-- **Read these before writing code** in that folder
-- More granular and actionable than DESIGN.md
+- Located in **implementation folders** (plugins, routes, domain,
+  hooks, components, services, lib, store).
+- Describes coding conventions, patterns, and anti-patterns for that
+  folder.
+- **Read these before writing code** in that folder.
+- More granular and actionable than DESIGN.md.
 
-## How to Use This System
+## Services in this monorepo
 
-<% if (platforms.includes('mobile')) { %>
-When working on a file in `mobile/src/services/`:
+<% services.forEach((svc) => { -%>
+- **`<%= svc.name %>`** (`<%= svc.kind %>`) — backend on port `<%= svc.backend.port %>`<% if (svc.web && svc.web.enabled) { %>, web on port `<%= svc.web.port %>`<% } %><% if (svc.mobile && svc.mobile.enabled) { %>, mobile (Expo)<% } %>
+<% }); -%>
 
-1. Read `DESIGN.md` at project root (overall architecture)
-2. Read `mobile/DESIGN.md` (mobile app architecture)
-3. Read `mobile/src/services/BEST_PRACTICES.md` (service conventions)
-<% } %>
-<% if (platforms.includes('web')) { %>
-When working on a file in `web/src/lib/`:
+## How to use this system
 
-1. Read `DESIGN.md` at project root (overall architecture)
-2. Read `web/DESIGN.md` (web app architecture)
-3. Read `web/src/lib/BEST_PRACTICES.md` (library conventions)
-<% } %>
+**Starting from the file you're editing, walk upward through the
+directory tree. Read every `DESIGN.md` and `BEST_PRACTICES.md` you
+encounter, as deeply as the current task requires. Don't stop at the
+first one — the relevant context for a cross-cutting change often
+lives two or three levels up.**
 
-The hierarchy flows: **Root → App → Feature folder**
+<% services.forEach((svc) => { -%>
+### Working inside `<%= svc.name %>`
 
-## File Locations
+<% if (svc.mobile && svc.mobile.enabled) { -%>
+When editing a file in `<%= svc.name %>/mobile/src/services/`:
+
+1. Read `DESIGN.md` at the project root (cross-service architecture).
+2. Read `<%= svc.name %>/mobile/DESIGN.md` (mobile app architecture).
+3. Read `<%= svc.name %>/mobile/src/services/BEST_PRACTICES.md`
+   (service conventions).
+4. Continue reading upward if the task spans more than one folder.
+
+<% } -%>
+<% if (svc.web && svc.web.enabled) { -%>
+When editing a file in `<%= svc.name %>/web/src/lib/`:
+
+1. Read `DESIGN.md` at the project root (cross-service architecture).
+2. Read `<%= svc.name %>/web/DESIGN.md` (web app architecture).
+3. Read `<%= svc.name %>/web/src/lib/BEST_PRACTICES.md` (library
+   conventions).
+4. Continue reading upward if the task spans more than one folder.
+
+<% } -%>
+When editing a file in `<%= svc.name %>/backend/controllers/rest-api/routes/`:
+
+1. Read `DESIGN.md` at the project root (cross-service architecture).
+2. Read `<%= svc.name %>/backend/DESIGN.md` (service architecture).
+3. Read `<%= svc.name %>/backend/controllers/rest-api/DESIGN.md`
+   (server boot sequence, request flow).
+4. Read `<%= svc.name %>/backend/controllers/rest-api/routes/BEST_PRACTICES.md`
+   (thin handlers, schema imports, auth hooks).
+5. Continue reading upward if the task spans more than one folder.
+
+<% }); -%>
+
+The hierarchy flows: **Project root → Service root → Subsystem → Feature folder**.
+
+## File locations
 
 ```
 <%= projectName %>/
-├── <%= guidelineFileName %>                    # This file
-├── DESIGN.md                    # System architecture
+├── <%= guidelineFileName %>                # This file
+├── DESIGN.md                    # Cross-service architecture
 │
-├── backend/
-│   ├── DESIGN.md                # Backend layered architecture
-│   ├── domain/
-│   │   ├── DESIGN.md            # Domain entity creation guide
-│   │   └── BEST_PRACTICES.md    # Schema, repository, service patterns
-│   ├── lib/
-│   │   └── BEST_PRACTICES.md    # BetterAuth config, constants
-│   ├── utils/
-│   │   └── BEST_PRACTICES.md    # ErrorFactory, DB, Redis, email
-│   └── controllers/
-│       ├── rest-api/
-│       │   ├── DESIGN.md        # Server boot sequence, request flow
-│       │   ├── plugins/
-│       │   │   └── BEST_PRACTICES.md  # Auth middleware, error handler, config
-│       │   └── routes/
-│       │       └── BEST_PRACTICES.md  # Thin handlers, schema imports, auth hooks
-<% if (backend.eventQueue) { %>
-│       └── event-queue/
-│           └── DESIGN.md        # BullMQ worker architecture
-<% } %>
+<% services.forEach((svc) => { -%>
+├── <%= svc.name %>/
+│   ├── backend/
+│   │   ├── DESIGN.md            # <%= svc.name %> backend layered architecture
+│   │   ├── domain/
+│   │   │   ├── DESIGN.md        # Domain entity creation guide
+│   │   │   └── BEST_PRACTICES.md  # Schema, repository, service patterns
+│   │   ├── lib/
+│   │   │   └── BEST_PRACTICES.md  # Library conventions
+│   │   ├── utils/
+│   │   │   └── BEST_PRACTICES.md  # ErrorFactory, DB, Redis, email
+│   │   └── controllers/
+│   │       └── rest-api/
+│   │           ├── DESIGN.md    # Server boot sequence, request flow
+│   │           ├── plugins/
+│   │           │   └── BEST_PRACTICES.md  # Auth middleware, error handler, config
+│   │           └── routes/
+│   │               └── BEST_PRACTICES.md  # Thin handlers, schema imports, auth hooks
+<% if (svc.backend.eventQueue) { -%>
+│   │       └── event-queue/
+│   │           └── DESIGN.md    # BullMQ worker architecture
+<% } -%>
+<% if (svc.mobile && svc.mobile.enabled) { -%>
+│   ├── mobile/
+│   │   ├── DESIGN.md            # Mobile app architecture
+│   │   ├── app/
+│   │   │   └── DESIGN.md        # Routing, navigation, auth flow
+│   │   └── src/
+│   │       ├── components/
+│   │       │   └── BEST_PRACTICES.md  # Theming, props, animations
+│   │       ├── hooks/
+│   │       │   └── BEST_PRACTICES.md  # useCallback, result objects
+│   │       ├── services/
+│   │       │   └── BEST_PRACTICES.md  # Singleton pattern, logging
+│   │       ├── store/
+│   │       │   └── BEST_PRACTICES.md  # Zustand selectors, persistence
+│   │       ├── lib/
+│   │       │   └── BEST_PRACTICES.md  # Auth client, SecureStore
+│   │       └── context/
+│   │           └── BEST_PRACTICES.md  # Theme context, useAppTheme
+<% } -%>
+<% if (svc.web && svc.web.enabled) { -%>
+│   └── web/
+│       ├── DESIGN.md            # Next.js architecture, SSR
+│       └── src/
+│           ├── components/
+│           │   └── BEST_PRACTICES.md  # shadcn/ui, server vs client
+│           ├── hooks/
+│           │   └── BEST_PRACTICES.md  # Server hydration, useSession
+│           ├── lib/
+│           │   └── BEST_PRACTICES.md  # Auth actions, cookies, PKCE
+│           └── store/
+│               └── BEST_PRACTICES.md  # Zustand, useShallow, hydration
+<% } -%>
 │
-<% if (platforms.includes('mobile')) { %>
-├── mobile/
-│   ├── DESIGN.md                # Mobile app architecture
-│   ├── app/
-│   │   └── DESIGN.md           # Routing, navigation, auth flow
-│   └── src/
-│       ├── components/
-│       │   └── BEST_PRACTICES.md  # Theming, props, animations
-│       ├── hooks/
-│       │   └── BEST_PRACTICES.md  # useCallback, result objects
-│       ├── services/
-│       │   └── BEST_PRACTICES.md  # Singleton pattern, logging
-│       ├── store/
-│       │   └── BEST_PRACTICES.md  # Zustand selectors, persistence
-│       ├── lib/
-│       │   └── BEST_PRACTICES.md  # Auth client, SecureStore
-│       └── context/
-│           └── BEST_PRACTICES.md  # Theme context, useAppTheme
-│
-<% } %>
-<% if (platforms.includes('web')) { %>
-├── web/
-│   ├── DESIGN.md                # Next.js architecture, SSR
-│   └── src/
-│       ├── components/
-│       │   └── BEST_PRACTICES.md  # shadcn/ui, server vs client
-│       ├── hooks/
-│       │   └── BEST_PRACTICES.md  # Server hydration, useSession
-│       ├── lib/
-│       │   └── BEST_PRACTICES.md  # Auth actions, cookies, PKCE
-│       └── store/
-│           └── BEST_PRACTICES.md  # Zustand, useShallow, hydration
-<% } %>
+<% }); -%>
+└── stackr.config.json            # Source of truth: services, ports, orm
 ```
 
-## Key Principle
+## Cross-service boundaries
+
+The `auth` service is the trust anchor. Non-auth services verify
+requests by forwarding cookies to
+`${AUTH_SERVICE_URL}/api/auth/get-session`. Never add user or session
+tables outside the auth service — always use the forwarded `user`
+decorated on the request.
+
+## Key principle
 
 **DESIGN.md = "Why and how things are structured"**
 **BEST_PRACTICES.md = "How to write code here"**
 
-Agents should always check for these files before making changes, starting from the most specific (current folder) and reading up the hierarchy as needed for context.
+Agents should always check for these files before making changes,
+**starting from the most specific (current folder) and reading upward
+through the hierarchy as deeply as the task requires**. Don't stop at
+the first file you find — scan upward until you've covered every level
+that the change touches.
+
+---
+
+_This file is `<%= guidelineFileName %>`. The other AI-tool-specific
+files (`CLAUDE.md`, `AGENTS.md`, `.cursorrules`, `.windsurfrules`) are
+rendered from the same template._

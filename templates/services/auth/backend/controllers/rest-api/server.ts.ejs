@@ -1,0 +1,87 @@
+import fastify from "fastify";
+
+import config from "./plugins/config";
+import auth from "./plugins/auth";
+import errorHandler from "./plugins/error-handler";
+import authRoutes from "./routes/auth";
+import deviceSessionRoutes from "./routes/device-sessions";
+<% if (platforms.includes('web')) { %>
+import oauthWebRoutes from "./routes/oauth-web";
+import { initRedis } from "../../utils/redis";
+<% } %>
+
+const server = fastify({
+  ajv: {
+    customOptions: {
+      removeAdditional: "all",
+      coerceTypes: true,
+      useDefaults: true,
+      formats: {
+        'date-time': true, // Accept any string for date-time format
+      },
+    },
+  },
+  logger: {
+    level: process.env.LOG_LEVEL || 'info',
+    transport: process.env.NODE_ENV === 'development' ? {
+      target: 'pino-pretty',
+      options: {
+        translateTime: 'HH:MM:ss Z',
+        ignore: 'pid,hostname',
+      },
+    } : undefined,
+  },
+  // Generate request IDs for better error tracking
+  genReqId: () => `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+});
+
+// Register core plugins first
+await server.register(config);
+
+// Register error handler early to catch all errors
+await server.register(errorHandler);
+
+// Register CORS with credentials support for cookie-based auth
+await server.register(import('@fastify/cors'), {
+  // In production, use explicit origins; in development, allow all
+  origin: process.env.NODE_ENV === 'production'
+    ? (process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()) || [])
+    : true,
+  // Required for cookie-based auth - allows cookies to be sent cross-origin
+  credentials: true,
+  // Allowed headers for requests
+  allowedHeaders: ['Content-Type', 'Cookie', 'X-Device-Session-Token'],
+  // Expose Set-Cookie header so clients can receive cookies
+  exposedHeaders: ['set-cookie'],
+});
+
+// Register auth plugin
+await server.register(auth);
+
+<% if (platforms.includes('web')) { %>
+// Initialize Redis for web OAuth PKCE flow
+await initRedis();
+
+<% } %>
+// Register routes
+// Auth routes at /api/auth to match BetterAuth basePath
+await server.register(authRoutes, { prefix: "/api/auth" });
+// Device session routes for anonymous sessions
+await server.register(deviceSessionRoutes, { prefix: "/device-sessions" });
+<% if (platforms.includes('web')) { %>
+// Web OAuth routes for BFF pattern with PKCE
+await server.register(oauthWebRoutes, { prefix: "/api/auth/web/oauth" });
+<% } %>
+
+// Root health check
+server.get("/", async (request, reply) => {
+  return reply.code(200).send({
+    message: "API is running",
+    timestamp: new Date().toISOString(),
+    version: "1.0.0"
+  });
+});
+
+await server.ready();
+
+export default server;

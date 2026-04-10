@@ -1,0 +1,126 @@
+# Domain Layer - Best Practices
+
+## Isolated Try-Catch Pattern
+
+Wrap **only the specific operation** that can fail - not entire functions.
+
+### In Repository
+
+Every DB operation gets its own try-catch:
+
+<% if (backend.orm === 'drizzle') { %>
+```typescript
+export const findById = async (id: string): Promise<Entity | null> => {
+  try {
+    const [row] = await db.select().from(schema.entity).where(eq(schema.entity.id, id));
+    return row ? toEntity(row) : null;
+  } catch (error) {
+    throw ErrorFactory.databaseError({
+      operation: 'findById',
+      id,
+      originalError: error instanceof Error ? error.message : String(error),
+    });
+  }
+};
+```
+<% } %>
+<% if (backend.orm === 'prisma') { %>
+```typescript
+export const findById = async (id: string): Promise<Entity | null> => {
+  try {
+    const row = await prisma.entity.findUnique({ where: { id } });
+    return row ? toEntity(row) : null;
+  } catch (error) {
+    throw ErrorFactory.databaseError({
+      operation: 'findById',
+      id,
+      originalError: error instanceof Error ? error.message : String(error),
+    });
+  }
+};
+```
+<% } %>
+
+### In Service
+
+Only wrap external service calls. Let repository errors propagate naturally:
+
+```typescript
+// No try-catch - repository handles its own errors
+export const validateSession = async (token: string): Promise<Session | null> => {
+  const session = await findByToken(token);
+  if (!session) return null;
+  return session;
+};
+<% if (features.authentication.enabled) { %>
+
+// Try-catch for external service call
+export const revokeSession = async (token: string, headers: Headers): Promise<Response> => {
+  try {
+    return await auth.api.revokeSession({ headers, body: { token } });
+  } catch (error) {
+    throw ErrorFactory.externalServiceError('BetterAuth', {
+      operation: 'revokeSession',
+      originalError: error instanceof Error ? error.message : String(error),
+    });
+  }
+};
+<% } %>
+```
+
+## TypeBox Schemas
+
+### Always Export Both Schema and Type
+
+```typescript
+export const MyEntitySchema = Type.Object({
+  id: Type.String(),
+  name: Type.String(),
+  createdAt: Type.String({ format: 'date-time' }),
+});
+export type MyEntity = Static<typeof MyEntitySchema>;
+```
+
+### Schema Organization
+
+- **Entity schemas**: Match API response shape (dates as ISO strings)
+- **Body schemas**: Request validation with constraints
+- **Response schemas**: Compose entity schemas with additional fields
+
+```typescript
+// Request body with validation
+export const CreateEntityBodySchema = Type.Object({
+  name: Type.String({ minLength: 1, maxLength: 255 }),
+});
+
+// Response composing entity
+export const CreateEntityResponseSchema = Type.Object({
+  entity: MyEntitySchema,
+  token: Type.String(),
+});
+```
+
+## Data Transformation
+
+Transform DB rows to API format in repository using a helper:
+
+```typescript
+const toEntity = (row: typeof schema.entity.$inferSelect): Entity => ({
+  ...row,
+  createdAt: row.createdAt.toISOString(),
+  updatedAt: row.updatedAt.toISOString(),
+});
+
+// Use in all functions returning data
+return row ? toEntity(row) : null;
+```
+
+## ErrorFactory Usage
+
+| Context | Method |
+|---------|--------|
+| Repository DB error | `ErrorFactory.databaseError({ operation, originalError })` |
+| External service call | `ErrorFactory.externalServiceError('ServiceName', { operation, originalError })` |
+| Resource not found | `ErrorFactory.resourceNotFound('entity')` |
+| Validation failed | `ErrorFactory.validationFailed({ field, reason })` |
+| Session issues | `ErrorFactory.sessionNotFound()` |

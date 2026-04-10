@@ -1,40 +1,37 @@
-import type { ProjectConfig } from '../../../src/types/index.js';
+import type { InitConfig } from '../../../src/types/index.js';
+import { authEntry, coreEntry, noIntegrations } from '../../../src/config/presets.js';
 
-export const minimalConfig: Readonly<ProjectConfig> = {
+/**
+ * Minimal InitConfig fixture for phase 2 tests. Equivalent to what
+ * `create-stackr myapp --defaults` produces: one auth service + one
+ * base service named "core", no web/mobile, prisma, npm.
+ */
+export const minimalConfig: Readonly<InitConfig> = {
   projectName: 'test-minimal',
   packageManager: 'npm',
   appScheme: 'testminimal',
-  platforms: ['mobile', 'web'],
-  features: {
-    onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
-    authentication: {
-      enabled: true,
-      providers: {
-        emailPassword: true,
-        google: false,
-        apple: false,
-        github: false,
-      },
-      emailVerification: false,
-      passwordReset: true,
-      twoFactor: false,
-    },
-    paywall: false,
-    sessionManagement: true,
-  },
-  integrations: {
-    revenueCat: { enabled: false, iosKey: '', androidKey: '' },
-    adjust: { enabled: false, appToken: '', environment: 'sandbox' },
-    scate: { enabled: false, apiKey: '' },
-    att: { enabled: false },
-  },
-  backend: {
-    database: 'postgresql',
-    orm: 'prisma',
-    eventQueue: false,
-    docker: true,
-  },
+  orm: 'prisma',
+  aiTools: ['codex'],
   preset: 'minimal',
   customized: false,
-  aiTools: ['codex'],
-} as const;
+  services: [
+    authEntry({
+      emailVerification: false,
+      passwordReset: true,
+      adminDashboard: false,
+      provisioningTargets: ['core'],
+    }),
+    coreEntry({
+      name: 'core',
+      backend: {
+        port: 8080,
+        eventQueue: false,
+        imageUploads: false,
+        authMiddleware: 'standard',
+      },
+      web: null,
+      mobile: null,
+      integrations: noIntegrations(),
+    }),
+  ],
+};
