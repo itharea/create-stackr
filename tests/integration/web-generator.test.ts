@@ -68,15 +68,15 @@ describe('Integration: Web Template Generation', () => {
       const projectDir = path.join(tempDir, 'web-only-app');
       await generator.generate(projectDir);
 
-      // Verify web directory exists
-      expect(await fs.pathExists(path.join(projectDir, 'web'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/src'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/app'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/components'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/lib'))).toBe(true);
+      // Verify web directory exists (phase 1: nested under core/)
+      expect(await fs.pathExists(path.join(projectDir, 'core/web'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/app'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/components'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/lib'))).toBe(true);
 
       // Verify mobile directory does NOT exist
-      expect(await fs.pathExists(path.join(projectDir, 'mobile'))).toBe(false);
+      expect(await fs.pathExists(path.join(projectDir, 'core/mobile'))).toBe(false);
     });
 
     it('should generate Next.js configuration files', async () => {
@@ -119,11 +119,11 @@ describe('Integration: Web Template Generation', () => {
       await generator.generate(projectDir);
 
       // Verify Next.js config files
-      expect(await fs.pathExists(path.join(projectDir, 'web/next.config.ts'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/tsconfig.json'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/postcss.config.mjs'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/eslint.config.mjs'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/components.json'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/next.config.ts'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/tsconfig.json'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/postcss.config.mjs'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/eslint.config.mjs'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/components.json'))).toBe(true);
     });
 
     it('should generate web package.json with correct dependencies', async () => {
@@ -165,7 +165,7 @@ describe('Integration: Web Template Generation', () => {
       const projectDir = path.join(tempDir, 'web-pkg-test');
       await generator.generate(projectDir);
 
-      const packageJson = await fs.readJSON(path.join(projectDir, 'web/package.json'));
+      const packageJson = await fs.readJSON(path.join(projectDir, 'core/web/package.json'));
 
       // Verify Next.js core dependencies
       expect(packageJson.dependencies.next).toBeDefined();
@@ -226,7 +226,7 @@ describe('Integration: Web Template Generation', () => {
       const projectDir = path.join(tempDir, 'web-sonner-test');
       await generator.generate(projectDir);
 
-      const packageJson = await fs.readJSON(path.join(projectDir, 'web/package.json'));
+      const packageJson = await fs.readJSON(path.join(projectDir, 'core/web/package.json'));
 
       // Verify sonner is included when authentication is enabled
       expect(packageJson.dependencies.sonner).toBeDefined();
@@ -271,13 +271,13 @@ describe('Integration: Web Template Generation', () => {
       const projectDir = path.join(tempDir, 'web-otp-test');
       await generator.generate(projectDir);
 
-      const packageJson = await fs.readJSON(path.join(projectDir, 'web/package.json'));
+      const packageJson = await fs.readJSON(path.join(projectDir, 'core/web/package.json'));
 
       // Verify input-otp is included when emailVerification is enabled
       expect(packageJson.dependencies['input-otp']).toBeDefined();
 
       // Verify input-otp component is generated
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/components/ui/input-otp.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/components/ui/input-otp.tsx'))).toBe(true);
     });
 
     it('should exclude input-otp when emailVerification disabled', async () => {
@@ -319,7 +319,7 @@ describe('Integration: Web Template Generation', () => {
       const projectDir = path.join(tempDir, 'web-no-otp-test');
       await generator.generate(projectDir);
 
-      const packageJson = await fs.readJSON(path.join(projectDir, 'web/package.json'));
+      const packageJson = await fs.readJSON(path.join(projectDir, 'core/web/package.json'));
 
       // Verify input-otp is NOT included when emailVerification is disabled
       expect(packageJson.dependencies['input-otp']).toBeUndefined();
@@ -367,20 +367,20 @@ describe('Integration: Web Template Generation', () => {
       await generator.generate(projectDir);
 
       // Verify auth pages
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(auth)/login/page.tsx'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(auth)/register/page.tsx'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(auth)/layout.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/app/(auth)/login/page.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/app/(auth)/register/page.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/app/(auth)/layout.tsx'))).toBe(true);
 
       // Verify auth components
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/components/auth/login-form.tsx'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/components/auth/register-form.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/components/auth/login-form.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/components/auth/register-form.tsx'))).toBe(true);
 
       // Verify password reset pages (enabled)
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(auth)/forgot-password/page.tsx'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(auth)/reset-password/page.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/app/(auth)/forgot-password/page.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/app/(auth)/reset-password/page.tsx'))).toBe(true);
 
       // Verify protected routes (dashboard now in (protected) route group)
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(protected)/dashboard/page.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/app/(protected)/dashboard/page.tsx'))).toBe(true);
     });
 
     it('should generate OAuth components when OAuth providers enabled', async () => {
@@ -423,11 +423,11 @@ describe('Integration: Web Template Generation', () => {
       await generator.generate(projectDir);
 
       // Verify OAuth components
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/components/auth/oauth-buttons.tsx'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/auth/callback/route.ts'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/components/auth/oauth-buttons.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/app/auth/callback/route.ts'))).toBe(true);
 
       // Verify email verification page
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(auth)/verify-email/page.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/app/(auth)/verify-email/page.tsx'))).toBe(true);
     });
 
     // Note: Session pages are included as part of web auth feature.
@@ -472,9 +472,9 @@ describe('Integration: Web Template Generation', () => {
       await generator.generate(projectDir);
 
       // Verify session management pages (in (protected) route group)
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(protected)/settings/sessions/page.tsx'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(protected)/settings/sessions/sessions-client.tsx'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/components/settings/session-card.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/app/(protected)/settings/sessions/page.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/app/(protected)/settings/sessions/sessions-client.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/components/settings/session-card.tsx'))).toBe(true);
     });
   });
 
@@ -519,16 +519,16 @@ describe('Integration: Web Template Generation', () => {
       await generator.generate(projectDir);
 
       // Verify deleted files are NOT generated
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/store/auth.store.ts'))).toBe(false);
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/components/auth/auth-hydrator.tsx'))).toBe(false);
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/hooks/use-session.ts'))).toBe(false);
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/components/auth/protected-route.tsx'))).toBe(false);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/store/auth.store.ts'))).toBe(false);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/components/auth/auth-hydrator.tsx'))).toBe(false);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/hooks/use-session.ts'))).toBe(false);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/components/auth/protected-route.tsx'))).toBe(false);
 
       // Verify submit-button IS generated
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/components/ui/submit-button.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/components/ui/submit-button.tsx'))).toBe(true);
 
       // Verify login-form uses useActionState, not useAuthStore
-      const loginForm = await fs.readFile(path.join(projectDir, 'web/src/components/auth/login-form.tsx'), 'utf-8');
+      const loginForm = await fs.readFile(path.join(projectDir, 'core/web/src/components/auth/login-form.tsx'), 'utf-8');
       expect(loginForm).toContain('useActionState');
       expect(loginForm).not.toContain('useAuthStore');
     });
@@ -572,7 +572,7 @@ describe('Integration: Web Template Generation', () => {
       const projectDir = path.join(tempDir, 'web-no-zustand-test');
       await generator.generate(projectDir);
 
-      const packageJson = await fs.readJSON(path.join(projectDir, 'web/package.json'));
+      const packageJson = await fs.readJSON(path.join(projectDir, 'core/web/package.json'));
       expect(packageJson.dependencies.zustand).toBeUndefined();
     });
 
@@ -615,7 +615,7 @@ describe('Integration: Web Template Generation', () => {
       const projectDir = path.join(tempDir, 'web-zustand-test');
       await generator.generate(projectDir);
 
-      const packageJson = await fs.readJSON(path.join(projectDir, 'web/package.json'));
+      const packageJson = await fs.readJSON(path.join(projectDir, 'core/web/package.json'));
       expect(packageJson.dependencies.zustand).toBeDefined();
     });
   });
@@ -661,19 +661,19 @@ describe('Integration: Web Template Generation', () => {
       await generator.generate(projectDir);
 
       // Verify UI components
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/components/ui/button.tsx'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/components/ui/input.tsx'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/components/ui/label.tsx'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/components/ui/card.tsx'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/components/ui/skeleton.tsx'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/components/ui/spinner.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/components/ui/button.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/components/ui/input.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/components/ui/label.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/components/ui/card.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/components/ui/skeleton.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/components/ui/spinner.tsx'))).toBe(true);
 
       // Verify theme components
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/components/providers/theme-provider.tsx'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/components/theme-toggle.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/components/providers/theme-provider.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/components/theme-toggle.tsx'))).toBe(true);
 
       // Verify lib utilities
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/lib/utils.ts'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/lib/utils.ts'))).toBe(true);
     });
 
     it('should generate globals.css with dark mode support', async () => {
@@ -715,7 +715,7 @@ describe('Integration: Web Template Generation', () => {
       const projectDir = path.join(tempDir, 'web-css-test');
       await generator.generate(projectDir);
 
-      const cssPath = path.join(projectDir, 'web/src/app/globals.css');
+      const cssPath = path.join(projectDir, 'core/web/src/app/globals.css');
       expect(await fs.pathExists(cssPath)).toBe(true);
 
       const cssContent = await fs.readFile(cssPath, 'utf-8');
@@ -766,18 +766,18 @@ describe('Integration: Web Template Generation', () => {
       const projectDir = path.join(tempDir, 'dual-platform-test');
       await generator.generate(projectDir);
 
-      // Verify both platforms exist
-      expect(await fs.pathExists(path.join(projectDir, 'mobile'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'backend'))).toBe(true);
+      // Verify both platforms exist (phase 1: nested under core/)
+      expect(await fs.pathExists(path.join(projectDir, 'core/mobile'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/backend'))).toBe(true);
 
       // Verify mobile structure
-      expect(await fs.pathExists(path.join(projectDir, 'mobile/app'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'mobile/package.json'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/mobile/app'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/mobile/package.json'))).toBe(true);
 
       // Verify web structure
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/app'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/package.json'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/app'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/package.json'))).toBe(true);
     });
   });
 });

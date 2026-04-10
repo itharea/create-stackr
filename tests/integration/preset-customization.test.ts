@@ -58,14 +58,14 @@ describe('Preset Customization Flows', () => {
     const projectDir = path.join(tempDir, 'minimal-preset-test');
     await generator.generate(projectDir);
 
-    // Verify structure based on preset config
+    // Verify structure based on preset config (phase 1: nested under core/)
     if (config.platforms.includes('mobile')) {
-      expect(await fs.pathExists(path.join(projectDir, 'mobile/package.json'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/mobile/package.json'))).toBe(true);
     }
     if (config.platforms.includes('web')) {
-      expect(await fs.pathExists(path.join(projectDir, 'web/package.json'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/package.json'))).toBe(true);
     }
-    expect(await fs.pathExists(path.join(projectDir, 'backend/package.json'))).toBe(true);
+    expect(await fs.pathExists(path.join(projectDir, 'core/backend/package.json'))).toBe(true);
   });
 
   it('should generate valid project from full-featured preset', async () => {
@@ -83,8 +83,8 @@ describe('Preset Customization Flows', () => {
     const projectDir = path.join(tempDir, 'full-preset-test');
     await generator.generate(projectDir);
 
-    // Verify integrations are included
-    const mobilePkg = await fs.readJSON(path.join(projectDir, 'mobile/package.json'));
+    // Verify integrations are included (phase 1: nested under core/)
+    const mobilePkg = await fs.readJSON(path.join(projectDir, 'core/mobile/package.json'));
 
     if (config.integrations.revenueCat.enabled) {
       expect(mobilePkg.dependencies['react-native-purchases']).toBeDefined();

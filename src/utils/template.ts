@@ -49,9 +49,9 @@ export function shouldIncludeFile(
   // Platform-based filtering (consistent architecture)
   // ==========================================================================
   // All platform-specific content lives under /mobile/ or /web/ subdirectories:
-  // - base/mobile/, features/mobile/, integrations/mobile/ → mobile platform
-  // - base/web/, features/web/, integrations/web/ → web platform
-  // - base/backend/, shared/ → always included (platform-agnostic)
+  // - services/base/mobile/, features/mobile/, integrations/mobile/ → mobile platform
+  // - services/base/web/, features/web/, integrations/web/ → web platform
+  // - services/base/backend/, shared/ → always included (platform-agnostic)
 
   // Exclude mobile-specific content when mobile platform not selected
   if (filePath.includes('/mobile/') && !config.platforms.includes('mobile')) {
@@ -177,6 +177,27 @@ export function isTemplate(filePath: string): boolean {
 }
 
 /**
+ * Simple prefix-swap mapping table — covers the cases where a template path
+ * maps to a destination path purely by swapping a prefix. Features and
+ * integrations are NOT in this table because they fan out to several
+ * different subpaths depending on the rest of the path; they stay imperative
+ * in the switch below.
+ *
+ * Phase 2 extends this table (not the imperative branches) when it needs to
+ * map additional service template subtrees — `services/auth/backend/*`,
+ * `monorepo-root/*`, etc. Keeping the contract here means phase 2 only
+ * touches the table and one per-service prefix computation, not the EJS
+ * fan-out logic.
+ */
+const SIMPLE_PATH_MAPPINGS: readonly { from: string; to: string }[] = [
+  { from: 'services/base/backend/', to: 'core/backend/' },
+  { from: 'services/base/mobile/', to: 'core/mobile/' },
+  { from: 'services/base/web/', to: 'core/web/' },
+  // shared/* lives at the monorepo root — no core/ prefix.
+  { from: 'shared/', to: '' },
+];
+
+/**
  * Get destination path for a template file
  * Removes .ejs extension and maps template path to project path
  */
@@ -192,82 +213,87 @@ export function getDestinationPath(
   }
 
   // ==========================================================================
-  // Platform base paths
+  // Simple prefix swaps (services/base/*, shared/)
   // ==========================================================================
-  // base/mobile/* → mobile/*
-  if (relativePath.startsWith('base/mobile/')) {
-    relativePath = relativePath.substring('base/'.length);
-  }
-  // base/backend/* → backend/*
-  else if (relativePath.startsWith('base/backend/')) {
-    relativePath = relativePath.substring('base/'.length);
-  }
-  // base/web/* → web/*
-  else if (relativePath.startsWith('base/web/')) {
-    relativePath = relativePath.substring('base/'.length);
-  }
-
-  // ==========================================================================
-  // Mobile features and integrations (now under /mobile/ subdirectory)
-  // ==========================================================================
-  // features/mobile/*/app/* → mobile/app/*
-  else if (relativePath.startsWith('features/mobile/')) {
-    const featurePath = relativePath.substring('features/mobile/'.length);
-    const restOfPath = featurePath.substring(featurePath.indexOf('/') + 1);
-
-    if (restOfPath.startsWith('app/') || restOfPath === 'app') {
-      relativePath = `mobile/${restOfPath}`;
-    } else if (['services', 'store', 'hooks', 'components', 'types'].some(dir => restOfPath.startsWith(dir + '/') || restOfPath === dir)) {
-      relativePath = `mobile/src/${restOfPath}`;
-    } else {
-      relativePath = `mobile/${restOfPath}`;
-    }
-  }
-
-  // integrations/mobile/*/services/* → mobile/src/services/*
-  else if (relativePath.startsWith('integrations/mobile/')) {
-    const integrationPath = relativePath.substring('integrations/mobile/'.length);
-    const restOfPath = integrationPath.substring(integrationPath.indexOf('/') + 1);
-
-    if (restOfPath.startsWith('services/') || restOfPath.startsWith('store/')) {
-      relativePath = `mobile/src/${restOfPath}`;
-    } else {
-      relativePath = `mobile/${restOfPath}`;
+  let mapped = false;
+  for (const mapping of SIMPLE_PATH_MAPPINGS) {
+    if (relativePath.startsWith(mapping.from)) {
+      relativePath = mapping.to + relativePath.substring(mapping.from.length);
+      mapped = true;
+      break;
     }
   }
 
   // ==========================================================================
-  // Web features and integrations (future - placeholder for consistency)
+  // Mobile features and integrations (under /mobile/ subdirectory)
+  //
+  // Phase 1: features and integrations are still scoped to `core/*`. Phase 2
+  // will rescope them per service. Each branch computes the conceptual
+  // mobile/web subpath exactly as in v0.4, then prepends `core/` to the
+  // result — the ORM suffix strip and `.ejs` strip below operate on the
+  // already-prefixed path without needing to change.
   // ==========================================================================
-  // features/web/*/app/* → web/src/app/*
-  else if (relativePath.startsWith('features/web/')) {
-    const featurePath = relativePath.substring('features/web/'.length);
-    const restOfPath = featurePath.substring(featurePath.indexOf('/') + 1);
+  if (!mapped) {
+    // features/mobile/*/app/* → core/mobile/app/*
+    if (relativePath.startsWith('features/mobile/')) {
+      const featurePath = relativePath.substring('features/mobile/'.length);
+      const restOfPath = featurePath.substring(featurePath.indexOf('/') + 1);
 
-    // Map to web directory structure (Next.js App Router)
-    if (restOfPath.startsWith('app/') || restOfPath === 'app') {
-      relativePath = `web/src/${restOfPath}`;
-    } else if (['components', 'lib', 'hooks'].some(dir => restOfPath.startsWith(dir + '/') || restOfPath === dir)) {
-      relativePath = `web/src/${restOfPath}`;
-    } else {
-      relativePath = `web/${restOfPath}`;
+      let subpath: string;
+      if (restOfPath.startsWith('app/') || restOfPath === 'app') {
+        subpath = `mobile/${restOfPath}`;
+      } else if (['services', 'store', 'hooks', 'components', 'types'].some(dir => restOfPath.startsWith(dir + '/') || restOfPath === dir)) {
+        subpath = `mobile/src/${restOfPath}`;
+      } else {
+        subpath = `mobile/${restOfPath}`;
+      }
+
+      relativePath = `core/${subpath}`;
     }
-  }
 
-  // integrations/web/* → web/src/*
-  else if (relativePath.startsWith('integrations/web/')) {
-    const integrationPath = relativePath.substring('integrations/web/'.length);
-    const restOfPath = integrationPath.substring(integrationPath.indexOf('/') + 1);
+    // integrations/mobile/*/services/* → core/mobile/src/services/*
+    else if (relativePath.startsWith('integrations/mobile/')) {
+      const integrationPath = relativePath.substring('integrations/mobile/'.length);
+      const restOfPath = integrationPath.substring(integrationPath.indexOf('/') + 1);
 
-    relativePath = `web/src/${restOfPath}`;
-  }
+      let subpath: string;
+      if (restOfPath.startsWith('services/') || restOfPath.startsWith('store/')) {
+        subpath = `mobile/src/${restOfPath}`;
+      } else {
+        subpath = `mobile/${restOfPath}`;
+      }
 
-  // ==========================================================================
-  // Shared templates (platform-agnostic)
-  // ==========================================================================
-  // shared/* → *
-  else if (relativePath.startsWith('shared/')) {
-    relativePath = relativePath.substring('shared/'.length);
+      relativePath = `core/${subpath}`;
+    }
+
+    // ==========================================================================
+    // Web features and integrations (future - placeholder for consistency)
+    // ==========================================================================
+    // features/web/*/app/* → core/web/src/app/*
+    else if (relativePath.startsWith('features/web/')) {
+      const featurePath = relativePath.substring('features/web/'.length);
+      const restOfPath = featurePath.substring(featurePath.indexOf('/') + 1);
+
+      // Map to web directory structure (Next.js App Router)
+      let subpath: string;
+      if (restOfPath.startsWith('app/') || restOfPath === 'app') {
+        subpath = `web/src/${restOfPath}`;
+      } else if (['components', 'lib', 'hooks'].some(dir => restOfPath.startsWith(dir + '/') || restOfPath === dir)) {
+        subpath = `web/src/${restOfPath}`;
+      } else {
+        subpath = `web/${restOfPath}`;
+      }
+
+      relativePath = `core/${subpath}`;
+    }
+
+    // integrations/web/* → core/web/src/*
+    else if (relativePath.startsWith('integrations/web/')) {
+      const integrationPath = relativePath.substring('integrations/web/'.length);
+      const restOfPath = integrationPath.substring(integrationPath.indexOf('/') + 1);
+
+      relativePath = `core/web/src/${restOfPath}`;
+    }
   }
 
   // Remove ORM suffix from file names (.prisma.ts → .ts, .drizzle.ts → .ts)

@@ -44,31 +44,38 @@ describe('E2E: Preset Generation', () => {
       const generator = new ProjectGenerator(config);
       await generator.generate(projectDir);
 
-      // Verify platform directories
+      // Verify platform directories (phase 1: nested under core/)
       if (config.platforms.includes('mobile')) {
-        expect(await fs.pathExists(path.join(projectDir, 'mobile'))).toBe(true);
-        expect(await fs.pathExists(path.join(projectDir, 'mobile/package.json'))).toBe(true);
-        expect(await fs.pathExists(path.join(projectDir, 'mobile/app.json'))).toBe(true);
+        expect(await fs.pathExists(path.join(projectDir, 'core/mobile'))).toBe(true);
+        expect(await fs.pathExists(path.join(projectDir, 'core/mobile/package.json'))).toBe(true);
+        expect(await fs.pathExists(path.join(projectDir, 'core/mobile/app.json'))).toBe(true);
 
         // Verify package.json is valid JSON
-        const mobilePkg = await fs.readJSON(path.join(projectDir, 'mobile/package.json'));
+        const mobilePkg = await fs.readJSON(path.join(projectDir, 'core/mobile/package.json'));
         expect(mobilePkg.name).toBe(`${config.projectName}-mobile`);
       }
 
       if (config.platforms.includes('web')) {
-        expect(await fs.pathExists(path.join(projectDir, 'web'))).toBe(true);
-        expect(await fs.pathExists(path.join(projectDir, 'web/package.json'))).toBe(true);
+        expect(await fs.pathExists(path.join(projectDir, 'core/web'))).toBe(true);
+        expect(await fs.pathExists(path.join(projectDir, 'core/web/package.json'))).toBe(true);
 
-        const webPkg = await fs.readJSON(path.join(projectDir, 'web/package.json'));
+        const webPkg = await fs.readJSON(path.join(projectDir, 'core/web/package.json'));
         expect(webPkg.name).toBe(`${config.projectName}-web`);
       }
 
       // Backend always exists
-      expect(await fs.pathExists(path.join(projectDir, 'backend'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'backend/package.json'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/backend'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/backend/package.json'))).toBe(true);
 
-      const backendPkg = await fs.readJSON(path.join(projectDir, 'backend/package.json'));
+      const backendPkg = await fs.readJSON(path.join(projectDir, 'core/backend/package.json'));
       expect(backendPkg.name).toBe(`${config.projectName}-backend`);
+
+      // Verify stackr.config.json is written at the project root
+      const stackrConfigPath = path.join(projectDir, 'stackr.config.json');
+      expect(await fs.pathExists(stackrConfigPath)).toBe(true);
+      const stackrConfig = await fs.readJSON(stackrConfigPath);
+      expect(stackrConfig.version).toBe(1);
+      expect(stackrConfig.services[0].name).toBe('core');
 
       // Verify no unprocessed EJS in TypeScript files
       const tsFiles = await findTypeScriptFiles(projectDir);

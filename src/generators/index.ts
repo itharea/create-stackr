@@ -8,8 +8,11 @@ import { TEMPLATE_DIR } from '../utils/template.js';
 import { generateOnboardingPages } from './onboarding.js';
 import { initializeGit } from '../utils/git.js';
 import { cleanup } from '../utils/cleanup.js';
+import { saveStackrConfig } from '../utils/config-file.js';
+import { readStackrVersion } from '../utils/version.js';
 import type { ProjectConfig } from '../types/index.js';
 import { AI_TOOL_FILES } from '../types/index.js';
+import type { StackrConfigFile, ServiceEntry } from '../types/config-file.js';
 
 interface GeneratorConfig extends ProjectConfig {
   verbose?: boolean;
@@ -51,7 +54,13 @@ export class ProjectGenerator {
       // Step 6: Make setup script executable
       await this.makeSetupScriptExecutable();
 
-      // Step 7: Initialize git repository
+      // Step 7: Write stackr.config.json
+      // MUST run before initializeGit() — initializeGit() runs
+      // `git add . && git commit` in one step, so any file written after
+      // it lands in the working tree untracked.
+      await this.writeStackrConfig();
+
+      // Step 8: Initialize git repository
       await this.initializeGit();
     } catch (error) {
       // Handle error and cleanup
@@ -145,6 +154,62 @@ export class ProjectGenerator {
         chalk.yellow('\n⚠️  Could not make setup.sh executable. Run: chmod +x ./scripts/setup.sh')
       );
     }
+  }
+
+  /**
+   * Write the initial `stackr.config.json` at the project root.
+   *
+   * Phase 1 emits exactly one `'core'` service with `kind: 'base'`. Auth is
+   * still embedded in `core/backend` (phase 2 will extract it), so
+   * `authMiddleware` is deliberately `'none'` — the other three values
+   * mean "forwarding to a peer auth service" per meta_phases.md §7, which
+   * would be a lie for phase 1 projects.
+   *
+   * Integration toggles are copied field-by-field (`{ enabled }` only) —
+   * the live `ProjectConfig.integrations` shape carries API keys
+   * (iosKey, androidKey, appToken, apiKey) that MUST NEVER be serialized
+   * into stackr.config.json, which is committed to git. A unit test
+   * enforces this.
+   */
+  private async writeStackrConfig(): Promise<void> {
+    const now = new Date().toISOString();
+    const stackrVersion = readStackrVersion();
+
+    const coreEntry: ServiceEntry = {
+      name: 'core',
+      kind: 'base',
+      backend: {
+        port: 8080,
+        eventQueue: this.config.backend.eventQueue,
+        imageUploads: false,
+        // See JSDoc above: phase 1 does not forward to a peer auth service.
+        authMiddleware: 'none',
+      },
+      web: this.config.platforms.includes('web') ? { enabled: true, port: 3000 } : null,
+      mobile: this.config.platforms.includes('mobile') ? { enabled: true } : null,
+      integrations: {
+        revenueCat: { enabled: this.config.integrations.revenueCat.enabled },
+        adjust: { enabled: this.config.integrations.adjust.enabled },
+        scate: { enabled: this.config.integrations.scate.enabled },
+        att: { enabled: this.config.integrations.att.enabled },
+      },
+      generatedAt: now,
+      generatedBy: stackrVersion,
+    };
+
+    const cfg: StackrConfigFile = {
+      version: 1,
+      stackrVersion,
+      projectName: this.config.projectName,
+      createdAt: now,
+      packageManager: this.config.packageManager,
+      orm: this.config.backend.orm,
+      aiTools: this.config.aiTools,
+      appScheme: this.config.appScheme,
+      services: [coreEntry],
+    };
+
+    await saveStackrConfig(this.targetDir, cfg);
   }
 
   /**

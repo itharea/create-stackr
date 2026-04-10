@@ -28,7 +28,8 @@ export async function generateOnboardingPages(
     return;
   }
 
-  const onboardingDir = path.join(targetDir, 'mobile/app/(onboarding)');
+  // Phase 1: generator output is nested under core/
+  const onboardingDir = path.join(targetDir, 'core/mobile/app/(onboarding)');
   await fs.ensureDir(onboardingDir);
 
   // Generate pages 4-5

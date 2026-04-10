@@ -74,7 +74,7 @@ describe('Template Utils', () => {
     });
 
     it('should include base files always', () => {
-      expect(shouldIncludeFile('base/mobile/src/constants/Theme.ts', mockConfig)).toBe(true);
+      expect(shouldIncludeFile('services/base/mobile/src/constants/Theme.ts', mockConfig)).toBe(true);
     });
 
     it('should exclude event queue files when disabled', () => {
@@ -85,8 +85,8 @@ describe('Template Utils', () => {
           eventQueue: false
         }
       };
-      expect(shouldIncludeFile('base/backend/controllers/event-queue/index.ts', config)).toBe(false);
-      expect(shouldIncludeFile('base/backend/controllers/event-queue/workers/user.ts', config)).toBe(false);
+      expect(shouldIncludeFile('services/base/backend/controllers/event-queue/index.ts', config)).toBe(false);
+      expect(shouldIncludeFile('services/base/backend/controllers/event-queue/workers/user.ts', config)).toBe(false);
     });
 
     it('should include event queue files when enabled', () => {
@@ -97,12 +97,12 @@ describe('Template Utils', () => {
           eventQueue: true
         }
       };
-      expect(shouldIncludeFile('base/backend/controllers/event-queue/index.ts', config)).toBe(true);
-      expect(shouldIncludeFile('base/backend/controllers/event-queue/workers/user.ts', config)).toBe(true);
+      expect(shouldIncludeFile('services/base/backend/controllers/event-queue/index.ts', config)).toBe(true);
+      expect(shouldIncludeFile('services/base/backend/controllers/event-queue/workers/user.ts', config)).toBe(true);
     });
 
     it('should always exclude .gitkeep files', () => {
-      expect(shouldIncludeFile('base/mobile/src/.gitkeep', mockConfig)).toBe(false);
+      expect(shouldIncludeFile('services/base/mobile/src/.gitkeep', mockConfig)).toBe(false);
       expect(shouldIncludeFile('features/mobile/auth/.gitkeep', mockConfig)).toBe(false);
     });
 
@@ -124,66 +124,66 @@ describe('Template Utils', () => {
   });
 
   describe('getDestinationPath', () => {
-    it('should map base/mobile to mobile', () => {
-      const result = getDestinationPath('base/mobile/package.json.ejs', '/target');
-      expect(result).toBe('/target/mobile/package.json');
+    it('should map services/base/mobile to core/mobile', () => {
+      const result = getDestinationPath('services/base/mobile/package.json.ejs', '/target');
+      expect(result).toBe('/target/core/mobile/package.json');
     });
 
-    it('should map base/backend to backend', () => {
-      const result = getDestinationPath('base/backend/package.json.ejs', '/target');
-      expect(result).toBe('/target/backend/package.json');
+    it('should map services/base/backend to core/backend', () => {
+      const result = getDestinationPath('services/base/backend/package.json.ejs', '/target');
+      expect(result).toBe('/target/core/backend/package.json');
     });
 
-    it('should map features to mobile/app', () => {
+    it('should map features to core/mobile/app', () => {
       const result = getDestinationPath('features/mobile/onboarding/app/page.tsx', '/target');
-      expect(result).toBe('/target/mobile/app/page.tsx');
+      expect(result).toBe('/target/core/mobile/app/page.tsx');
     });
 
-    it('should map features services to mobile/src/services', () => {
+    it('should map features services to core/mobile/src/services', () => {
       const result = getDestinationPath('features/mobile/auth/services/auth.ts', '/target');
-      expect(result).toBe('/target/mobile/src/services/auth.ts');
+      expect(result).toBe('/target/core/mobile/src/services/auth.ts');
     });
 
-    it('should map features types to mobile/src/types', () => {
+    it('should map features types to core/mobile/src/types', () => {
       const result = getDestinationPath('features/mobile/auth/types/deviceSession.ts', '/target');
-      expect(result).toBe('/target/mobile/src/types/deviceSession.ts');
+      expect(result).toBe('/target/core/mobile/src/types/deviceSession.ts');
     });
 
-    it('should map integrations to mobile/src', () => {
+    it('should map integrations to core/mobile/src', () => {
       const result = getDestinationPath('integrations/mobile/revenuecat/services/revenuecatService.ts', '/target');
-      expect(result).toBe('/target/mobile/src/services/revenuecatService.ts');
+      expect(result).toBe('/target/core/mobile/src/services/revenuecatService.ts');
     });
 
-    it('should map shared to root', () => {
+    it('should map shared to root (no core prefix)', () => {
       const result = getDestinationPath('shared/README.md.ejs', '/target');
       expect(result).toBe('/target/README.md');
     });
 
     it('should remove .ejs extension', () => {
-      const result = getDestinationPath('base/mobile/app.json.ejs', '/target');
-      expect(result).toBe('/target/mobile/app.json');
+      const result = getDestinationPath('services/base/mobile/app.json.ejs', '/target');
+      expect(result).toBe('/target/core/mobile/app.json');
     });
 
     it('should handle deeply nested paths', () => {
       const result = getDestinationPath(
-        'base/mobile/src/components/ui/forms/input/index.tsx',
+        'services/base/mobile/src/components/ui/forms/input/index.tsx',
         '/target'
       );
-      expect(result).toBe('/target/mobile/src/components/ui/forms/input/index.tsx');
+      expect(result).toBe('/target/core/mobile/src/components/ui/forms/input/index.tsx');
     });
 
     it('should handle paths with dots in directory names', () => {
       const result = getDestinationPath(
-        'base/web/.next/cache/webpack/file.js',
+        'services/base/web/.next/cache/webpack/file.js',
         '/target'
       );
-      expect(result).toBe('/target/web/.next/cache/webpack/file.js');
+      expect(result).toBe('/target/core/web/.next/cache/webpack/file.js');
     });
   });
 
   describe('JSON template validation', () => {
     it('should render valid JSON from mobile package.json.ejs', async () => {
-      const rendered = await renderTemplate('base/mobile/package.json.ejs', mockConfig);
+      const rendered = await renderTemplate('services/base/mobile/package.json.ejs', mockConfig);
       expect(() => JSON.parse(rendered)).not.toThrow();
       const parsed = JSON.parse(rendered);
       expect(parsed.name).toBe('test-app-mobile');
@@ -191,7 +191,7 @@ describe('Template Utils', () => {
     });
 
     it('should render valid JSON from backend package.json.ejs', async () => {
-      const rendered = await renderTemplate('base/backend/package.json.ejs', mockConfig);
+      const rendered = await renderTemplate('services/base/backend/package.json.ejs', mockConfig);
       expect(() => JSON.parse(rendered)).not.toThrow();
       const parsed = JSON.parse(rendered);
       expect(parsed.name).toBe('test-app-backend');
@@ -199,7 +199,7 @@ describe('Template Utils', () => {
     });
 
     it('should render valid JSON from app.json.ejs', async () => {
-      const rendered = await renderTemplate('base/mobile/app.json.ejs', mockConfig);
+      const rendered = await renderTemplate('services/base/mobile/app.json.ejs', mockConfig);
       expect(() => JSON.parse(rendered)).not.toThrow();
       const parsed = JSON.parse(rendered);
       expect(parsed.expo).toBeDefined();
@@ -207,7 +207,7 @@ describe('Template Utils', () => {
     });
 
     it('should render valid JSON from eas.json.ejs', async () => {
-      const rendered = await renderTemplate('base/mobile/eas.json.ejs', mockConfig);
+      const rendered = await renderTemplate('services/base/mobile/eas.json.ejs', mockConfig);
       expect(() => JSON.parse(rendered)).not.toThrow();
       const parsed = JSON.parse(rendered);
       expect(parsed.build).toBeDefined();
@@ -222,34 +222,34 @@ describe('Template Utils', () => {
           revenueCat: { enabled: true, iosKey: 'test-ios', androidKey: 'test-android' }
         }
       };
-      const rendered = await renderTemplate('base/mobile/package.json.ejs', configWithRevenueCat);
+      const rendered = await renderTemplate('services/base/mobile/package.json.ejs', configWithRevenueCat);
       const parsed = JSON.parse(rendered);
       expect(parsed.dependencies['react-native-purchases']).toBeDefined();
     });
 
     it('should exclude conditional dependencies when features disabled', async () => {
-      const rendered = await renderTemplate('base/mobile/package.json.ejs', mockConfig);
+      const rendered = await renderTemplate('services/base/mobile/package.json.ejs', mockConfig);
       const parsed = JSON.parse(rendered);
       expect(parsed.dependencies['react-native-purchases']).toBeUndefined();
     });
 
     describe('app.json extra configuration', () => {
       it('should include apiUrl in extra section', async () => {
-        const rendered = await renderTemplate('base/mobile/app.json.ejs', mockConfig);
+        const rendered = await renderTemplate('services/base/mobile/app.json.ejs', mockConfig);
         const parsed = JSON.parse(rendered);
         expect(parsed.expo.extra.apiUrl).toBeDefined();
         expect(parsed.expo.extra.apiUrl).toBe('http://localhost:8080');
       });
 
       it('should not include redundant scaffolding metadata in extra', async () => {
-        const rendered = await renderTemplate('base/mobile/app.json.ejs', mockConfig);
+        const rendered = await renderTemplate('services/base/mobile/app.json.ejs', mockConfig);
         const parsed = JSON.parse(rendered);
         // appScheme is scaffolding config, not runtime config
         expect(parsed.expo.extra.appScheme).toBeUndefined();
       });
 
       it('should include onboarding feature flag in extra when enabled', async () => {
-        const rendered = await renderTemplate('base/mobile/app.json.ejs', mockConfig);
+        const rendered = await renderTemplate('services/base/mobile/app.json.ejs', mockConfig);
         const parsed = JSON.parse(rendered);
         // onboarding enabled flag is needed at runtime for navigation logic
         expect(parsed.expo.extra.features.onboarding.enabled).toBe(true);
@@ -263,7 +263,7 @@ describe('Template Utils', () => {
             onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false }
           }
         };
-        const rendered = await renderTemplate('base/mobile/app.json.ejs', configWithoutOnboarding);
+        const rendered = await renderTemplate('services/base/mobile/app.json.ejs', configWithoutOnboarding);
         const parsed = JSON.parse(rendered);
         expect(parsed.expo.extra.features.onboarding.enabled).toBe(false);
       });
@@ -276,7 +276,7 @@ describe('Template Utils', () => {
             revenueCat: { enabled: true, iosKey: 'test-ios-key', androidKey: 'test-android-key' }
           }
         };
-        const rendered = await renderTemplate('base/mobile/app.json.ejs', configWithRevenueCat);
+        const rendered = await renderTemplate('services/base/mobile/app.json.ejs', configWithRevenueCat);
         const parsed = JSON.parse(rendered);
         expect(parsed.expo.extra.revenueCat).toBeDefined();
         expect(parsed.expo.extra.revenueCat.iosKey).toBe('test-ios-key');
@@ -284,7 +284,7 @@ describe('Template Utils', () => {
       });
 
       it('should exclude revenueCat config in extra when disabled', async () => {
-        const rendered = await renderTemplate('base/mobile/app.json.ejs', mockConfig);
+        const rendered = await renderTemplate('services/base/mobile/app.json.ejs', mockConfig);
         const parsed = JSON.parse(rendered);
         expect(parsed.expo.extra.revenueCat).toBeUndefined();
       });
@@ -297,7 +297,7 @@ describe('Template Utils', () => {
             adjust: { enabled: true, appToken: 'test-app-token', environment: 'production' }
           }
         };
-        const rendered = await renderTemplate('base/mobile/app.json.ejs', configWithAdjust);
+        const rendered = await renderTemplate('services/base/mobile/app.json.ejs', configWithAdjust);
         const parsed = JSON.parse(rendered);
         expect(parsed.expo.extra.adjust).toBeDefined();
         expect(parsed.expo.extra.adjust.appToken).toBe('test-app-token');
@@ -305,7 +305,7 @@ describe('Template Utils', () => {
       });
 
       it('should exclude adjust config in extra when disabled', async () => {
-        const rendered = await renderTemplate('base/mobile/app.json.ejs', mockConfig);
+        const rendered = await renderTemplate('services/base/mobile/app.json.ejs', mockConfig);
         const parsed = JSON.parse(rendered);
         expect(parsed.expo.extra.adjust).toBeUndefined();
       });
@@ -318,14 +318,14 @@ describe('Template Utils', () => {
             scate: { enabled: true, apiKey: 'test-scate-key' }
           }
         };
-        const rendered = await renderTemplate('base/mobile/app.json.ejs', configWithScate);
+        const rendered = await renderTemplate('services/base/mobile/app.json.ejs', configWithScate);
         const parsed = JSON.parse(rendered);
         expect(parsed.expo.extra.scate).toBeDefined();
         expect(parsed.expo.extra.scate.apiKey).toBe('test-scate-key');
       });
 
       it('should exclude scate config in extra when disabled', async () => {
-        const rendered = await renderTemplate('base/mobile/app.json.ejs', mockConfig);
+        const rendered = await renderTemplate('services/base/mobile/app.json.ejs', mockConfig);
         const parsed = JSON.parse(rendered);
         expect(parsed.expo.extra.scate).toBeUndefined();
       });
@@ -340,7 +340,7 @@ describe('Template Utils', () => {
             att: { enabled: true },
           }
         };
-        const rendered = await renderTemplate('base/mobile/app.json.ejs', configWithAllIntegrations);
+        const rendered = await renderTemplate('services/base/mobile/app.json.ejs', configWithAllIntegrations);
         const parsed = JSON.parse(rendered);
         expect(parsed.expo.extra.revenueCat).toBeDefined();
         expect(parsed.expo.extra.adjust).toBeDefined();
@@ -355,7 +355,7 @@ describe('Template Utils', () => {
             att: { enabled: true }
           }
         };
-        const rendered = await renderTemplate('base/mobile/app.json.ejs', configWithATT);
+        const rendered = await renderTemplate('services/base/mobile/app.json.ejs', configWithATT);
         const parsed = JSON.parse(rendered);
         expect(parsed.expo.plugins).toContain('expo-tracking-transparency');
         expect(parsed.expo.ios.infoPlist).toBeDefined();
@@ -363,7 +363,7 @@ describe('Template Utils', () => {
       });
 
       it('should not include expo-tracking-transparency plugin when ATT disabled', async () => {
-        const rendered = await renderTemplate('base/mobile/app.json.ejs', mockConfig);
+        const rendered = await renderTemplate('services/base/mobile/app.json.ejs', mockConfig);
         const parsed = JSON.parse(rendered);
         expect(parsed.expo.plugins).not.toContain('expo-tracking-transparency');
       });
@@ -383,77 +383,77 @@ describe('Template Utils', () => {
     it('should include Prisma files when orm is prisma', () => {
       const config = createTestConfig({ backend: { orm: 'prisma' } });
       // .prisma.ts suffix files
-      expect(shouldIncludeFile('base/backend/utils/db.prisma.ts', config)).toBe(true);
-      expect(shouldIncludeFile('base/backend/lib/auth.prisma.ts.ejs', config)).toBe(true);
-      expect(shouldIncludeFile('base/backend/prisma.config.prisma.ts', config)).toBe(true);
+      expect(shouldIncludeFile('services/base/backend/utils/db.prisma.ts', config)).toBe(true);
+      expect(shouldIncludeFile('services/base/backend/lib/auth.prisma.ts.ejs', config)).toBe(true);
+      expect(shouldIncludeFile('services/base/backend/prisma.config.prisma.ts', config)).toBe(true);
       // Files in prisma/ directory
-      expect(shouldIncludeFile('base/backend/prisma/schema.prisma.ejs', config)).toBe(true);
+      expect(shouldIncludeFile('services/base/backend/prisma/schema.prisma.ejs', config)).toBe(true);
     });
 
     it('should exclude Drizzle files when orm is prisma', () => {
       const config = createTestConfig({ backend: { orm: 'prisma' } });
       // .drizzle.ts suffix files
-      expect(shouldIncludeFile('base/backend/utils/db.drizzle.ts', config)).toBe(false);
-      expect(shouldIncludeFile('base/backend/lib/auth.drizzle.ts.ejs', config)).toBe(false);
-      expect(shouldIncludeFile('base/backend/drizzle.config.drizzle.ts', config)).toBe(false);
+      expect(shouldIncludeFile('services/base/backend/utils/db.drizzle.ts', config)).toBe(false);
+      expect(shouldIncludeFile('services/base/backend/lib/auth.drizzle.ts.ejs', config)).toBe(false);
+      expect(shouldIncludeFile('services/base/backend/drizzle.config.drizzle.ts', config)).toBe(false);
       // Files in drizzle/ directory
-      expect(shouldIncludeFile('base/backend/drizzle/schema.drizzle.ts', config)).toBe(false);
-      expect(shouldIncludeFile('base/backend/drizzle/migrations/0001_init.sql', config)).toBe(false);
+      expect(shouldIncludeFile('services/base/backend/drizzle/schema.drizzle.ts', config)).toBe(false);
+      expect(shouldIncludeFile('services/base/backend/drizzle/migrations/0001_init.sql', config)).toBe(false);
     });
 
     it('should include Drizzle files when orm is drizzle', () => {
       const config = createTestConfig({ backend: { orm: 'drizzle' } });
       // .drizzle.ts suffix files
-      expect(shouldIncludeFile('base/backend/utils/db.drizzle.ts', config)).toBe(true);
-      expect(shouldIncludeFile('base/backend/lib/auth.drizzle.ts.ejs', config)).toBe(true);
-      expect(shouldIncludeFile('base/backend/drizzle.config.drizzle.ts', config)).toBe(true);
+      expect(shouldIncludeFile('services/base/backend/utils/db.drizzle.ts', config)).toBe(true);
+      expect(shouldIncludeFile('services/base/backend/lib/auth.drizzle.ts.ejs', config)).toBe(true);
+      expect(shouldIncludeFile('services/base/backend/drizzle.config.drizzle.ts', config)).toBe(true);
       // Files in drizzle/ directory
-      expect(shouldIncludeFile('base/backend/drizzle/schema.drizzle.ts', config)).toBe(true);
+      expect(shouldIncludeFile('services/base/backend/drizzle/schema.drizzle.ts', config)).toBe(true);
     });
 
     it('should exclude Prisma files when orm is drizzle', () => {
       const config = createTestConfig({ backend: { orm: 'drizzle' } });
       // .prisma.ts suffix files
-      expect(shouldIncludeFile('base/backend/utils/db.prisma.ts', config)).toBe(false);
-      expect(shouldIncludeFile('base/backend/lib/auth.prisma.ts.ejs', config)).toBe(false);
-      expect(shouldIncludeFile('base/backend/prisma.config.prisma.ts', config)).toBe(false);
+      expect(shouldIncludeFile('services/base/backend/utils/db.prisma.ts', config)).toBe(false);
+      expect(shouldIncludeFile('services/base/backend/lib/auth.prisma.ts.ejs', config)).toBe(false);
+      expect(shouldIncludeFile('services/base/backend/prisma.config.prisma.ts', config)).toBe(false);
       // Files in prisma/ directory
-      expect(shouldIncludeFile('base/backend/prisma/schema.prisma.ejs', config)).toBe(false);
-      expect(shouldIncludeFile('base/backend/prisma/generated/client.ts', config)).toBe(false);
+      expect(shouldIncludeFile('services/base/backend/prisma/schema.prisma.ejs', config)).toBe(false);
+      expect(shouldIncludeFile('services/base/backend/prisma/generated/client.ts', config)).toBe(false);
     });
   });
 
   describe('getDestinationPath - ORM file naming', () => {
     it('should strip .prisma suffix from file paths', () => {
-      const result = getDestinationPath('base/backend/utils/db.prisma.ts', '/target');
-      expect(result).toBe('/target/backend/utils/db.ts');
+      const result = getDestinationPath('services/base/backend/utils/db.prisma.ts', '/target');
+      expect(result).toBe('/target/core/backend/utils/db.ts');
     });
 
     it('should strip .drizzle suffix from file paths', () => {
-      const result = getDestinationPath('base/backend/utils/db.drizzle.ts', '/target');
-      expect(result).toBe('/target/backend/utils/db.ts');
+      const result = getDestinationPath('services/base/backend/utils/db.drizzle.ts', '/target');
+      expect(result).toBe('/target/core/backend/utils/db.ts');
     });
 
     it('should handle .prisma.ts.ejs files correctly', () => {
-      const result = getDestinationPath('base/backend/lib/auth.prisma.ts.ejs', '/target');
-      expect(result).toBe('/target/backend/lib/auth.ts');
+      const result = getDestinationPath('services/base/backend/lib/auth.prisma.ts.ejs', '/target');
+      expect(result).toBe('/target/core/backend/lib/auth.ts');
     });
 
     it('should handle .drizzle.ts.ejs files correctly', () => {
-      const result = getDestinationPath('base/backend/lib/auth.drizzle.ts.ejs', '/target');
-      expect(result).toBe('/target/backend/lib/auth.ts');
+      const result = getDestinationPath('services/base/backend/lib/auth.drizzle.ts.ejs', '/target');
+      expect(result).toBe('/target/core/backend/lib/auth.ts');
     });
 
     it('should handle drizzle schema path correctly', () => {
-      const result = getDestinationPath('base/backend/drizzle/schema.drizzle.ts', '/target');
-      expect(result).toBe('/target/backend/drizzle/schema.ts');
+      const result = getDestinationPath('services/base/backend/drizzle/schema.drizzle.ts', '/target');
+      expect(result).toBe('/target/core/backend/drizzle/schema.ts');
     });
 
     it('should handle config file naming correctly', () => {
-      expect(getDestinationPath('base/backend/prisma.config.prisma.ts', '/target'))
-        .toBe('/target/backend/prisma.config.ts');
-      expect(getDestinationPath('base/backend/drizzle.config.drizzle.ts', '/target'))
-        .toBe('/target/backend/drizzle.config.ts');
+      expect(getDestinationPath('services/base/backend/prisma.config.prisma.ts', '/target'))
+        .toBe('/target/core/backend/prisma.config.ts');
+      expect(getDestinationPath('services/base/backend/drizzle.config.drizzle.ts', '/target'))
+        .toBe('/target/core/backend/drizzle.config.ts');
     });
   });
 
@@ -470,7 +470,7 @@ describe('Template Utils', () => {
           },
         },
       };
-      expect(shouldIncludeFile('base/backend/utils/email.ts.ejs', config)).toBe(true);
+      expect(shouldIncludeFile('services/base/backend/utils/email.ts.ejs', config)).toBe(true);
     });
 
     it('should include email utility when passwordReset is enabled', () => {
@@ -485,7 +485,7 @@ describe('Template Utils', () => {
           },
         },
       };
-      expect(shouldIncludeFile('base/backend/utils/email.ts.ejs', config)).toBe(true);
+      expect(shouldIncludeFile('services/base/backend/utils/email.ts.ejs', config)).toBe(true);
     });
 
     it('should include email utility when both email features are enabled', () => {
@@ -500,7 +500,7 @@ describe('Template Utils', () => {
           },
         },
       };
-      expect(shouldIncludeFile('base/backend/utils/email.ts.ejs', config)).toBe(true);
+      expect(shouldIncludeFile('services/base/backend/utils/email.ts.ejs', config)).toBe(true);
     });
 
     it('should exclude email utility when neither email feature is enabled', () => {
@@ -515,7 +515,7 @@ describe('Template Utils', () => {
           },
         },
       };
-      expect(shouldIncludeFile('base/backend/utils/email.ts.ejs', config)).toBe(false);
+      expect(shouldIncludeFile('services/base/backend/utils/email.ts.ejs', config)).toBe(false);
     });
   });
 });

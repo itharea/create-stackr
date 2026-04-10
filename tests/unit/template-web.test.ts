@@ -9,28 +9,28 @@ describe('Web Template Utilities', () => {
   describe('shouldIncludeFile - platform filtering', () => {
     it('includes web templates when web platform selected', () => {
       const config = { ...minimalConfig, platforms: ['web'] as Platform[] };
-      expect(shouldIncludeFile('base/web/package.json.ejs', config)).toBe(true);
-      expect(shouldIncludeFile('base/web/src/app/page.tsx', config)).toBe(true);
+      expect(shouldIncludeFile('services/base/web/package.json.ejs', config)).toBe(true);
+      expect(shouldIncludeFile('services/base/web/src/app/page.tsx', config)).toBe(true);
     });
 
     it('excludes web templates when only mobile selected', () => {
-      expect(shouldIncludeFile('base/web/package.json.ejs', mobileOnlyConfig)).toBe(false);
-      expect(shouldIncludeFile('base/web/src/app/page.tsx', mobileOnlyConfig)).toBe(false);
+      expect(shouldIncludeFile('services/base/web/package.json.ejs', mobileOnlyConfig)).toBe(false);
+      expect(shouldIncludeFile('services/base/web/src/app/page.tsx', mobileOnlyConfig)).toBe(false);
     });
 
     it('includes mobile templates when mobile platform selected', () => {
       const config = { ...minimalConfig, platforms: ['mobile'] as Platform[] };
-      expect(shouldIncludeFile('base/mobile/package.json.ejs', config)).toBe(true);
+      expect(shouldIncludeFile('services/base/mobile/package.json.ejs', config)).toBe(true);
     });
 
     it('excludes mobile templates when only web selected', () => {
-      expect(shouldIncludeFile('base/mobile/package.json.ejs', webOnlyConfig)).toBe(false);
+      expect(shouldIncludeFile('services/base/mobile/package.json.ejs', webOnlyConfig)).toBe(false);
     });
 
     it('includes both when both platforms selected', () => {
       const config = { ...minimalConfig, platforms: ['mobile', 'web'] as Platform[] };
-      expect(shouldIncludeFile('base/mobile/package.json.ejs', config)).toBe(true);
-      expect(shouldIncludeFile('base/web/package.json.ejs', config)).toBe(true);
+      expect(shouldIncludeFile('services/base/mobile/package.json.ejs', config)).toBe(true);
+      expect(shouldIncludeFile('services/base/web/package.json.ejs', config)).toBe(true);
     });
 
     // Tests for new /mobile/ structure in features and integrations
@@ -67,8 +67,8 @@ describe('Web Template Utilities', () => {
     });
 
     it('always includes backend templates regardless of platform', () => {
-      expect(shouldIncludeFile('base/backend/server.ts', webOnlyConfig)).toBe(true);
-      expect(shouldIncludeFile('base/backend/server.ts', mobileOnlyConfig)).toBe(true);
+      expect(shouldIncludeFile('services/base/backend/server.ts', webOnlyConfig)).toBe(true);
+      expect(shouldIncludeFile('services/base/backend/server.ts', mobileOnlyConfig)).toBe(true);
     });
 
     it('always includes shared templates regardless of platform', () => {
@@ -258,82 +258,82 @@ describe('Web Template Utilities', () => {
 
     describe('web base templates', () => {
       it('includes theme provider when web selected', () => {
-        expect(shouldIncludeFile('base/web/src/components/providers/theme-provider.tsx', webOnlyConfig)).toBe(true);
+        expect(shouldIncludeFile('services/base/web/src/components/providers/theme-provider.tsx', webOnlyConfig)).toBe(true);
       });
 
       it('includes UI components when web selected', () => {
-        expect(shouldIncludeFile('base/web/src/components/ui/button.tsx', webOnlyConfig)).toBe(true);
-        expect(shouldIncludeFile('base/web/src/components/ui/input.tsx', webOnlyConfig)).toBe(true);
-        expect(shouldIncludeFile('base/web/src/components/ui/card.tsx', webOnlyConfig)).toBe(true);
-        expect(shouldIncludeFile('base/web/src/components/ui/submit-button.tsx', webOnlyConfig)).toBe(true);
+        expect(shouldIncludeFile('services/base/web/src/components/ui/button.tsx', webOnlyConfig)).toBe(true);
+        expect(shouldIncludeFile('services/base/web/src/components/ui/input.tsx', webOnlyConfig)).toBe(true);
+        expect(shouldIncludeFile('services/base/web/src/components/ui/card.tsx', webOnlyConfig)).toBe(true);
+        expect(shouldIncludeFile('services/base/web/src/components/ui/submit-button.tsx', webOnlyConfig)).toBe(true);
       });
 
       it('includes Next.js config files when web selected', () => {
-        expect(shouldIncludeFile('base/web/next.config.ts', webOnlyConfig)).toBe(true);
-        expect(shouldIncludeFile('base/web/tsconfig.json', webOnlyConfig)).toBe(true);
-        expect(shouldIncludeFile('base/web/postcss.config.mjs', webOnlyConfig)).toBe(true);
+        expect(shouldIncludeFile('services/base/web/next.config.ts', webOnlyConfig)).toBe(true);
+        expect(shouldIncludeFile('services/base/web/tsconfig.json', webOnlyConfig)).toBe(true);
+        expect(shouldIncludeFile('services/base/web/postcss.config.mjs', webOnlyConfig)).toBe(true);
       });
     });
   });
 
   describe('getDestinationPath - web mappings', () => {
-    it('maps base/web/* to web/*', () => {
-      const result = getDestinationPath('base/web/package.json', '/project');
-      expect(result).toBe('/project/web/package.json');
+    it('maps services/base/web/* to core/web/*', () => {
+      const result = getDestinationPath('services/base/web/package.json', '/project');
+      expect(result).toBe('/project/core/web/package.json');
     });
 
-    it('maps base/web/src/* to web/src/*', () => {
-      const result = getDestinationPath('base/web/src/app/page.tsx', '/project');
-      expect(result).toBe('/project/web/src/app/page.tsx');
+    it('maps services/base/web/src/* to core/web/src/*', () => {
+      const result = getDestinationPath('services/base/web/src/app/page.tsx', '/project');
+      expect(result).toBe('/project/core/web/src/app/page.tsx');
     });
 
     it('removes .ejs extension from web templates', () => {
-      const result = getDestinationPath('base/web/package.json.ejs', '/project');
-      expect(result).toBe('/project/web/package.json');
+      const result = getDestinationPath('services/base/web/package.json.ejs', '/project');
+      expect(result).toBe('/project/core/web/package.json');
     });
   });
 
   describe('getDestinationPath - web feature mappings', () => {
-    it('maps features/web/auth/app/* to web/src/app/*', () => {
+    it('maps features/web/auth/app/* to core/web/src/app/*', () => {
       const result = getDestinationPath('features/web/auth/app/(auth)/login/page.tsx', '/project');
-      expect(result).toBe('/project/web/src/app/(auth)/login/page.tsx');
+      expect(result).toBe('/project/core/web/src/app/(auth)/login/page.tsx');
     });
 
-    it('maps features/web/auth/components/* to web/src/components/*', () => {
+    it('maps features/web/auth/components/* to core/web/src/components/*', () => {
       const result = getDestinationPath('features/web/auth/components/auth/login-form.tsx', '/project');
-      expect(result).toBe('/project/web/src/components/auth/login-form.tsx');
+      expect(result).toBe('/project/core/web/src/components/auth/login-form.tsx');
     });
 
     it('removes .ejs extension from web feature templates', () => {
       const result = getDestinationPath('features/web/auth/app/(auth)/login/page.tsx.ejs', '/project');
-      expect(result).toBe('/project/web/src/app/(auth)/login/page.tsx');
+      expect(result).toBe('/project/core/web/src/app/(auth)/login/page.tsx');
     });
 
-    it('maps base/web/src/components/* correctly', () => {
-      const result = getDestinationPath('base/web/src/components/ui/button.tsx', '/project');
-      expect(result).toBe('/project/web/src/components/ui/button.tsx');
+    it('maps services/base/web/src/components/* correctly', () => {
+      const result = getDestinationPath('services/base/web/src/components/ui/button.tsx', '/project');
+      expect(result).toBe('/project/core/web/src/components/ui/button.tsx');
     });
 
-    it('maps base/web/src/lib/* correctly', () => {
-      const result = getDestinationPath('base/web/src/lib/utils.ts', '/project');
-      expect(result).toBe('/project/web/src/lib/utils.ts');
+    it('maps services/base/web/src/lib/* correctly', () => {
+      const result = getDestinationPath('services/base/web/src/lib/utils.ts', '/project');
+      expect(result).toBe('/project/core/web/src/lib/utils.ts');
     });
   });
 
   describe('getDestinationPath - mobile feature/integration mappings', () => {
-    it('maps features/mobile/*/app/* to mobile/app/*', () => {
+    it('maps features/mobile/*/app/* to core/mobile/app/*', () => {
       const result = getDestinationPath('features/mobile/auth/app/login.tsx', '/project');
-      expect(result).toBe('/project/mobile/app/login.tsx');
+      expect(result).toBe('/project/core/mobile/app/login.tsx');
     });
 
-    it('maps features/mobile/*/services/* to mobile/src/services/*', () => {
+    it('maps features/mobile/*/services/* to core/mobile/src/services/*', () => {
       const result = getDestinationPath('features/mobile/auth/services/auth.ts', '/project');
-      expect(result).toBe('/project/mobile/src/services/auth.ts');
+      expect(result).toBe('/project/core/mobile/src/services/auth.ts');
     });
 
-    it('maps integrations/mobile/*/services/* to mobile/src/services/*', () => {
+    it('maps integrations/mobile/*/services/* to core/mobile/src/services/*', () => {
       const result = getDestinationPath('integrations/mobile/adjust/services/adjust.ts', '/project');
-      expect(result).toBe('/project/mobile/src/services/adjust.ts');
+      expect(result).toBe('/project/core/mobile/src/services/adjust.ts');
     });
   });
 });

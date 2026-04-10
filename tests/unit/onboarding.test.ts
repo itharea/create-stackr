@@ -53,7 +53,7 @@ describe('Onboarding Generator', () => {
 
     await generateOnboardingPages(config, tempDir);
 
-    const onboardingDir = path.join(tempDir, 'mobile/app/(onboarding)');
+    const onboardingDir = path.join(tempDir, 'core/mobile/app/(onboarding)');
     expect(await fs.pathExists(onboardingDir)).toBe(false);
   });
 
@@ -95,7 +95,7 @@ describe('Onboarding Generator', () => {
     await generateOnboardingPages(config, tempDir);
 
     // Should not generate any files (templates handle 1-3)
-    const onboardingDir = path.join(tempDir, 'mobile/app/(onboarding)');
+    const onboardingDir = path.join(tempDir, 'core/mobile/app/(onboarding)');
     expect(await fs.pathExists(onboardingDir)).toBe(false);
   });
 
@@ -136,7 +136,7 @@ describe('Onboarding Generator', () => {
 
     await generateOnboardingPages(config, tempDir);
 
-    const onboardingDir = path.join(tempDir, 'mobile/app/(onboarding)');
+    const onboardingDir = path.join(tempDir, 'core/mobile/app/(onboarding)');
     expect(await fs.pathExists(onboardingDir)).toBe(true);
 
     // Should have generated pages 4 and 5
@@ -193,7 +193,7 @@ describe('Onboarding Generator', () => {
     await generateOnboardingPages(config, tempDir);
 
     const pageContent = await fs.readFile(
-      path.join(tempDir, 'mobile/app/(onboarding)/page-4.tsx'),
+      path.join(tempDir, 'core/mobile/app/(onboarding)/page-4.tsx'),
       'utf-8'
     );
 
@@ -239,7 +239,7 @@ describe('Onboarding Generator', () => {
     await generateOnboardingPages(config, tempDir);
 
     const lastPageContent = await fs.readFile(
-      path.join(tempDir, 'mobile/app/(onboarding)/page-4.tsx'),
+      path.join(tempDir, 'core/mobile/app/(onboarding)/page-4.tsx'),
       'utf-8'
     );
 
@@ -284,7 +284,7 @@ describe('Onboarding Generator', () => {
     await generateOnboardingPages(config, tempDir);
 
     const lastPageContent = await fs.readFile(
-      path.join(tempDir, 'mobile/app/(onboarding)/page-4.tsx'),
+      path.join(tempDir, 'core/mobile/app/(onboarding)/page-4.tsx'),
       'utf-8'
     );
 

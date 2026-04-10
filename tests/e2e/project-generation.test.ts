@@ -72,33 +72,34 @@ describe('E2E: Full Project Generation', () => {
     const projectDir = path.join(tempDir, 'minimal-app');
     await generator.generate(projectDir);
 
-    // Verify top-level structure
-    expect(await fs.pathExists(path.join(projectDir, 'mobile'))).toBe(true);
-    expect(await fs.pathExists(path.join(projectDir, 'backend'))).toBe(true);
+    // Verify top-level structure (phase 1: nested under core/)
+    expect(await fs.pathExists(path.join(projectDir, 'core/mobile'))).toBe(true);
+    expect(await fs.pathExists(path.join(projectDir, 'core/backend'))).toBe(true);
     expect(await fs.pathExists(path.join(projectDir, 'scripts'))).toBe(true);
     expect(await fs.pathExists(path.join(projectDir, '.gitignore'))).toBe(true);
     expect(await fs.pathExists(path.join(projectDir, 'README.md'))).toBe(true);
+    expect(await fs.pathExists(path.join(projectDir, 'stackr.config.json'))).toBe(true);
 
     // Verify mobile structure
-    expect(await fs.pathExists(path.join(projectDir, 'mobile/app'))).toBe(true);
-    expect(await fs.pathExists(path.join(projectDir, 'mobile/src'))).toBe(true);
-    expect(await fs.pathExists(path.join(projectDir, 'mobile/package.json'))).toBe(true);
-    expect(await fs.pathExists(path.join(projectDir, 'mobile/tsconfig.json'))).toBe(true);
-    expect(await fs.pathExists(path.join(projectDir, 'mobile/.env.example'))).toBe(true);
+    expect(await fs.pathExists(path.join(projectDir, 'core/mobile/app'))).toBe(true);
+    expect(await fs.pathExists(path.join(projectDir, 'core/mobile/src'))).toBe(true);
+    expect(await fs.pathExists(path.join(projectDir, 'core/mobile/package.json'))).toBe(true);
+    expect(await fs.pathExists(path.join(projectDir, 'core/mobile/tsconfig.json'))).toBe(true);
+    expect(await fs.pathExists(path.join(projectDir, 'core/mobile/.env.example'))).toBe(true);
 
     // Verify backend structure
-    expect(await fs.pathExists(path.join(projectDir, 'backend/controllers'))).toBe(true);
-    expect(await fs.pathExists(path.join(projectDir, 'backend/domain'))).toBe(true);
-    expect(await fs.pathExists(path.join(projectDir, 'backend/package.json'))).toBe(true);
-    expect(await fs.pathExists(path.join(projectDir, 'backend/.env.example'))).toBe(true);
+    expect(await fs.pathExists(path.join(projectDir, 'core/backend/controllers'))).toBe(true);
+    expect(await fs.pathExists(path.join(projectDir, 'core/backend/domain'))).toBe(true);
+    expect(await fs.pathExists(path.join(projectDir, 'core/backend/package.json'))).toBe(true);
+    expect(await fs.pathExists(path.join(projectDir, 'core/backend/.env.example'))).toBe(true);
 
     // Verify package.json validity
-    const mobilePkg = await fs.readJSON(path.join(projectDir, 'mobile/package.json'));
+    const mobilePkg = await fs.readJSON(path.join(projectDir, 'core/mobile/package.json'));
     expect(mobilePkg.name).toBe('minimal-app-mobile');
     expect(mobilePkg.dependencies).toBeDefined();
     expect(mobilePkg.scripts).toBeDefined();
 
-    const backendPkg = await fs.readJSON(path.join(projectDir, 'backend/package.json'));
+    const backendPkg = await fs.readJSON(path.join(projectDir, 'core/backend/package.json'));
     expect(backendPkg.name).toBe('minimal-app-backend');
     expect(backendPkg.dependencies).toBeDefined();
     expect(backendPkg.scripts).toBeDefined();
@@ -149,14 +150,14 @@ describe('E2E: Full Project Generation', () => {
     await generator.generate(projectDir);
 
     // Verify all integrations are included
-    const mobilePkg = await fs.readJSON(path.join(projectDir, 'mobile/package.json'));
+    const mobilePkg = await fs.readJSON(path.join(projectDir, 'core/mobile/package.json'));
     expect(mobilePkg.dependencies['react-native-purchases']).toBeDefined();
     expect(mobilePkg.dependencies['react-native-adjust']).toBeDefined();
     expect(mobilePkg.dependencies['scatesdk-react']).toBeDefined();
     expect(mobilePkg.dependencies['expo-tracking-transparency']).toBeDefined();
 
     // Verify onboarding pages
-    const onboardingDir = path.join(projectDir, 'mobile/app/(onboarding)');
+    const onboardingDir = path.join(projectDir, 'core/mobile/app/(onboarding)');
     expect(await fs.pathExists(path.join(onboardingDir, 'page-1.tsx'))).toBe(true);
     expect(await fs.pathExists(path.join(onboardingDir, 'page-2.tsx'))).toBe(true);
     expect(await fs.pathExists(path.join(onboardingDir, 'page-3.tsx'))).toBe(true);
@@ -165,29 +166,29 @@ describe('E2E: Full Project Generation', () => {
     expect(await fs.pathExists(path.join(onboardingDir, '_layout.tsx'))).toBe(true);
 
     // Verify paywall
-    expect(await fs.pathExists(path.join(projectDir, 'mobile/app/paywall.tsx'))).toBe(true);
+    expect(await fs.pathExists(path.join(projectDir, 'core/mobile/app/paywall.tsx'))).toBe(true);
 
     // Verify integration services
     expect(
-      await fs.pathExists(path.join(projectDir, 'mobile/src/services/revenuecat-service.ts'))
+      await fs.pathExists(path.join(projectDir, 'core/mobile/src/services/revenuecat-service.ts'))
     ).toBe(true);
     expect(
-      await fs.pathExists(path.join(projectDir, 'mobile/src/services/adjust-service.ts'))
+      await fs.pathExists(path.join(projectDir, 'core/mobile/src/services/adjust-service.ts'))
     ).toBe(true);
     expect(
-      await fs.pathExists(path.join(projectDir, 'mobile/src/services/scate-service.ts'))
+      await fs.pathExists(path.join(projectDir, 'core/mobile/src/services/scate-service.ts'))
     ).toBe(true);
     expect(
-      await fs.pathExists(path.join(projectDir, 'mobile/src/services/att-service.ts'))
+      await fs.pathExists(path.join(projectDir, 'core/mobile/src/services/att-service.ts'))
     ).toBe(true);
 
     // Verify backend has event queue
-    const backendPkg = await fs.readJSON(path.join(projectDir, 'backend/package.json'));
+    const backendPkg = await fs.readJSON(path.join(projectDir, 'core/backend/package.json'));
     expect(backendPkg.dependencies.bullmq).toBeDefined();
 
     // Verify event queue controller exists
     expect(
-      await fs.pathExists(path.join(projectDir, 'backend/controllers/event-queue'))
+      await fs.pathExists(path.join(projectDir, 'core/backend/controllers/event-queue'))
     ).toBe(true);
   });
 
@@ -235,13 +236,14 @@ describe('E2E: Full Project Generation', () => {
     const projectDir = path.join(tempDir, 'json-test-app');
     await generator.generate(projectDir);
 
-    // All JSON files should be valid
+    // All JSON files should be valid (phase 1: nested under core/)
     const jsonFiles = [
-      'mobile/package.json',
-      'mobile/app.json',
-      'mobile/tsconfig.json',
-      'backend/package.json',
-      'backend/tsconfig.json',
+      'core/mobile/package.json',
+      'core/mobile/app.json',
+      'core/mobile/tsconfig.json',
+      'core/backend/package.json',
+      'core/backend/tsconfig.json',
+      'stackr.config.json',
     ];
 
     for (const file of jsonFiles) {
@@ -298,15 +300,15 @@ describe('E2E: Full Project Generation', () => {
     const projectDir = path.join(tempDir, 'ts-test-app');
     await generator.generate(projectDir);
 
-    // Verify TypeScript files exist and have valid syntax
+    // Verify TypeScript files exist and have valid syntax (phase 1: nested under core/)
     const tsFiles = [
-      'mobile/app/_layout.tsx',
-      'mobile/app/(tabs)/_layout.tsx',
-      'mobile/app/(tabs)/index.tsx',
-      'mobile/app/(onboarding)/_layout.tsx',
-      'mobile/app/(onboarding)/page-1.tsx',
-      'mobile/src/constants/Theme.ts',
-      'mobile/src/utils/responsive.ts',
+      'core/mobile/app/_layout.tsx',
+      'core/mobile/app/(tabs)/_layout.tsx',
+      'core/mobile/app/(tabs)/index.tsx',
+      'core/mobile/app/(onboarding)/_layout.tsx',
+      'core/mobile/app/(onboarding)/page-1.tsx',
+      'core/mobile/src/constants/Theme.ts',
+      'core/mobile/src/utils/responsive.ts',
     ];
 
     for (const file of tsFiles) {
@@ -367,19 +369,19 @@ describe('E2E: Full Project Generation', () => {
       await generator.generate(projectDir);
 
       // Verify Drizzle-specific files exist
-      expect(await fs.pathExists(path.join(projectDir, 'backend/drizzle/schema.ts'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'backend/drizzle.config.ts'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'backend/utils/db.ts'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'backend/lib/auth.ts'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'backend/domain/user/repository.ts'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'backend/domain/device-session/repository.ts'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/backend/drizzle/schema.ts'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/backend/drizzle.config.ts'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/backend/utils/db.ts'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/backend/lib/auth.ts'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/backend/domain/user/repository.ts'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/backend/domain/device-session/repository.ts'))).toBe(true);
 
       // Verify Prisma files do NOT exist
-      expect(await fs.pathExists(path.join(projectDir, 'backend/prisma/schema.prisma'))).toBe(false);
-      expect(await fs.pathExists(path.join(projectDir, 'backend/prisma.config.ts'))).toBe(false);
+      expect(await fs.pathExists(path.join(projectDir, 'core/backend/prisma/schema.prisma'))).toBe(false);
+      expect(await fs.pathExists(path.join(projectDir, 'core/backend/prisma.config.ts'))).toBe(false);
 
       // Verify package.json has Drizzle dependencies
-      const packageJson = await fs.readJSON(path.join(projectDir, 'backend/package.json'));
+      const packageJson = await fs.readJSON(path.join(projectDir, 'core/backend/package.json'));
       expect(packageJson.dependencies['drizzle-orm']).toBeDefined();
       expect(packageJson.devDependencies['drizzle-kit']).toBeDefined();
       expect(packageJson.dependencies['@prisma/client']).toBeUndefined();
@@ -435,16 +437,16 @@ describe('E2E: Full Project Generation', () => {
       await generator.generate(projectDir);
 
       // Verify Prisma-specific files exist
-      expect(await fs.pathExists(path.join(projectDir, 'backend/prisma/schema.prisma'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'backend/prisma.config.ts'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'backend/utils/db.ts'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/backend/prisma/schema.prisma'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/backend/prisma.config.ts'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/backend/utils/db.ts'))).toBe(true);
 
       // Verify Drizzle files do NOT exist
-      expect(await fs.pathExists(path.join(projectDir, 'backend/drizzle/schema.ts'))).toBe(false);
-      expect(await fs.pathExists(path.join(projectDir, 'backend/drizzle.config.ts'))).toBe(false);
+      expect(await fs.pathExists(path.join(projectDir, 'core/backend/drizzle/schema.ts'))).toBe(false);
+      expect(await fs.pathExists(path.join(projectDir, 'core/backend/drizzle.config.ts'))).toBe(false);
 
       // Verify package.json has Prisma dependencies
-      const packageJson = await fs.readJSON(path.join(projectDir, 'backend/package.json'));
+      const packageJson = await fs.readJSON(path.join(projectDir, 'core/backend/package.json'));
       expect(packageJson.dependencies['@prisma/client']).toBeDefined();
       expect(packageJson.devDependencies['prisma']).toBeDefined();
       expect(packageJson.dependencies['drizzle-orm']).toBeUndefined();
@@ -491,33 +493,33 @@ describe('E2E: Full Project Generation', () => {
       const projectDir = path.join(tempDir, 'e2e-web-only');
       await generator.generate(projectDir);
 
-      // Verify top-level structure (no mobile)
-      expect(await fs.pathExists(path.join(projectDir, 'web'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'backend'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'mobile'))).toBe(false);
+      // Verify top-level structure (phase 1: nested under core/, no mobile)
+      expect(await fs.pathExists(path.join(projectDir, 'core/web'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/backend'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/mobile'))).toBe(false);
 
       // Verify web structure
-      expect(await fs.pathExists(path.join(projectDir, 'web/package.json'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/tsconfig.json'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/next.config.ts'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/.env.example'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/package.json'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/tsconfig.json'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/next.config.ts'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/.env.example'))).toBe(true);
 
       // Verify auth pages
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(auth)/login/page.tsx'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(auth)/register/page.tsx'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(auth)/forgot-password/page.tsx'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(auth)/verify-email/page.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/app/(auth)/login/page.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/app/(auth)/register/page.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/app/(auth)/forgot-password/page.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/app/(auth)/verify-email/page.tsx'))).toBe(true);
 
       // Verify OAuth (Google enabled)
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/components/auth/oauth-buttons.tsx'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/auth/callback/route.ts'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/components/auth/oauth-buttons.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/app/auth/callback/route.ts'))).toBe(true);
 
       // Verify protected routes (dashboard now in (protected) route group)
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(protected)/dashboard/page.tsx'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(protected)/layout.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/app/(protected)/dashboard/page.tsx'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/web/src/app/(protected)/layout.tsx'))).toBe(true);
 
       // Verify package.json validity
-      const webPkg = await fs.readJSON(path.join(projectDir, 'web/package.json'));
+      const webPkg = await fs.readJSON(path.join(projectDir, 'core/web/package.json'));
       expect(webPkg.name).toBe('e2e-web-only-web');
       expect(webPkg.dependencies.next).toBeDefined();
       expect(webPkg.dependencies.react).toBeDefined();
@@ -563,14 +565,14 @@ describe('E2E: Full Project Generation', () => {
       const projectDir = path.join(tempDir, 'e2e-web-ts');
       await generator.generate(projectDir);
 
-      // Verify TypeScript files have no unprocessed EJS
+      // Verify TypeScript files have no unprocessed EJS (phase 1: nested under core/)
       const tsFiles = [
-        'web/src/app/layout.tsx',
-        'web/src/app/page.tsx',
-        'web/src/app/(auth)/login/page.tsx',
-        'web/src/components/auth/login-form.tsx',
-        'web/src/components/ui/button.tsx',
-        'web/src/lib/utils.ts',
+        'core/web/src/app/layout.tsx',
+        'core/web/src/app/page.tsx',
+        'core/web/src/app/(auth)/login/page.tsx',
+        'core/web/src/components/auth/login-form.tsx',
+        'core/web/src/components/ui/button.tsx',
+        'core/web/src/lib/utils.ts',
       ];
 
       for (const file of tsFiles) {
@@ -623,14 +625,14 @@ describe('E2E: Full Project Generation', () => {
       const projectDir = path.join(tempDir, 'e2e-web-drizzle');
       await generator.generate(projectDir);
 
-      // Verify web exists
-      expect(await fs.pathExists(path.join(projectDir, 'web'))).toBe(true);
+      // Verify web exists (phase 1: nested under core/)
+      expect(await fs.pathExists(path.join(projectDir, 'core/web'))).toBe(true);
 
       // Verify Drizzle backend
-      expect(await fs.pathExists(path.join(projectDir, 'backend/drizzle/schema.ts'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'backend/drizzle.config.ts'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/backend/drizzle/schema.ts'))).toBe(true);
+      expect(await fs.pathExists(path.join(projectDir, 'core/backend/drizzle.config.ts'))).toBe(true);
 
-      const backendPkg = await fs.readJSON(path.join(projectDir, 'backend/package.json'));
+      const backendPkg = await fs.readJSON(path.join(projectDir, 'core/backend/package.json'));
       expect(backendPkg.dependencies['drizzle-orm']).toBeDefined();
     });
   });

@@ -60,8 +60,9 @@ describe('Copy Utils', () => {
       await copyTemplateFiles(tempDir, mockConfig);
 
       // Check that basic structure exists (at least some files should be copied)
-      const mobileDir = path.join(tempDir, 'mobile');
-      const backendDir = path.join(tempDir, 'backend');
+      // Phase 1: generator output is nested under core/
+      const mobileDir = path.join(tempDir, 'core/mobile');
+      const backendDir = path.join(tempDir, 'core/backend');
 
       // These paths should exist if templates are copied
       const mobileDirExists = await fs.pathExists(mobileDir);
@@ -74,7 +75,7 @@ describe('Copy Utils', () => {
       await copyTemplateFiles(tempDir, mockConfig);
 
       // Onboarding directory should NOT exist since it's disabled
-      const onboardingDir = path.join(tempDir, 'mobile/app/(onboarding)');
+      const onboardingDir = path.join(tempDir, 'core/mobile/app/(onboarding)');
       const exists = await fs.pathExists(onboardingDir);
 
       expect(exists).toBe(false);
@@ -93,7 +94,7 @@ describe('Copy Utils', () => {
 
   describe('copyFile', () => {
     it('should copy a static file without config', async () => {
-      const sourceFile = path.join(TEMPLATE_DIR, 'base/mobile/src/constants/Theme.ts');
+      const sourceFile = path.join(TEMPLATE_DIR, 'services/base/mobile/src/constants/Theme.ts');
       const destFile = path.join(tempDir, 'Theme.ts');
 
       await copyFile(sourceFile, destFile);
@@ -106,7 +107,7 @@ describe('Copy Utils', () => {
     });
 
     it('should render EJS template when config provided', async () => {
-      const sourceFile = 'base/mobile/package.json.ejs';
+      const sourceFile = 'services/base/mobile/package.json.ejs';
       const destFile = path.join(tempDir, 'package.json');
 
       await copyFile(sourceFile, destFile, mockConfig);
@@ -120,7 +121,7 @@ describe('Copy Utils', () => {
     });
 
     it('should copy EJS file as-is when no config provided', async () => {
-      const sourceFile = path.join(TEMPLATE_DIR, 'base/mobile/package.json.ejs');
+      const sourceFile = path.join(TEMPLATE_DIR, 'services/base/mobile/package.json.ejs');
       const destFile = path.join(tempDir, 'package.json.ejs');
 
       await copyFile(sourceFile, destFile);
@@ -134,7 +135,7 @@ describe('Copy Utils', () => {
     });
 
     it('should create parent directories if they dont exist', async () => {
-      const sourceFile = path.join(TEMPLATE_DIR, 'base/mobile/src/constants/Theme.ts');
+      const sourceFile = path.join(TEMPLATE_DIR, 'services/base/mobile/src/constants/Theme.ts');
       const destFile = path.join(tempDir, 'deeply/nested/path/Theme.ts');
 
       await copyFile(sourceFile, destFile);

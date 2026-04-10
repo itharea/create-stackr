@@ -75,16 +75,27 @@ describe('ProjectGenerator', () => {
     const projectDir = path.join(tempDir, 'test-minimal');
     await generator.generate(projectDir);
 
-    // Verify basic structure exists
-    expect(await fs.pathExists(path.join(projectDir, 'mobile'))).toBe(true);
-    expect(await fs.pathExists(path.join(projectDir, 'backend'))).toBe(true);
+    // Verify basic structure exists (phase 1: nested under core/)
+    expect(await fs.pathExists(path.join(projectDir, 'core/mobile'))).toBe(true);
+    expect(await fs.pathExists(path.join(projectDir, 'core/backend'))).toBe(true);
 
     // Verify package.json files exist
-    expect(await fs.pathExists(path.join(projectDir, 'mobile/package.json'))).toBe(true);
-    expect(await fs.pathExists(path.join(projectDir, 'backend/package.json'))).toBe(true);
+    expect(await fs.pathExists(path.join(projectDir, 'core/mobile/package.json'))).toBe(true);
+    expect(await fs.pathExists(path.join(projectDir, 'core/backend/package.json'))).toBe(true);
+
+    // Verify stackr.config.json is written at the project root and parses
+    const stackrConfigPath = path.join(projectDir, 'stackr.config.json');
+    expect(await fs.pathExists(stackrConfigPath)).toBe(true);
+    const stackrConfig = await fs.readJSON(stackrConfigPath);
+    expect(stackrConfig.version).toBe(1);
+    expect(stackrConfig.projectName).toBe('test-minimal');
+    expect(stackrConfig.orm).toBe('prisma');
+    expect(stackrConfig.services).toHaveLength(1);
+    expect(stackrConfig.services[0].name).toBe('core');
+    expect(stackrConfig.services[0].kind).toBe('base');
 
     // Verify package.json content
-    const mobilePkg = await fs.readJSON(path.join(projectDir, 'mobile/package.json'));
+    const mobilePkg = await fs.readJSON(path.join(projectDir, 'core/mobile/package.json'));
     expect(mobilePkg.name).toBe('test-minimal-mobile');
     expect(mobilePkg.dependencies.expo).toBeDefined();
 
@@ -125,8 +136,8 @@ describe('ProjectGenerator', () => {
     const projectDir = path.join(tempDir, 'test-onboarding');
     await generator.generate(projectDir);
 
-    // Verify onboarding directory exists
-    const onboardingDir = path.join(projectDir, 'mobile/app/(onboarding)');
+    // Verify onboarding directory exists (phase 1: under core/mobile)
+    const onboardingDir = path.join(projectDir, 'core/mobile/app/(onboarding)');
     expect(await fs.pathExists(onboardingDir)).toBe(true);
 
     // Verify onboarding pages exist
@@ -169,18 +180,18 @@ describe('ProjectGenerator', () => {
     const projectDir = path.join(tempDir, 'test-integrations');
     await generator.generate(projectDir);
 
-    // Verify package.json includes integrations
-    const mobilePkg = await fs.readJSON(path.join(projectDir, 'mobile/package.json'));
+    // Verify package.json includes integrations (phase 1: under core/)
+    const mobilePkg = await fs.readJSON(path.join(projectDir, 'core/mobile/package.json'));
     expect(mobilePkg.dependencies['react-native-purchases']).toBeDefined();
     expect(mobilePkg.dependencies['react-native-adjust']).toBeDefined();
     expect(mobilePkg.dependencies['expo-tracking-transparency']).toBeDefined();
 
     // Verify integration service files exist
     expect(
-      await fs.pathExists(path.join(projectDir, 'mobile/src/services/revenuecat-service.ts'))
+      await fs.pathExists(path.join(projectDir, 'core/mobile/src/services/revenuecat-service.ts'))
     ).toBe(true);
     expect(
-      await fs.pathExists(path.join(projectDir, 'mobile/src/services/adjust-service.ts'))
+      await fs.pathExists(path.join(projectDir, 'core/mobile/src/services/adjust-service.ts'))
     ).toBe(true);
   });
 
