@@ -82,7 +82,9 @@ export async function runCreateFlow(
     `  ${chalk.cyan('2.')} ./scripts/setup.sh`,
     `  ${chalk.cyan('3.')} docker compose up -d`,
     '',
-    chalk.gray('The setup script will create per-service .env files and install dependencies.')
+    chalk.gray('The setup script installs dependencies, wires the `stackr` CLI locally,'),
+    chalk.gray('and creates per-service .env files. After it finishes you can grow the'),
+    chalk.gray('monorepo with `npx stackr add service <name>`.')
   );
 
   displaySuccess('Monorepo created successfully!', nextSteps);

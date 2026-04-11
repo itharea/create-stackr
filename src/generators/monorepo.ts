@@ -13,6 +13,7 @@ import { ServiceGenerator } from './service.js';
 import { buildServiceContext, buildStackrConfig } from './service-context.js';
 import { renderDockerCompose } from './docker-compose.js';
 import { writeEnvFilesWithCredentials } from './env-files.js';
+import { readStackrVersion } from '../utils/version.js';
 
 /**
  * Orchestrates full-project generation for `create-stackr`.
@@ -109,6 +110,10 @@ export class MonorepoGenerator {
       aiTools: this.initConfig.aiTools,
       services: this.initConfig.services,
       preset: this.initConfig.preset,
+      // Pinned to the current CLI version so `templates/project/package.json.ejs`
+      // can emit a `devDependency` on `create-stackr@^<version>` and the
+      // generated project can run `npx stackr add service …` post-install.
+      stackrVersion: readStackrVersion(),
     };
 
     const subtrees = ['project'];

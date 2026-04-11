@@ -79,9 +79,14 @@ Examples:
   $ npx create-stackr my-app --defaults --with-services scout,manage
   $ npx create-stackr my-app --no-auth --service-name api
 
-After your project is generated, use the companion \`stackr\` binary inside it:
+After your project is generated, run \`./scripts/setup.sh\` once — it
+installs the monorepo-root devDependency on \`create-stackr\`, which
+drops the \`stackr\` binary into \`node_modules/.bin\` so you can run:
   $ cd my-app
-  $ stackr add service wallet
+  $ ./scripts/setup.sh
+  $ npx stackr add service wallet
+If you prefer a system-wide install: \`npm i -g create-stackr\` once,
+then \`stackr add service wallet\` works from any generated project.
 
 For more information, visit:
   https://stackr.sh/docs
