@@ -41,11 +41,12 @@ cd <%= svc.name %>/mobile && <%= packageManager %> start
 
 ```
 <%= projectName %>/
+├── package.json                # Root devDependencies (create-stackr for the `stackr` CLI)
 ├── stackr.config.json          # Source of truth for services, orm, ports
 ├── docker-compose.yml          # Managed by stackr (marker blocks)
 ├── docker-compose.prod.yml     # Production overlay
 ├── scripts/
-│   ├── setup.sh                # Loops services, installs deps
+│   ├── setup.sh                # Loops services, installs deps, wires stackr CLI
 │   ├── docker-dev.sh
 │   └── docker-prod.sh
 <% services.forEach((svc) => { -%>
@@ -69,11 +70,23 @@ service's own `backend/DESIGN.md` for the full picture.
 
 ## Adding a service later
 
-Once stackr v0.5 ships its `stackr add service` command, you'll be able
-to grow the monorepo without clobbering your docker-compose edits:
+The root `package.json` pins `create-stackr` as a devDependency, so
+after `./scripts/setup.sh` has run the root install the `stackr` CLI is
+available locally. To grow the monorepo without clobbering your
+docker-compose edits:
 
 ```bash
+npx stackr add service wallet
+# or: <%= packageManager %> run stackr -- add service wallet
+```
+
+If you'd rather have `stackr` on your PATH system-wide, install it
+globally once:
+
+```bash
+npm i -g create-stackr
 stackr add service wallet
 ```
 
-For now, keep this monorepo's `stackr.config.json` as the source of truth.
+Either way, `stackr.config.json` stays the source of truth for the
+monorepo shape.

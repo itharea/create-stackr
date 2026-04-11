@@ -8,11 +8,15 @@
 #   2. Creates each service's backend/.env from backend/.env.example
 #      (real random credentials are written at create-stackr time —
 #      this copy is only a safety net for users who deleted .env)
-#   3. If any .env file was regenerated this run AND docker volumes
+#   3. Installs monorepo-root devDependencies so the `stackr` CLI binary
+#      from `create-stackr` is available inside the project. Non-fatal
+#      — a transient registry / offline environment does not abort the
+#      rest of setup.
+#   4. If any .env file was regenerated this run AND docker volumes
 #      exist for this project, offers a confirmed reset so Postgres
 #      doesn't refuse to start with credentials that no longer match
 #      the existing volume
-#   4. Runs `<%= packageManager %> install` in every backend / web / mobile
+#   5. Runs `<%= packageManager %> install` in every backend / web / mobile
 #      subproject
 #
 # Re-run safely — existing .env files are never overwritten, and the
@@ -43,6 +47,32 @@ if [ ! -f .env ]; then
   fi
 else
   echo "  ℹ️  Root .env already exists — skipping"
+fi
+
+# --- Monorepo root devDependencies --------------------------------------------
+# The root package.json pins `create-stackr` as a devDependency so the
+# `stackr` CLI binary (for `stackr add service`, `stackr migrations ack`,
+# etc.) lands in `node_modules/.bin/stackr` and is reachable via
+# `npx stackr` or `<%= packageManager %> run stackr`. Non-fatal: if the
+# install fails (e.g. the CLI version isn't published yet, or the user
+# is offline), we print a clear warning with a global-install fallback
+# and continue with the per-service installs below.
+if [ -f package.json ]; then
+  echo ""
+  echo "📦 Installing monorepo-root devDependencies..."
+  if <%= packageManager %> install; then
+    echo "  ✅ Root devDependencies installed — `npx stackr` is now available"
+  else
+    echo ""
+    echo "  ⚠️  Root install failed — the `stackr` CLI won't be available via npx."
+    echo "     You can still use it globally:"
+    echo "       npm i -g create-stackr"
+    echo "       stackr add service <name>"
+    echo ""
+    echo "     Or retry the root install manually once the registry is reachable:"
+    echo "       <%= packageManager %> install"
+    echo ""
+  fi
 fi
 
 # --- Per-service backend .env + install ---------------------------------------
@@ -149,3 +179,5 @@ echo "  2. Start the stack:  docker compose up -d"
 <% services.forEach((svc) => { -%>
 echo "  3. Dev <%= svc.name %> backend:  cd <%= svc.name %>/backend && <%= packageManager %> run dev:rest-api"
 <% }); -%>
+echo "  4. Add a new service:  npx stackr add service <name>"
+echo ""
