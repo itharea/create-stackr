@@ -617,6 +617,16 @@ A: Yes, Next.js App Router uses React Server Components by default. Client compo
 
 ## Roadmap
 
+### Completed in v0.5.0
+- [x] Multi-microservice monorepo scaffolding (`auth/` + one or more base services)
+- [x] Second CLI binary: `stackr add service <name>` for post-init service scaffolding
+- [x] `stackr.config.json` durable source of truth written at generation time
+- [x] Three auth middleware flavors (standard, role-gated, flexible) with HTTP forwarding
+- [x] Marker-block `docker-compose.yml` regeneration that preserves user edits
+- [x] Pending-migration sentinel (`stackr migrations ack`) for auth schema changes
+- [x] Programmatic docker-compose + per-service env prefixing (`AUTH_DB_*`, `CORE_DB_*`, …)
+- [x] Root `package.json` with `create-stackr` pinned as a devDependency so `npx stackr` works inside generated projects
+
 ### Completed in v0.4.0
 - [x] AI coding tool selection (Claude Code, Codex, Cursor, Windsurf)
 - [x] Architectural documentation (DESIGN.md, BEST_PRACTICES.md) in generated projects
@@ -640,7 +650,7 @@ A: Yes, Next.js App Router uses React Server Components by default. Client compo
 - [x] Email verification & password reset
 
 ### Upcoming
-- [ ] v0.5.0: More SDK integrations (Firebase, Supabase)
+- [ ] v0.6.0: `stackr add auth` (retroactively add auth to a `--no-auth` project), `stackr migrate` (automated DB migrations via docker or host mode), more SDK integrations (Firebase, Supabase)
 - [ ] v1.0.0: Stable API, production-ready
 
 ## Technology Stack
