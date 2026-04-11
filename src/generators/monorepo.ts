@@ -12,6 +12,7 @@ import { AI_TOOL_FILES } from '../types/index.js';
 import { ServiceGenerator } from './service.js';
 import { buildServiceContext, buildStackrConfig } from './service-context.js';
 import { renderDockerCompose } from './docker-compose.js';
+import { writeEnvFilesWithCredentials } from './env-files.js';
 
 /**
  * Orchestrates full-project generation for `create-stackr`.
@@ -58,14 +59,21 @@ export class MonorepoGenerator {
       await fs.writeFile(path.join(targetDir, 'docker-compose.yml'), devCompose);
       await fs.writeFile(path.join(targetDir, 'docker-compose.prod.yml'), prodCompose);
 
-      // 3b. Seed root .env from .env.example so the user can `docker compose
-      //     up` immediately without running scripts/setup.sh first, and so
-      //     `stackr add service` has something to merge into.
-      const envExamplePath = path.join(targetDir, '.env.example');
-      const envPath = path.join(targetDir, '.env');
-      if ((await fs.pathExists(envExamplePath)) && !(await fs.pathExists(envPath))) {
-        await fs.copy(envExamplePath, envPath);
-      }
+      // 3b. Write real .env files with strong random credentials. Each
+      //     service gets fresh Postgres / Redis / BetterAuth secrets that
+      //     land in BOTH the root .env (where docker-compose reads them
+      //     to start the db / redis containers and to build the backend
+      //     service environments) and the service's own backend/.env
+      //     (used when running a backend locally without docker). The
+      //     committed .env.example files are left untouched — they ship
+      //     with human-readable placeholder values as documentation.
+      //     This restores the v0.4 behaviour that was lost when the
+      //     multi-microservice refactor dropped `setup.sh`'s inline
+      //     openssl-rand credential generation.
+      await writeEnvFilesWithCredentials({
+        targetDir,
+        serviceNames: this.initConfig.services.map((s) => s.name),
+      });
 
       // 4. stackr.config.json
       await saveStackrConfig(targetDir, stackrConfig);

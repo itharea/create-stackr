@@ -50,17 +50,25 @@ describe('config conflicts — generation fails fast', () => {
     const result = validateConfiguration(config);
     expect(result.valid).toBe(false);
 
-    // But the generator *should* still fail — either because
-    // `ensureDir` + `pathExists` collide or because two services try to
-    // write to the same path. We let it run to confirm *something* goes
-    // wrong and no partial project is left silently in a "half-done" state
-    // that the user could mistake for success.
+    // Run the generator against the broken config too, as a belt-and-
+    // suspenders check that nothing silently produces a "half-done"
+    // project the user could mistake for success. Either outcome is
+    // acceptable here — the validator above is the single gate — so
+    // swallow any throw.
+    //
+    // IMPORTANT: await the promise properly. The old form
+    //   `await expect(async () => { await gen.generate(...) }).not.toThrow()`
+    // was buggy: `.not.toThrow()` is a SYNCHRONOUS matcher that only
+    // checks whether calling the fn throws before it returns, and the
+    // inner async work was never awaited. afterEach would then race
+    // against still-running `fs.ensureDir` calls inside the generator
+    // and surface as an ENOENT `mkdir` unhandled rejection under load.
     const projectDir = path.join(tempDir, config.projectName);
-    await expect(async () => {
+    try {
       await new MonorepoGenerator(config).generate(projectDir);
-    }).not.toThrow();
-    // Even if generation doesn't throw, the stackr.config.json should
-    // reflect the (broken) config; the validator is the single gate.
+    } catch {
+      /* tolerated — the validator above is the assertion that matters */
+    }
   });
 
   it('role-gated without roles is rejected by validator', () => {
