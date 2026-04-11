@@ -58,6 +58,15 @@ export class MonorepoGenerator {
       await fs.writeFile(path.join(targetDir, 'docker-compose.yml'), devCompose);
       await fs.writeFile(path.join(targetDir, 'docker-compose.prod.yml'), prodCompose);
 
+      // 3b. Seed root .env from .env.example so the user can `docker compose
+      //     up` immediately without running scripts/setup.sh first, and so
+      //     `stackr add service` has something to merge into.
+      const envExamplePath = path.join(targetDir, '.env.example');
+      const envPath = path.join(targetDir, '.env');
+      if ((await fs.pathExists(envExamplePath)) && !(await fs.pathExists(envPath))) {
+        await fs.copy(envExamplePath, envPath);
+      }
+
       // 4. stackr.config.json
       await saveStackrConfig(targetDir, stackrConfig);
 

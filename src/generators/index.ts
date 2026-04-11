@@ -24,5 +24,9 @@ export class ProjectGenerator {
 
 export { MonorepoGenerator } from './monorepo.js';
 export { ServiceGenerator } from './service.js';
-export { buildServiceContext, buildStackrConfig } from './service-context.js';
-export { renderDockerCompose } from './docker-compose.js';
+export {
+  buildServiceContext,
+  buildStackrConfig,
+  stackrConfigToInitConfig,
+} from './service-context.js';
+export { renderDockerCompose, renderComposeInnerBlocks } from './docker-compose.js';

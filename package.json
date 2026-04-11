@@ -1,10 +1,11 @@
 {
   "name": "create-stackr",
-  "version": "0.4.0",
-  "description": "Create production-ready full-stack mobile apps with React Native (Expo) and Node.js backend",
+  "version": "0.5.0",
+  "description": "Scaffold production-ready multi-microservice monorepos with Fastify backends, BetterAuth, Docker, and more",
   "type": "module",
   "bin": {
-    "create-stackr": "./bin/cli.js"
+    "create-stackr": "./bin/create-stackr.js",
+    "stackr": "./bin/stackr.js"
   },
   "files": [
     "bin",
@@ -14,7 +15,8 @@
     "LICENSE"
   ],
   "scripts": {
-    "dev": "tsx src/index.ts",
+    "dev": "tsx src/entrypoints/create.ts",
+    "dev:stackr": "tsx src/entrypoints/stackr.ts",
     "build": "tsc",
     "test": "vitest run",
     "test:watch": "VITEST_WATCH=1 vitest",

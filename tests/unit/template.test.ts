@@ -1,8 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import path from 'path';
-import { getDestinationPath, shouldIncludeFile } from '../../src/utils/template.js';
+import {
+  getDestinationPath,
+  renderTemplate,
+  shouldIncludeFile,
+} from '../../src/utils/template.js';
 import { buildServiceContext } from '../../src/generators/service-context.js';
 import { minimalConfig } from '../fixtures/configs/minimal.js';
+import { cloneInitConfig } from '../fixtures/configs/index.js';
 
 describe('getDestinationPath', () => {
   const targetDir = '/tmp/target';
@@ -108,5 +113,92 @@ describe('shouldIncludeFile', () => {
     const auth = minimalConfig.services.find((s) => s.kind === 'auth')!;
     const ctx = buildServiceContext(minimalConfig, auth);
     expect(shouldIncludeFile('services/base/backend/controllers/rest-api/plugins/auth.ts.ejs', ctx)).toBe(false);
+  });
+
+  it('skips shared/AGENTS.md (rendered separately by the monorepo root pass)', () => {
+    const core = minimalConfig.services.find((s) => s.name === 'core')!;
+    const ctx = buildServiceContext(minimalConfig, core);
+    expect(shouldIncludeFile('shared/AGENTS.md.ejs', ctx)).toBe(false);
+  });
+
+  it('excludes domain/device-session and routes/device-sessions for non-auth services', () => {
+    const core = minimalConfig.services.find((s) => s.name === 'core')!;
+    const coreCtx = buildServiceContext(minimalConfig, core);
+    expect(
+      shouldIncludeFile('services/base/backend/domain/device-session/model.ts.ejs', coreCtx)
+    ).toBe(false);
+    expect(
+      shouldIncludeFile(
+        'services/base/backend/controllers/rest-api/routes/device-sessions/index.ts.ejs',
+        coreCtx
+      )
+    ).toBe(false);
+  });
+
+  it('includes device-session files for the auth service', () => {
+    const auth = minimalConfig.services.find((s) => s.kind === 'auth')!;
+    const authCtx = buildServiceContext(minimalConfig, auth);
+    expect(
+      shouldIncludeFile('services/auth/backend/domain/device-session/model.ts.ejs', authCtx)
+    ).toBe(true);
+  });
+
+  it('sdkInitializer returns false when no SDK integrations are enabled', () => {
+    const core = minimalConfig.services.find((s) => s.name === 'core')!;
+    const ctx = buildServiceContext(minimalConfig, core);
+    expect(
+      shouldIncludeFile('services/base/backend/services/sdkInitializer/index.ts.ejs', ctx)
+    ).toBe(false);
+  });
+
+  it('sdkInitializer returns true when at least one SDK integration is enabled', () => {
+    const cfg = cloneInitConfig(minimalConfig);
+    const core = cfg.services.find((s) => s.name === 'core')!;
+    core.integrations.revenueCat.enabled = true;
+    const ctx = buildServiceContext(cfg, core);
+    expect(
+      shouldIncludeFile('services/base/backend/services/sdkInitializer/index.ts.ejs', ctx)
+    ).toBe(true);
+  });
+
+  it('excludes features/mobile/auth when mobile is enabled but auth is disabled', () => {
+    // Construct a mobile-enabled service with authMiddleware 'none' so the
+    // platform check passes but features.authentication.enabled is false.
+    const cfg = cloneInitConfig(minimalConfig);
+    // Remove the auth service so `authentication.enabled` is guaranteed false
+    // regardless of middleware.
+    cfg.services = cfg.services.filter((s) => s.kind !== 'auth');
+    const core = cfg.services.find((s) => s.name === 'core')!;
+    core.backend.authMiddleware = 'none';
+    core.mobile = { enabled: true };
+    const ctx = buildServiceContext(cfg, core);
+    expect(ctx.platforms).toContain('mobile');
+    expect(ctx.features.authentication.enabled).toBe(false);
+    expect(
+      shouldIncludeFile('features/mobile/auth/login/index.tsx.ejs', ctx)
+    ).toBe(false);
+  });
+
+  it('excludes forgot-password/reset-password files when passwordReset is disabled', () => {
+    const cfg = cloneInitConfig(minimalConfig);
+    const auth = cfg.services.find((s) => s.kind === 'auth')!;
+    auth.authConfig!.passwordReset = false;
+    const core = cfg.services.find((s) => s.name === 'core')!;
+    core.mobile = { enabled: true };
+    const ctx = buildServiceContext(cfg, core);
+    expect(
+      shouldIncludeFile('features/mobile/auth/forgot-password/index.tsx.ejs', ctx)
+    ).toBe(false);
+    expect(
+      shouldIncludeFile('features/mobile/auth/reset-password/index.tsx.ejs', ctx)
+    ).toBe(false);
+  });
+});
+
+describe('renderTemplate', () => {
+  it('rejects with "Template not found" when the file does not exist', async () => {
+    await expect(
+      renderTemplate('definitely/does/not/exist.ejs', {})
+    ).rejects.toThrow(/Template not found/);
   });
 });

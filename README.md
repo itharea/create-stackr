@@ -4,39 +4,45 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/node/v/create-stackr)](https://nodejs.org)
 
-> **v0.4**: Now with AI coding tool selection, architectural documentation in generated projects, React 19 patterns, and clean backend layers. Feedback welcome!
+> **v0.5**: Multi-microservice monorepo layout is the new default. Each project gets an isolated `auth/` service plus one or more base services that can grow via `stackr add service`. **Breaking change** — see [Upgrading from v0.4](#upgrading-from-v04).
 
-Create production-ready fullstack apps with Expo (mobile), Next.js (web), and Node.js backend in minutes.
+Scaffold production-ready multi-microservice monorepos with isolated Fastify services, BetterAuth, per-service Postgres + Redis, Docker Compose, and optional Expo / Next.js frontends per service.
 
 ## Quick Start
 
 ```bash
-# npm
-npx create-stackr@latest my-app
+# Create a fresh monorepo with auth + core
+npx create-stackr@latest my-app --defaults
 
-# yarn
-yarn create stackr my-app
+# Create a monorepo with extra base services pre-scaffolded
+npx create-stackr@latest my-app --defaults --with-services scout,manage
 
-# bun
-bunx create-stackr my-app
+# Months later, grow the monorepo from inside the project
+cd my-app
+stackr add service wallet
 ```
+
+`create-stackr` ships two binaries:
+
+| Binary | When to use |
+|---|---|
+| `create-stackr` | Initial scaffold — run once per project |
+| `stackr` | Post-init operations (`add service`, `migrations ack`) — run from inside a generated project |
 
 ## Features
 
-- **React Native (Expo)** - Cross-platform mobile development (iOS & Android)
-- **Next.js Web App** - Modern React web application with App Router
-- **Node.js Backend** - Fastify + PostgreSQL + Redis
-- **ORM Flexibility** - Choose between Prisma (default) or Drizzle ORM
-- **BetterAuth Authentication** - Email/password + OAuth providers (Google, Apple, GitHub)
-- **Native OAuth SDKs** - Seamless sign-in with native SDKs and browser fallback
-- **SDK Integrations** - RevenueCat, Adjust, Scate
-- **Onboarding Flows** - Customizable multi-page user onboarding
-- **Subscription Paywalls** - RevenueCat integration for in-app purchases
-- **Docker Support** - Complete development environment with Docker Compose
-- **Analytics** - Adjust attribution and Scate engagement tracking
-- **ATT Support** - App Tracking Transparency for iOS
-- **Two-Factor Auth** - Optional TOTP-based 2FA support
-- **Email Verification** - Built-in email verification and password reset
+- **Multi-microservice monorepo** - Isolated `auth/` + one or more base services, each with its own Postgres + Redis + backend container
+- **Three auth middleware flavors** - `standard` (cookie forwarding), `role-gated` (requires a role), `flexible` (cookie or device session)
+- **Grow your monorepo over time** - `stackr add service <name>` scaffolds a new service, wires it into docker-compose, and updates auth's additionalFields
+- **React Native (Expo)** - Cross-platform mobile development, per service
+- **Next.js Web App** - App Router, per service
+- **Node.js Backend** - Fastify + PostgreSQL + Redis, per service
+- **ORM Flexibility** - Monorepo-wide choice of Prisma (default) or Drizzle ORM
+- **BetterAuth Authentication** - Dedicated auth service with email/password + OAuth providers (Google, Apple, GitHub)
+- **SDK Integrations** - RevenueCat, Adjust, Scate, per service
+- **Docker Compose** - Marker-block regeneration preserves hand-written additions
+- **`stackr.config.json` as source of truth** - Durable on-disk contract describing the monorepo shape
+- **Pending-migration sentinel** - Auto-tracks schema changes and refuses further commands until the user runs the DB migration
 
 ## Requirements
 
@@ -84,6 +90,8 @@ Analytics SDKs with basic features:
 
 ## CLI Usage
 
+### `create-stackr` — project init
+
 ```bash
 # Interactive mode
 npx create-stackr my-app
@@ -96,12 +104,62 @@ npx create-stackr my-app --template analytics-focused
 # With defaults (minimal preset, no prompts)
 npx create-stackr my-app --defaults
 
+# Multi-service at init time
+npx create-stackr my-app --defaults --with-services scout,manage
+
+# No auth service (backend-only stack with no forwarding middleware)
+npx create-stackr my-app --no-auth --service-name api
+
 # Show help
 npx create-stackr --help
 
 # Verbose output
 npx create-stackr my-app --verbose
 ```
+
+### `stackr` — post-init operations
+
+Run from inside a generated project.
+
+```bash
+# Scaffold a new service (backend only)
+stackr add service wallet
+
+# Add a new service with a dedicated web frontend
+stackr add service wallet --web
+
+# Add a new service without running package manager install
+stackr add service wallet --no-install
+
+# Force compose regen when the managed marker blocks are missing
+stackr add service wallet --force
+
+# After running the DB migration printed in the next-steps output, clear
+# the pending-migration sentinel so further stackr commands work:
+stackr migrations ack auth
+```
+
+#### The pending-migration flow
+
+When `stackr add service` changes auth's schema (by adding a new
+`has<Service>Account` additional field), the DB is out of sync with the
+regenerated `auth/backend/lib/auth.ts`. Until a migration runs, any later
+sign-in from the new service would silently fail.
+
+To prevent that, stackr writes a `pendingMigrations` entry to
+`stackr.config.json` and every subsequent `stackr` subcommand refuses
+until you resolve it:
+
+```
+stackr add service wallet       # writes pendingMigrations: [ ...auth ]
+# → run the printed drizzle-kit / prisma command by hand
+stackr migrations ack auth      # clears the sentinel
+stackr add service treasury     # now allowed
+```
+
+Pass `--force` to `stackr add service` to stack a new pending migration
+on top of existing ones. Use `stackr migrations ack <service>` once per
+entry after running each migration.
 
 ## What You Get
 
@@ -634,6 +692,60 @@ A: Yes, Next.js App Router uses React Server Components by default. Client compo
 - [x] Two-factor authentication (TOTP)
 - [x] Email verification & password reset
 - [x] Next.js web app support
+
+## Project structure
+
+A minimal monorepo (auth + core) generated with v0.5 looks like:
+
+```
+my-app/
+├── stackr.config.json              # durable on-disk contract (source of truth)
+├── docker-compose.yml              # stackr managed marker blocks + your edits
+├── docker-compose.prod.yml
+├── .env / .env.example             # per-service prefixed vars (AUTH_DB_*, CORE_DB_*, ...)
+├── README.md / DESIGN.md / AGENTS.md
+├── scripts/                        # setup.sh, docker-dev.sh, docker-prod.sh
+│
+├── auth/                           # BetterAuth server
+│   └── backend/                    # Fastify :8082
+│
+├── core/                           # default base service (renameable)
+│   ├── backend/                    # Fastify :8080 — forwards cookies to auth
+│   ├── web/                        # optional Next.js per service
+│   └── mobile/                     # optional Expo per service
+│
+└── <extra-services>/               # added later via `stackr add service`
+    └── ... (same shape as core/)
+```
+
+Non-auth services authenticate by forwarding cookies to auth's
+`/api/auth/get-session` endpoint. Each service owns its own database,
+Dockerfile, and prefixed env vars — there is no shared backend code.
+
+## Upgrading from v0.4
+
+v0.5 is a hard breaking change. The default layout moved from a single
+unified `backend/ + mobile/ + web/` project to a multi-microservice
+monorepo. **Projects generated with v0.4 keep working as-is** — stackr
+does not attempt to migrate them automatically.
+
+To adopt v0.5 for an existing project:
+
+1. Generate a fresh v0.5 project alongside your existing one:
+   ```bash
+   npx create-stackr@latest my-app-v5 --defaults
+   ```
+2. Port domain code from your v0.4 `backend/domain` into `my-app-v5/core/backend/domain`.
+3. If your v0.4 project had multiple subsystems, split them across new
+   services with `stackr add service scout`, etc.
+4. Move your mobile / web code into `core/mobile` and `core/web`
+   (or create a dedicated service for them).
+
+Closest one-shot equivalent to v0.4's single-project output:
+
+```bash
+npx create-stackr@latest my-app --defaults --no-auth --service-name core
+```
 
 ## Contributing
 

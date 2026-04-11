@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-04-11
+
+### ⚠ BREAKING CHANGES
+
+- **Default project layout is now a multi-microservice monorepo** (`auth/ + core/ + ...`) instead of a single `backend/ + mobile/ + web/` layout. v0.4 projects keep working as-is but are NOT automatically migrated. See the Upgrading from v0.4 section in the README.
+- **New second CLI binary: `stackr`** (for `stackr add service <name>` and related post-init commands). The `create-stackr` binary stays dedicated to initial scaffolding.
+- **`stackr.config.json` is now written at generation time** and is required by all `stackr` subcommands. It is the durable source of truth describing the monorepo shape (services, ORM choice, package manager, AI tools, pending migrations).
+- The `src/index.ts` entrypoint is now a thin re-export. The real CLI lives at `src/entrypoints/create.ts` and `src/entrypoints/stackr.ts`.
+
+### Added
+
+- **Multi-service monorepo scaffolding**: `create-stackr <name>` now generates `auth/` plus one or more base services. Use `--with-services scout,manage` to pre-scaffold extras at init time, `--no-auth` to skip the auth service entirely, or `--service-name <name>` to rename the initial base service.
+- **`stackr add service <name>` subcommand**: Scaffolds a new microservice into an existing project, wires it into `docker-compose.yml`, appends its prefixed env vars to the root `.env`, and regenerates `auth/backend/lib/auth.ts` with a new `has<Service>Account` additional field. Follows a strict five-phase (A–E) ordering — all writes stage into a tempdir, a dry-run pass validates YAML and config, then a single atomic commit runs with `stackr.config.json` saved last. If anything fails before the commit, the project is left byte-identical.
+- **`stackr migrations ack <service>` subcommand**: Clears a single `pendingMigration` entry from `stackr.config.json` after you run the DB migration by hand. Each ack clears one entry; stacked migrations (from `stackr add service --force`) must be acked one at a time.
+- **Three auth middleware flavors**: `standard` (forwards cookies to the auth service), `role-gated` (standard + requires a role), `flexible` (cookie or device session). Selected per service at init time or via `--auth-middleware` on `stackr add service`.
+- **Marker-block docker-compose regeneration**: `# >>> stackr managed services >>>` and `# >>> stackr managed volumes >>>` marker blocks wrap the stackr-owned compose entries. `stackr add service` rewrites ONLY the inside of those blocks, preserving any user-added services, comments, volumes, or networks byte-identical. A dedicated release-blocker integration test (`compose-regen-preserves-user-edits.test.ts`) enforces this contract.
+- **Pending-migration sentinel**: When `stackr add service` changes auth's schema, a `PendingMigration` entry is appended to `stackr.config.json`. Every subsequent `stackr` subcommand refuses until the entry is cleared via `stackr migrations ack`. `--force` bypasses the refusal but still stacks a new migration. This prevents the "silent next-sign-in fails 30 minutes later" footgun.
+- **Shared `Dockerfile` and `auth-plugin` templates**: `templates/services/base/backend/Dockerfile.ejs` and `templates/services/base/backend/controllers/rest-api/plugins/auth.ts.ejs` are the single sources of truth for every base service. The auth plugin template switches on the chosen middleware flavor at render time.
+- **Port allocation determinism**: `allocateBackendPort` / `allocateWebPort` pick the next free port above 8080 / 3000 respectively, reserving 8082 and 3002 for auth. Allocating twice against the same config yields the same port — verified by a dedicated unit test.
+- **Compose marker-block corruption detection**: `readMarkedBlock` now throws `MarkerCorruptionError` (discriminated by reason: `missing-start`, `missing-end`, `duplicate-start`, `duplicate-end`, `end-before-start`) instead of silently succeeding on malformed marker state. CRLF and LF line endings are detected and preserved.
+
+### Changed
+
+- `ProjectConfig` is now a deprecated alias for `InitConfig`. Deletion tracked for v0.6.
+- Presets are now `InitConfig` factories producing a `services[]` array.
+- `src/index.ts` pared to a re-export shim for backwards compatibility.
+- `bin/cli.js` renamed to `bin/create-stackr.js`; `bin/stackr.js` added alongside it.
+
+### Removed
+
+- Single-project mode. The closest equivalent is `npx create-stackr myapp --defaults --no-auth --service-name core`, which produces a minimal monorepo with a single base service.
+
+### Deferred (tracked in backlog)
+
+- `stackr add auth` — retroactively add an auth service to a `--no-auth` project
+- `stackr migrate` — run DB migrations automatically via docker or host mode (currently users run the printed command by hand and `stackr migrations ack`)
+- `stackr doctor`, `stackr add entity`, `stackr add route`
+
 ## [0.4.0] - 2026-02-19
 
 ### Added

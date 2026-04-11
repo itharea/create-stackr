@@ -64,4 +64,26 @@ describe('port-allocator', () => {
       expect(AUTH_WEB_PORT).toBe(3002);
     });
   });
+
+  describe('determinism (phase 3)', () => {
+    it('allocating a new port against the same config twice yields the same result', () => {
+      const services = [svc('auth', 8082), svc('core', 8080), svc('scout', 8081)];
+      const first = allocateBackendPort(services);
+      const second = allocateBackendPort(services);
+      expect(first).toBe(second);
+      expect(first).toBe(8083);
+    });
+
+    it('allocating after differently-ordered inputs yields the same next port', () => {
+      const servicesA = [svc('core', 8080), svc('auth', 8082), svc('scout', 8081)];
+      const servicesB = [svc('auth', 8082), svc('scout', 8081), svc('core', 8080)];
+      // Both fill 8080, 8081, 8082 — so the next free port is 8083 in both.
+      expect(allocateBackendPort(servicesA)).toBe(allocateBackendPort(servicesB));
+    });
+
+    it('web port allocation is deterministic across identical configs', () => {
+      const services = [svc('a', 8080, 3000), svc('b', 8081, 3001)];
+      expect(allocateWebPort(services)).toBe(allocateWebPort(services));
+    });
+  });
 });

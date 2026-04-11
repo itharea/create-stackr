@@ -42,6 +42,45 @@ export class MarkerNotFoundError extends Error {
   }
 }
 
+/**
+ * Thrown when a file's marker block is corrupt in a way that `readMarkedBlock`
+ * can detect but cannot safely repair. Discriminated so callers (`stackr add
+ * service`) can print a targeted recovery message per failure mode.
+ */
+export type MarkerCorruptionReason =
+  | 'missing-start'
+  | 'missing-end'
+  | 'duplicate-start'
+  | 'duplicate-end'
+  | 'end-before-start';
+
+export class MarkerCorruptionError extends Error {
+  constructor(
+    public readonly blockName: string,
+    public readonly reason: MarkerCorruptionReason
+  ) {
+    super(
+      `Marker block "${blockName}" is corrupt: ${describeCorruption(reason)}`
+    );
+    this.name = 'MarkerCorruptionError';
+  }
+}
+
+function describeCorruption(reason: MarkerCorruptionReason): string {
+  switch (reason) {
+    case 'missing-start':
+      return 'no start marker (# >>> stackr managed ... >>>) found';
+    case 'missing-end':
+      return 'start marker found but no matching end marker (# <<< stackr managed ... <<<)';
+    case 'duplicate-start':
+      return 'multiple start markers — the file has been edited into an inconsistent state';
+    case 'duplicate-end':
+      return 'multiple end markers — the file has been edited into an inconsistent state';
+    case 'end-before-start':
+      return 'end marker appears before the start marker';
+  }
+}
+
 export interface MarkerBlock {
   /** Index of the start-marker line (0-based). */
   start: number;
@@ -65,36 +104,68 @@ function detectLineSeparator(content: string): '\n' | '\r\n' {
 
 /**
  * Find the start and end marker lines for a given block name.
- * Returns null if either marker is missing.
+ *
+ * Returns `null` when neither marker is present (the "nothing to manage"
+ * case). Throws `MarkerCorruptionError` on every other kind of malformed
+ * marker state: missing start, missing end, duplicates, or out-of-order
+ * markers. The distinction matters because `stackr add service` treats a
+ * totally missing block differently from a corrupted one — the former
+ * can be repaired with `--force`, the latter demands user inspection.
+ *
+ * Line endings are detected from the source and preserved in `lineSeparator`.
  */
 export function readMarkedBlock(content: string, name: string): MarkerBlock | null {
   const sep = detectLineSeparator(content);
   const lines = content.split(sep);
 
   // Accept any amount of leading whitespace in front of the marker comment.
-  const startRe = new RegExp(`^(\\s*)#\\s*>>>\\s*stackr managed ${escapeRegex(name)}\\s*(?:\\(.*?\\)\\s*)?>>>\\s*$`);
-  const endRe = new RegExp(`^\\s*#\\s*<<<\\s*stackr managed ${escapeRegex(name)}\\s*<<<\\s*$`);
+  const startRe = new RegExp(
+    `^(\\s*)#\\s*>>>\\s*stackr managed ${escapeRegex(name)}\\s*(?:\\(.*?\\)\\s*)?>>>\\s*$`
+  );
+  const endRe = new RegExp(
+    `^\\s*#\\s*<<<\\s*stackr managed ${escapeRegex(name)}\\s*<<<\\s*$`
+  );
 
-  let startIdx = -1;
-  let endIdx = -1;
-  let indent = '';
+  const startIndices: number[] = [];
+  const endIndices: number[] = [];
+  const startIndents: string[] = [];
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (startIdx === -1) {
-      const m = line.match(startRe);
-      if (m) {
-        startIdx = i;
-        indent = m[1];
-      }
-    } else if (endRe.test(line)) {
-      endIdx = i;
-      break;
+    const sm = line.match(startRe);
+    if (sm) {
+      startIndices.push(i);
+      startIndents.push(sm[1]);
+      continue;
+    }
+    if (endRe.test(line)) {
+      endIndices.push(i);
     }
   }
 
-  if (startIdx === -1 || endIdx === -1) {
+  // No markers at all → block is simply absent. Caller decides whether to
+  // treat that as an error (e.g. `--force`) or an ordinary "fresh file" case.
+  if (startIndices.length === 0 && endIndices.length === 0) {
     return null;
+  }
+
+  if (startIndices.length > 1) {
+    throw new MarkerCorruptionError(name, 'duplicate-start');
+  }
+  if (endIndices.length > 1) {
+    throw new MarkerCorruptionError(name, 'duplicate-end');
+  }
+  if (startIndices.length === 0) {
+    throw new MarkerCorruptionError(name, 'missing-start');
+  }
+  if (endIndices.length === 0) {
+    throw new MarkerCorruptionError(name, 'missing-end');
+  }
+
+  const startIdx = startIndices[0];
+  const endIdx = endIndices[0];
+  if (endIdx < startIdx) {
+    throw new MarkerCorruptionError(name, 'end-before-start');
   }
 
   const innerLines = lines.slice(startIdx + 1, endIdx);
@@ -102,14 +173,20 @@ export function readMarkedBlock(content: string, name: string): MarkerBlock | nu
     start: startIdx,
     end: endIdx,
     inner: innerLines.join(sep),
-    indent,
+    indent: startIndents[0],
     lineSeparator: sep,
   };
 }
 
 /**
- * Replace the contents of a named marker block with `inner`. Throws
- * `MarkerNotFoundError` if the block isn't present.
+ * Replace the contents of a named marker block with `inner`.
+ *
+ * Throws `MarkerNotFoundError` if both markers are absent (the block is
+ * not in the file at all) and `MarkerCorruptionError` for any partial or
+ * corrupted marker state (missing one, duplicate, out of order). Callers
+ * like `stackr add service` treat the two cases differently: a totally
+ * missing block can be recovered by offering `--force` to reinitialize;
+ * a corrupt block requires user intervention.
  *
  * `inner` MUST already be correctly indented for insertion between the
  * markers (the function does not re-indent). Callers use the same indent

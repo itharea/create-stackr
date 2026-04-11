@@ -1,10 +1,12 @@
 import type {
+  AITool,
   InitConfig,
   ServiceConfig,
   ServiceRenderContext,
   LegacyFeaturesShim,
   LegacyBackendShim,
 } from '../types/index.js';
+import { noIntegrations } from '../config/presets.js';
 import type { ServiceEntry, StackrConfigFile } from '../types/config-file.js';
 import { readStackrVersion } from '../utils/version.js';
 
@@ -150,6 +152,66 @@ export function buildStackrConfig(initConfig: InitConfig): StackrConfigFile {
     appScheme: initConfig.appScheme,
     services,
   };
+}
+
+/**
+ * Reverse of `buildStackrConfig`. Lifts a `StackrConfigFile` loaded from
+ * disk back into an `InitConfig`-shaped runtime value so generators and
+ * `buildServiceContext` can work against a project that was created in
+ * a prior invocation (e.g. from `stackr add service`). Integration API
+ * keys are NOT in `stackr.config.json` — they're always runtime-only —
+ * so the returned `integrations` block uses empty-key defaults.
+ */
+export function stackrConfigToInitConfig(cfg: StackrConfigFile): InitConfig {
+  const services: ServiceConfig[] = cfg.services.map((entry) => serviceEntryToServiceConfig(entry));
+
+  return {
+    projectName: cfg.projectName,
+    packageManager: cfg.packageManager,
+    orm: cfg.orm,
+    appScheme: cfg.appScheme,
+    aiTools: cfg.aiTools as AITool[],
+    services,
+    // `preset` / `customized` aren't persisted in stackr.config.json and
+    // don't matter for post-init rendering — mark as customized so any
+    // fallback branching treats the runtime value as hand-authored.
+    customized: true,
+  };
+}
+
+function serviceEntryToServiceConfig(entry: ServiceEntry): ServiceConfig {
+  const svc: ServiceConfig = {
+    name: entry.name,
+    kind: entry.kind,
+    backend: {
+      port: entry.backend.port,
+      eventQueue: entry.backend.eventQueue,
+      imageUploads: entry.backend.imageUploads,
+      authMiddleware: entry.backend.authMiddleware,
+      ...(entry.backend.roles ? { roles: [...entry.backend.roles] } : {}),
+    },
+    web: entry.web ? { ...entry.web } : null,
+    mobile: entry.mobile ? { ...entry.mobile } : null,
+    // Integration secrets never live in stackr.config.json. Rehydrate with
+    // an empty-keys template so templates that read these fields render
+    // placeholder values rather than crashing. Real values come from the
+    // user's .env files at runtime.
+    integrations: noIntegrations(),
+  };
+
+  if (entry.kind === 'auth' && entry.authConfig) {
+    svc.authConfig = {
+      providers: { ...entry.authConfig.providers },
+      emailVerification: entry.authConfig.emailVerification,
+      passwordReset: entry.authConfig.passwordReset,
+      twoFactor: entry.authConfig.twoFactor,
+      adminDashboard: entry.authConfig.adminDashboard,
+      additionalUserFields: entry.authConfig.additionalUserFields.map((f) => ({ ...f })),
+      provisioningTargets: [...entry.authConfig.provisioningTargets],
+    };
+  }
+
+  return svc;
 }
 
 function buildServiceEntry(

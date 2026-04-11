@@ -5,7 +5,7 @@ import fs from 'fs-extra';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const CLI_PATH = path.resolve(__dirname, '../../dist/index.js');
+const CLI_PATH = path.resolve(__dirname, '../../dist/entrypoints/create.js');
 
 /**
  * Smoke tests — quick sanity checks that the built CLI is callable and

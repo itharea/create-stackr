@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
 import YAML from 'yaml';
+import inquirer from 'inquirer';
 import { MonorepoGenerator } from '../../src/generators/monorepo.js';
 import { minimalConfig } from '../fixtures/configs/minimal.js';
 import { cloneInitConfig } from '../fixtures/configs/index.js';
@@ -86,5 +87,62 @@ describe('E2E: monorepo generation', () => {
     expect(JSON.stringify(parsed.services.scout_rest_api)).toContain('AUTH_SERVICE_URL');
     expect(JSON.stringify(parsed.services.manage_rest_api)).toContain('AUTH_SERVICE_URL');
     expect(JSON.stringify(parsed.services.auth_rest_api)).not.toContain('AUTH_SERVICE_URL');
+  });
+
+  it('writes AGENTS.md (codex guideline file) when aiTools includes codex', async () => {
+    const projectDir = path.join(tempDir, 'ai-tools');
+    const cfg = cloneInitConfig(minimalConfig);
+    cfg.projectName = 'ai-tools';
+    await new MonorepoGenerator(cfg).generate(projectDir);
+
+    const agentsPath = path.join(projectDir, 'AGENTS.md');
+    expect(await fs.pathExists(agentsPath)).toBe(true);
+
+    const content = await fs.readFile(agentsPath, 'utf-8');
+    expect(content.length).toBeGreaterThan(0);
+    // EJS was rendered against the project context.
+    expect(content).toContain('ai-tools');
+    // No unrendered EJS tokens left behind.
+    expect(content).not.toMatch(/<%[=_-]?/);
+    expect(content).not.toMatch(/%>/);
+  });
+
+  it('refuses to overwrite a pre-existing target directory and runs handleError', async () => {
+    const projectDir = path.join(tempDir, 'collides');
+    await fs.ensureDir(projectDir);
+    await fs.writeFile(path.join(projectDir, 'sentinel.txt'), 'user-content');
+
+    // cleanup() prompts via inquirer on error — auto-decline so the test
+    // doesn't hang and so we can still assert the pre-existing directory
+    // is left alone.
+    const promptSpy = vi
+      .spyOn(inquirer, 'prompt')
+      // @ts-expect-error — narrow the return for the mocked call
+      .mockResolvedValue({ shouldCleanup: false });
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    try {
+      const cfg = cloneInitConfig(minimalConfig);
+      cfg.projectName = 'collides';
+      await expect(
+        new MonorepoGenerator(cfg).generate(projectDir)
+      ).rejects.toThrow(/already exists/);
+
+      // handleError path ran.
+      const errorOutput = errorSpy.mock.calls.flat().join(' ');
+      expect(errorOutput).toContain('Project generation failed');
+
+      // cleanup() was called → it asked inquirer.
+      expect(promptSpy).toHaveBeenCalled();
+
+      // User declined cleanup, so the pre-existing directory and its
+      // sentinel file remain untouched.
+      expect(await fs.pathExists(path.join(projectDir, 'sentinel.txt'))).toBe(true);
+    } finally {
+      promptSpy.mockRestore();
+      errorSpy.mockRestore();
+      logSpy.mockRestore();
+    }
   });
 });

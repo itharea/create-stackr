@@ -4,6 +4,7 @@ import {
   writeMarkedBlock,
   initComposeWithMarkedBlocks,
   MarkerNotFoundError,
+  MarkerCorruptionError,
 } from '../../src/utils/compose-merge.js';
 
 describe('compose-merge', () => {
@@ -119,6 +120,126 @@ describe('compose-merge', () => {
       const once = writeMarkedBlock(original, 'services', '  a: {}');
       const twice = writeMarkedBlock(once, 'services', '  a: {}');
       expect(twice).toBe(once);
+    });
+  });
+
+  describe('corruption detection (phase 3 hardening)', () => {
+    it('readMarkedBlock throws on missing start marker', () => {
+      const file = [
+        'services:',
+        '  some_db: {}',
+        '  # <<< stackr managed services <<<',
+      ].join('\n');
+      expect(() => readMarkedBlock(file, 'services')).toThrow(MarkerCorruptionError);
+      try {
+        readMarkedBlock(file, 'services');
+      } catch (err) {
+        expect((err as MarkerCorruptionError).reason).toBe('missing-start');
+      }
+    });
+
+    it('readMarkedBlock throws on missing end marker', () => {
+      const file = [
+        'services:',
+        '  # >>> stackr managed services >>>',
+        '  some_db: {}',
+      ].join('\n');
+      expect(() => readMarkedBlock(file, 'services')).toThrow(MarkerCorruptionError);
+      try {
+        readMarkedBlock(file, 'services');
+      } catch (err) {
+        expect((err as MarkerCorruptionError).reason).toBe('missing-end');
+      }
+    });
+
+    it('readMarkedBlock throws on duplicate start markers', () => {
+      const file = [
+        'services:',
+        '  # >>> stackr managed services >>>',
+        '  a: {}',
+        '  # >>> stackr managed services >>>',
+        '  b: {}',
+        '  # <<< stackr managed services <<<',
+      ].join('\n');
+      expect(() => readMarkedBlock(file, 'services')).toThrow(MarkerCorruptionError);
+      try {
+        readMarkedBlock(file, 'services');
+      } catch (err) {
+        expect((err as MarkerCorruptionError).reason).toBe('duplicate-start');
+      }
+    });
+
+    it('readMarkedBlock throws on duplicate end markers', () => {
+      const file = [
+        'services:',
+        '  # >>> stackr managed services >>>',
+        '  a: {}',
+        '  # <<< stackr managed services <<<',
+        '  # <<< stackr managed services <<<',
+      ].join('\n');
+      expect(() => readMarkedBlock(file, 'services')).toThrow(MarkerCorruptionError);
+      try {
+        readMarkedBlock(file, 'services');
+      } catch (err) {
+        expect((err as MarkerCorruptionError).reason).toBe('duplicate-end');
+      }
+    });
+
+    it('readMarkedBlock throws on end-before-start ordering', () => {
+      const file = [
+        'services:',
+        '  # <<< stackr managed services <<<',
+        '  stuff: {}',
+        '  # >>> stackr managed services >>>',
+      ].join('\n');
+      // Both markers are present but in wrong order. Because the single-
+      // pass scanner sees the end marker first and no unique-start detection,
+      // the "end-before-start" path is the expected failure mode.
+      expect(() => readMarkedBlock(file, 'services')).toThrow(MarkerCorruptionError);
+    });
+
+    it('returns null when BOTH markers are absent (unmanaged file)', () => {
+      const file = 'services:\n  some_db: {}\nvolumes:\n  data:\n';
+      expect(readMarkedBlock(file, 'services')).toBeNull();
+    });
+
+    it('writeMarkedBlock throws MarkerNotFoundError when both markers absent', () => {
+      const file = 'services:\n  some_db: {}\n';
+      expect(() => writeMarkedBlock(file, 'services', '  new: {}')).toThrow(MarkerNotFoundError);
+    });
+
+    it('writeMarkedBlock throws MarkerCorruptionError on partial markers', () => {
+      const file = 'services:\n  # >>> stackr managed services >>>\n  a: {}\n';
+      expect(() => writeMarkedBlock(file, 'services', '  new: {}')).toThrow(
+        MarkerCorruptionError
+      );
+    });
+
+    it('round-trips across CRLF line endings without mixing', () => {
+      const crlf = [
+        '# head',
+        'services:',
+        '  # >>> stackr managed services >>>',
+        '  old: {}',
+        '  # <<< stackr managed services <<<',
+      ].join('\r\n');
+      const updated = writeMarkedBlock(crlf, 'services', '  fresh: {}');
+      expect(updated.includes('fresh: {}')).toBe(true);
+      expect(updated.includes('old: {}')).toBe(false);
+      // Output should still be CRLF-separated; no raw '\n' without preceding '\r'.
+      expect(/[^\r]\n/.test(updated)).toBe(false);
+    });
+
+    it('round-trips across LF line endings without mixing', () => {
+      const lf = [
+        '# head',
+        'services:',
+        '  # >>> stackr managed services >>>',
+        '  old: {}',
+        '  # <<< stackr managed services <<<',
+      ].join('\n');
+      const updated = writeMarkedBlock(lf, 'services', '  fresh: {}');
+      expect(updated.includes('\r\n')).toBe(false);
     });
   });
 });

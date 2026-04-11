@@ -28,11 +28,40 @@ export function renderDockerCompose(
   return renderProdCompose(config);
 }
 
+/**
+ * Inner marker-block payloads for a fresh regeneration against `config`.
+ *
+ * Returns the pre-indented, newline-terminated strings that should land
+ * INSIDE the `services` and `volumes` marker blocks. This is what
+ * `stackr add service` passes to `writeMarkedBlock` to rewrite the
+ * managed portion of an existing compose file without touching the
+ * surrounding user content.
+ *
+ * The returned `services` / `volumes` strings are pristine regeneration
+ * output from the same render path `renderDockerCompose` uses — the only
+ * difference is that this helper skips the top-level file shell and the
+ * marker wrappers. See `renderDockerCompose` for fidelity rules.
+ */
+export function renderComposeInnerBlocks(
+  config: StackrConfigFile,
+  mode: 'dev' | 'prod'
+): { services: string; volumes: string } {
+  if (mode === 'dev') {
+    const { services, volumes } = renderDevComposeParts(config);
+    return { services, volumes };
+  }
+  const { services } = renderProdComposeParts(config);
+  return { services, volumes: '' };
+}
+
 // ---------------------------------------------------------------------------
 // Dev compose
 // ---------------------------------------------------------------------------
 
-function renderDevCompose(config: StackrConfigFile): string {
+function renderDevComposeParts(config: StackrConfigFile): {
+  services: string;
+  volumes: string;
+} {
   const { services: cfgServices, projectName } = config;
 
   // Compute per-service external ports so DB/Redis don't collide.
@@ -75,8 +104,15 @@ function renderDevCompose(config: StackrConfigFile): string {
     }
   }
 
-  const serviceEntries = serviceBlocks.join('\n');
-  const volumeEntries = volumeBlocks.join('');
+  return {
+    services: serviceBlocks.join('\n'),
+    volumes: volumeBlocks.join(''),
+  };
+}
+
+function renderDevCompose(config: StackrConfigFile): string {
+  const { services: serviceEntries, volumes: volumeEntries } =
+    renderDevComposeParts(config);
 
   const header =
     `# All infrastructure for local development\n` +
@@ -91,7 +127,9 @@ function renderDevCompose(config: StackrConfigFile): string {
 // Prod compose (overlay)
 // ---------------------------------------------------------------------------
 
-function renderProdCompose(config: StackrConfigFile): string {
+function renderProdComposeParts(config: StackrConfigFile): {
+  services: string;
+} {
   const { services: cfgServices } = config;
   const portMap = assignInfraPorts(cfgServices);
 
@@ -176,7 +214,13 @@ function renderProdCompose(config: StackrConfigFile): string {
     }
   }
 
-  const serviceEntries = serviceBlocks.join('\n');
+  return {
+    services: serviceBlocks.join('\n'),
+  };
+}
+
+function renderProdCompose(config: StackrConfigFile): string {
+  const { services: serviceEntries } = renderProdComposeParts(config);
   // Prod overlay has no managed volumes section (volumes come from dev).
   const header =
     `# Production overlay for docker-compose.yml\n` +

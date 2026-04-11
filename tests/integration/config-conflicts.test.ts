@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'fs-extra';
+import { rm } from 'fs/promises';
 import path from 'path';
 import os from 'os';
 import { MonorepoGenerator } from '../../src/generators/monorepo.js';
@@ -35,7 +36,11 @@ describe('config conflicts — generation fails fast', () => {
   });
 
   afterEach(async () => {
-    await fs.remove(tempDir);
+    // The duplicate-service-names test runs `git init` + file writes against
+    // a structurally broken project, which on macOS occasionally leaves
+    // background filesystem activity that races with plain fs.remove and
+    // surfaces as ENOTEMPTY. Use fs.rm with built-in retries.
+    await rm(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
 
   it('duplicate service names: generator either throws or the config is rejected upfront', async () => {

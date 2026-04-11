@@ -13,7 +13,7 @@ import type { InitConfig } from '../../src/types/index.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const REPO_ROOT = path.resolve(__dirname, '../..');
-const SRC_ENTRY = path.join(REPO_ROOT, 'src/index.ts');
+const SRC_ENTRY = path.join(REPO_ROOT, 'src/entrypoints/create.ts');
 const TSX_BIN = path.join(REPO_ROOT, 'node_modules/.bin/tsx');
 
 /**
