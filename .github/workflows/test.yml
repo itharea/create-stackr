@@ -87,7 +87,10 @@ jobs:
 
       - name: Verify build artifacts
         run: |
-          test -f bin/cli.js || exit 1
+          test -f bin/create-stackr.js || exit 1
+          test -f bin/stackr.js || exit 1
+          test -f dist/entrypoints/create.js || exit 1
+          test -f dist/entrypoints/stackr.js || exit 1
           test -d dist || exit 1
           test -d templates || exit 1
           echo "All build artifacts present"

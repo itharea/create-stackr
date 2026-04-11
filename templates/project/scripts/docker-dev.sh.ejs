@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Start the full dev stack (all services, with source mounts and hot reload).
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+exec docker compose up -d "$@"

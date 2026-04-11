@@ -1,0 +1,18 @@
+/**
+ * Drizzle ORM schema for `<%= service.name %>`.
+ *
+ * Base services own their own domain tables. User / session / auth tables
+ * live in the `<%= authServiceName || 'auth' %>` service and are accessed
+ * by forwarding cookies to `${AUTH_SERVICE_URL}/api/auth/get-session`.
+ *
+ * Add your service-specific tables below. The `example` placeholder shows
+ * the pattern — delete it once you've added real entities.
+ */
+
+import { pgTable, text, timestamp } from 'drizzle-orm/pg-core';
+
+export const example = pgTable('example', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name: text('name').notNull(),
+  createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
+});

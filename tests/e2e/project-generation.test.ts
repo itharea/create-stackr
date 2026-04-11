@@ -1,637 +1,191 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { ProjectGenerator } from '../../src/generators/index.js';
-import type { ProjectConfig } from '../../src/types/index.js';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
+import YAML from 'yaml';
+import ts from 'typescript';
+import { globby } from 'globby';
+import { MonorepoGenerator } from '../../src/generators/monorepo.js';
+import { loadStackrConfig } from '../../src/utils/config-file.js';
+import { minimalConfig } from '../fixtures/configs/minimal.js';
+import { multiServiceConfig } from '../fixtures/configs/multi-service.js';
+import { cloneInitConfig } from '../fixtures/configs/index.js';
 
-// Mock execa to avoid actual git/npm operations
-vi.mock('execa', () => ({
-  execa: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
-}));
-
-// Mock inquirer to automatically skip cleanup prompt
-vi.mock('inquirer', () => ({
-  default: {
-    prompt: vi.fn().mockResolvedValue({ shouldCleanup: false }),
-  },
-}));
-
-describe('E2E: Full Project Generation', () => {
+/**
+ * E2E — project generation. Walks the entire generated tree with a
+ * battery of file-level assertions:
+ *
+ *   (a) no unreplaced `<%= %>` or `<% %>` in any generated .ts/.md/.json
+ *   (b) every generated package.json is valid JSON
+ *   (c) every generated .ts in `auth/backend/` and `<base>/backend/`
+ *       parses with `ts.createSourceFile` (zero parse diagnostics)
+ *   (d) docker-compose.yml and docker-compose.prod.yml parse via yaml.parse
+ *   (e) stackr.config.json round-trips through loadStackrConfig
+ */
+describe('E2E — project generation file-level assertions (minimal)', () => {
   let tempDir: string;
+  let projectDir: string;
 
-  beforeEach(async () => {
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'test-e2e-'));
-  });
+  beforeAll(async () => {
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'e2e-project-min-'));
+    const cfg = cloneInitConfig(minimalConfig);
+    cfg.projectName = 'e2e-min';
+    cfg.appScheme = 'e2emin';
+    projectDir = path.join(tempDir, cfg.projectName);
+    await new MonorepoGenerator(cfg).generate(projectDir);
+  }, 60000);
 
-  afterEach(async () => {
+  afterAll(async () => {
     await fs.remove(tempDir);
   });
 
-  it('should generate complete minimal project', async () => {
-    const config: ProjectConfig = {
-      projectName: 'minimal-app',
-      packageManager: 'npm',
-      appScheme: 'minimalapp',
-      platforms: ['mobile', 'web'],
-      features: {
-        onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
-        authentication: {
-          enabled: true,
-          providers: {
-            emailPassword: true,
-            google: false,
-            apple: false,
-            github: false,
-          },
-          emailVerification: false,
-          passwordReset: true,
-          twoFactor: false,
-        },
-        paywall: false,
-        sessionManagement: true,
-      },
-      integrations: {
-        revenueCat: { enabled: false, iosKey: '', androidKey: '' },
-        adjust: { enabled: false, appToken: '', environment: 'sandbox' },
-        scate: { enabled: false, apiKey: '' },
-        att: { enabled: false },
-      },
-      backend: {
-        database: 'postgresql',
-        orm: 'prisma',
-        eventQueue: false,
-        docker: true,
-      },
-      preset: 'minimal',
-      customized: false,
-      aiTools: ['codex'],
-    };
-
-    const generator = new ProjectGenerator(config);
-    const projectDir = path.join(tempDir, 'minimal-app');
-    await generator.generate(projectDir);
-
-    // Verify top-level structure
-    expect(await fs.pathExists(path.join(projectDir, 'mobile'))).toBe(true);
-    expect(await fs.pathExists(path.join(projectDir, 'backend'))).toBe(true);
-    expect(await fs.pathExists(path.join(projectDir, 'scripts'))).toBe(true);
-    expect(await fs.pathExists(path.join(projectDir, '.gitignore'))).toBe(true);
-    expect(await fs.pathExists(path.join(projectDir, 'README.md'))).toBe(true);
-
-    // Verify mobile structure
-    expect(await fs.pathExists(path.join(projectDir, 'mobile/app'))).toBe(true);
-    expect(await fs.pathExists(path.join(projectDir, 'mobile/src'))).toBe(true);
-    expect(await fs.pathExists(path.join(projectDir, 'mobile/package.json'))).toBe(true);
-    expect(await fs.pathExists(path.join(projectDir, 'mobile/tsconfig.json'))).toBe(true);
-    expect(await fs.pathExists(path.join(projectDir, 'mobile/.env.example'))).toBe(true);
-
-    // Verify backend structure
-    expect(await fs.pathExists(path.join(projectDir, 'backend/controllers'))).toBe(true);
-    expect(await fs.pathExists(path.join(projectDir, 'backend/domain'))).toBe(true);
-    expect(await fs.pathExists(path.join(projectDir, 'backend/package.json'))).toBe(true);
-    expect(await fs.pathExists(path.join(projectDir, 'backend/.env.example'))).toBe(true);
-
-    // Verify package.json validity
-    const mobilePkg = await fs.readJSON(path.join(projectDir, 'mobile/package.json'));
-    expect(mobilePkg.name).toBe('minimal-app-mobile');
-    expect(mobilePkg.dependencies).toBeDefined();
-    expect(mobilePkg.scripts).toBeDefined();
-
-    const backendPkg = await fs.readJSON(path.join(projectDir, 'backend/package.json'));
-    expect(backendPkg.name).toBe('minimal-app-backend');
-    expect(backendPkg.dependencies).toBeDefined();
-    expect(backendPkg.scripts).toBeDefined();
-  });
-
-  it('should generate complete full-featured project', async () => {
-    const config: ProjectConfig = {
-      projectName: 'full-featured-app',
-      packageManager: 'npm',
-      appScheme: 'fullfeaturedapp',
-      platforms: ['mobile', 'web'],
-      features: {
-        onboarding: { enabled: true, pages: 5, skipButton: true, showPaywall: true },
-        authentication: {
-          enabled: true,
-          providers: {
-            emailPassword: true,
-            google: true,
-            apple: true,
-            github: false,
-          },
-          emailVerification: true,
-          passwordReset: true,
-          twoFactor: false,
-        },
-        paywall: true,
-        sessionManagement: true,
-      },
-      integrations: {
-        revenueCat: { enabled: true, iosKey: 'test-ios-key', androidKey: 'test-android-key' },
-        adjust: { enabled: true, appToken: 'test-token', environment: 'sandbox' },
-        scate: { enabled: true, apiKey: 'test-scate-key' },
-        att: { enabled: true },
-      },
-      backend: {
-        database: 'postgresql',
-        orm: 'prisma',
-        eventQueue: true,
-        docker: true,
-      },
-      preset: 'full-featured',
-      customized: false,
-      aiTools: ['codex'],
-    };
-
-    const generator = new ProjectGenerator(config);
-    const projectDir = path.join(tempDir, 'full-featured-app');
-    await generator.generate(projectDir);
-
-    // Verify all integrations are included
-    const mobilePkg = await fs.readJSON(path.join(projectDir, 'mobile/package.json'));
-    expect(mobilePkg.dependencies['react-native-purchases']).toBeDefined();
-    expect(mobilePkg.dependencies['react-native-adjust']).toBeDefined();
-    expect(mobilePkg.dependencies['scatesdk-react']).toBeDefined();
-    expect(mobilePkg.dependencies['expo-tracking-transparency']).toBeDefined();
-
-    // Verify onboarding pages
-    const onboardingDir = path.join(projectDir, 'mobile/app/(onboarding)');
-    expect(await fs.pathExists(path.join(onboardingDir, 'page-1.tsx'))).toBe(true);
-    expect(await fs.pathExists(path.join(onboardingDir, 'page-2.tsx'))).toBe(true);
-    expect(await fs.pathExists(path.join(onboardingDir, 'page-3.tsx'))).toBe(true);
-    expect(await fs.pathExists(path.join(onboardingDir, 'page-4.tsx'))).toBe(true);
-    expect(await fs.pathExists(path.join(onboardingDir, 'page-5.tsx'))).toBe(true);
-    expect(await fs.pathExists(path.join(onboardingDir, '_layout.tsx'))).toBe(true);
-
-    // Verify paywall
-    expect(await fs.pathExists(path.join(projectDir, 'mobile/app/paywall.tsx'))).toBe(true);
-
-    // Verify integration services
-    expect(
-      await fs.pathExists(path.join(projectDir, 'mobile/src/services/revenuecat-service.ts'))
-    ).toBe(true);
-    expect(
-      await fs.pathExists(path.join(projectDir, 'mobile/src/services/adjust-service.ts'))
-    ).toBe(true);
-    expect(
-      await fs.pathExists(path.join(projectDir, 'mobile/src/services/scate-service.ts'))
-    ).toBe(true);
-    expect(
-      await fs.pathExists(path.join(projectDir, 'mobile/src/services/att-service.ts'))
-    ).toBe(true);
-
-    // Verify backend has event queue
-    const backendPkg = await fs.readJSON(path.join(projectDir, 'backend/package.json'));
-    expect(backendPkg.dependencies.bullmq).toBeDefined();
-
-    // Verify event queue controller exists
-    expect(
-      await fs.pathExists(path.join(projectDir, 'backend/controllers/event-queue'))
-    ).toBe(true);
-  });
-
-  it('should generate valid JSON configuration files', async () => {
-    const config: ProjectConfig = {
-      projectName: 'json-test-app',
-      packageManager: 'npm',
-      appScheme: 'jsontestapp',
-      platforms: ['mobile', 'web'],
-      features: {
-        onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
-        authentication: {
-          enabled: true,
-          providers: {
-            emailPassword: true,
-            google: false,
-            apple: false,
-            github: false,
-          },
-          emailVerification: false,
-          passwordReset: true,
-          twoFactor: false,
-        },
-        paywall: false,
-        sessionManagement: true,
-      },
-      integrations: {
-        revenueCat: { enabled: false, iosKey: '', androidKey: '' },
-        adjust: { enabled: false, appToken: '', environment: 'sandbox' },
-        scate: { enabled: false, apiKey: '' },
-        att: { enabled: false },
-      },
-      backend: {
-        database: 'postgresql',
-        orm: 'prisma',
-        eventQueue: false,
-        docker: true,
-      },
-      preset: 'minimal',
-      customized: false,
-      aiTools: ['codex'],
-    };
-
-    const generator = new ProjectGenerator(config);
-    const projectDir = path.join(tempDir, 'json-test-app');
-    await generator.generate(projectDir);
-
-    // All JSON files should be valid
-    const jsonFiles = [
-      'mobile/package.json',
-      'mobile/app.json',
-      'mobile/tsconfig.json',
-      'backend/package.json',
-      'backend/tsconfig.json',
-    ];
-
-    for (const file of jsonFiles) {
-      const filePath = path.join(projectDir, file);
-      expect(await fs.pathExists(filePath)).toBe(true);
-
-      // Should parse without error
-      const content = await fs.readJSON(filePath);
-      expect(content).toBeDefined();
-    }
-  });
-
-  it('should generate valid TypeScript files that can be type-checked', async () => {
-    const config: ProjectConfig = {
-      projectName: 'ts-test-app',
-      packageManager: 'npm',
-      appScheme: 'tstestapp',
-      platforms: ['mobile', 'web'],
-      features: {
-        onboarding: { enabled: true, pages: 3, skipButton: true, showPaywall: false },
-        authentication: {
-          enabled: true,
-          providers: {
-            emailPassword: true,
-            google: false,
-            apple: false,
-            github: false,
-          },
-          emailVerification: false,
-          passwordReset: true,
-          twoFactor: false,
-        },
-        paywall: false,
-        sessionManagement: true,
-      },
-      integrations: {
-        revenueCat: { enabled: false, iosKey: '', androidKey: '' },
-        adjust: { enabled: false, appToken: '', environment: 'sandbox' },
-        scate: { enabled: false, apiKey: '' },
-        att: { enabled: false },
-      },
-      backend: {
-        database: 'postgresql',
-        orm: 'prisma',
-        eventQueue: false,
-        docker: true,
-      },
-      preset: 'custom',
-      customized: false,
-      aiTools: ['codex'],
-    };
-
-    const generator = new ProjectGenerator(config);
-    const projectDir = path.join(tempDir, 'ts-test-app');
-    await generator.generate(projectDir);
-
-    // Verify TypeScript files exist and have valid syntax
-    const tsFiles = [
-      'mobile/app/_layout.tsx',
-      'mobile/app/(tabs)/_layout.tsx',
-      'mobile/app/(tabs)/index.tsx',
-      'mobile/app/(onboarding)/_layout.tsx',
-      'mobile/app/(onboarding)/page-1.tsx',
-      'mobile/src/constants/Theme.ts',
-      'mobile/src/utils/responsive.ts',
-    ];
-
-    for (const file of tsFiles) {
-      const filePath = path.join(projectDir, file);
-      expect(await fs.pathExists(filePath)).toBe(true);
-
-      const content = await fs.readFile(filePath, 'utf-8');
-      expect(content.length).toBeGreaterThan(0);
-      // Basic syntax check - should have valid TS/TSX structure
-      expect(content).not.toContain('<%'); // No unprocessed EJS
-      expect(content).not.toContain('%>'); // No unprocessed EJS
-    }
-  });
-
-  describe('Drizzle ORM generation', () => {
-    it('should generate project with Drizzle ORM', async () => {
-      const config: ProjectConfig = {
-        projectName: 'drizzle-test-project',
-        packageManager: 'npm',
-        appScheme: 'drizzletestproject',
-        platforms: ['mobile', 'web'],
-        features: {
-          onboarding: { enabled: true, pages: 3, skipButton: true, showPaywall: false },
-          authentication: {
-            enabled: true,
-            providers: {
-              emailPassword: true,
-              google: false,
-              apple: false,
-              github: false,
-            },
-            emailVerification: false,
-            passwordReset: true,
-            twoFactor: false,
-          },
-          paywall: false,
-          sessionManagement: true,
-        },
-        integrations: {
-          revenueCat: { enabled: false, iosKey: '', androidKey: '' },
-          adjust: { enabled: false, appToken: '', environment: 'sandbox' },
-          scate: { enabled: false, apiKey: '' },
-          att: { enabled: false },
-        },
-        backend: {
-          database: 'postgresql',
-          orm: 'drizzle',
-          eventQueue: true,
-          docker: true,
-        },
-        preset: 'custom',
-        customized: false,
-        aiTools: ['codex'],
-      };
-
-      const generator = new ProjectGenerator(config);
-      const projectDir = path.join(tempDir, 'drizzle-test-project');
-      await generator.generate(projectDir);
-
-      // Verify Drizzle-specific files exist
-      expect(await fs.pathExists(path.join(projectDir, 'backend/drizzle/schema.ts'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'backend/drizzle.config.ts'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'backend/utils/db.ts'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'backend/lib/auth.ts'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'backend/domain/user/repository.ts'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'backend/domain/device-session/repository.ts'))).toBe(true);
-
-      // Verify Prisma files do NOT exist
-      expect(await fs.pathExists(path.join(projectDir, 'backend/prisma/schema.prisma'))).toBe(false);
-      expect(await fs.pathExists(path.join(projectDir, 'backend/prisma.config.ts'))).toBe(false);
-
-      // Verify package.json has Drizzle dependencies
-      const packageJson = await fs.readJSON(path.join(projectDir, 'backend/package.json'));
-      expect(packageJson.dependencies['drizzle-orm']).toBeDefined();
-      expect(packageJson.devDependencies['drizzle-kit']).toBeDefined();
-      expect(packageJson.dependencies['@prisma/client']).toBeUndefined();
-      expect(packageJson.devDependencies['prisma']).toBeUndefined();
-
-      // Verify Drizzle-specific scripts
-      expect(packageJson.scripts['db:generate']).toBe('drizzle-kit generate');
-      expect(packageJson.scripts['db:push']).toBe('drizzle-kit push');
+  it('no unreplaced EJS tokens in any generated .ts/.md/.json', async () => {
+    const files = await globby(['**/*.ts', '**/*.tsx', '**/*.md', '**/*.json'], {
+      cwd: projectDir,
+      onlyFiles: true,
+      dot: true,
+      gitignore: false,
+      ignore: ['**/node_modules/**'],
     });
-
-    it('should generate project with Prisma ORM (verifies ORM is correctly applied)', async () => {
-      const config: ProjectConfig = {
-        projectName: 'prisma-test-project',
-        packageManager: 'npm',
-        appScheme: 'prismatestproject',
-        platforms: ['mobile', 'web'],
-        features: {
-          onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
-          authentication: {
-            enabled: true,
-            providers: {
-              emailPassword: true,
-              google: false,
-              apple: false,
-              github: false,
-            },
-            emailVerification: false,
-            passwordReset: true,
-            twoFactor: false,
-          },
-          paywall: false,
-          sessionManagement: true,
-        },
-        integrations: {
-          revenueCat: { enabled: false, iosKey: '', androidKey: '' },
-          adjust: { enabled: false, appToken: '', environment: 'sandbox' },
-          scate: { enabled: false, apiKey: '' },
-          att: { enabled: false },
-        },
-        backend: {
-          database: 'postgresql',
-          orm: 'prisma',
-          eventQueue: false,
-          docker: true,
-        },
-        preset: 'minimal',
-        customized: false,
-        aiTools: ['codex'],
-      };
-
-      const generator = new ProjectGenerator(config);
-      const projectDir = path.join(tempDir, 'prisma-test-project');
-      await generator.generate(projectDir);
-
-      // Verify Prisma-specific files exist
-      expect(await fs.pathExists(path.join(projectDir, 'backend/prisma/schema.prisma'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'backend/prisma.config.ts'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'backend/utils/db.ts'))).toBe(true);
-
-      // Verify Drizzle files do NOT exist
-      expect(await fs.pathExists(path.join(projectDir, 'backend/drizzle/schema.ts'))).toBe(false);
-      expect(await fs.pathExists(path.join(projectDir, 'backend/drizzle.config.ts'))).toBe(false);
-
-      // Verify package.json has Prisma dependencies
-      const packageJson = await fs.readJSON(path.join(projectDir, 'backend/package.json'));
-      expect(packageJson.dependencies['@prisma/client']).toBeDefined();
-      expect(packageJson.devDependencies['prisma']).toBeDefined();
-      expect(packageJson.dependencies['drizzle-orm']).toBeUndefined();
-    });
-  });
-
-  describe('Web Platform Generation', () => {
-    it('should generate complete web-only project', async () => {
-      const config: ProjectConfig = {
-        projectName: 'e2e-web-only',
-        packageManager: 'npm',
-        appScheme: 'e2ewebonly',
-        platforms: ['web'],
-        features: {
-          onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
-          authentication: {
-            enabled: true,
-            providers: { emailPassword: true, google: true, apple: false, github: false },
-            emailVerification: true,
-            passwordReset: true,
-            twoFactor: false,
-          },
-          paywall: false,
-          sessionManagement: true,
-        },
-        integrations: {
-          revenueCat: { enabled: false, iosKey: '', androidKey: '' },
-          adjust: { enabled: false, appToken: '', environment: 'sandbox' },
-          scate: { enabled: false, apiKey: '' },
-          att: { enabled: false },
-        },
-        backend: {
-          database: 'postgresql',
-          orm: 'prisma',
-          eventQueue: false,
-          docker: true,
-        },
-        preset: 'custom',
-        customized: true,
-        aiTools: ['codex'],
-      };
-
-      const generator = new ProjectGenerator(config);
-      const projectDir = path.join(tempDir, 'e2e-web-only');
-      await generator.generate(projectDir);
-
-      // Verify top-level structure (no mobile)
-      expect(await fs.pathExists(path.join(projectDir, 'web'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'backend'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'mobile'))).toBe(false);
-
-      // Verify web structure
-      expect(await fs.pathExists(path.join(projectDir, 'web/package.json'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/tsconfig.json'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/next.config.ts'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/.env.example'))).toBe(true);
-
-      // Verify auth pages
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(auth)/login/page.tsx'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(auth)/register/page.tsx'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(auth)/forgot-password/page.tsx'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(auth)/verify-email/page.tsx'))).toBe(true);
-
-      // Verify OAuth (Google enabled)
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/components/auth/oauth-buttons.tsx'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/auth/callback/route.ts'))).toBe(true);
-
-      // Verify protected routes (dashboard now in (protected) route group)
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(protected)/dashboard/page.tsx'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'web/src/app/(protected)/layout.tsx'))).toBe(true);
-
-      // Verify package.json validity
-      const webPkg = await fs.readJSON(path.join(projectDir, 'web/package.json'));
-      expect(webPkg.name).toBe('e2e-web-only-web');
-      expect(webPkg.dependencies.next).toBeDefined();
-      expect(webPkg.dependencies.react).toBeDefined();
-      expect(webPkg.dependencies['next-themes']).toBeDefined();
-    });
-
-    it('should generate web project with valid TypeScript files', async () => {
-      const config: ProjectConfig = {
-        projectName: 'e2e-web-ts',
-        packageManager: 'npm',
-        appScheme: 'e2ewebts',
-        platforms: ['web'],
-        features: {
-          onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
-          authentication: {
-            enabled: true,
-            providers: { emailPassword: true, google: false, apple: false, github: false },
-            emailVerification: false,
-            passwordReset: true,
-            twoFactor: false,
-          },
-          paywall: false,
-          sessionManagement: true,
-        },
-        integrations: {
-          revenueCat: { enabled: false, iosKey: '', androidKey: '' },
-          adjust: { enabled: false, appToken: '', environment: 'sandbox' },
-          scate: { enabled: false, apiKey: '' },
-          att: { enabled: false },
-        },
-        backend: {
-          database: 'postgresql',
-          orm: 'prisma',
-          eventQueue: false,
-          docker: true,
-        },
-        preset: 'minimal',
-        customized: false,
-        aiTools: ['codex'],
-      };
-
-      const generator = new ProjectGenerator(config);
-      const projectDir = path.join(tempDir, 'e2e-web-ts');
-      await generator.generate(projectDir);
-
-      // Verify TypeScript files have no unprocessed EJS
-      const tsFiles = [
-        'web/src/app/layout.tsx',
-        'web/src/app/page.tsx',
-        'web/src/app/(auth)/login/page.tsx',
-        'web/src/components/auth/login-form.tsx',
-        'web/src/components/ui/button.tsx',
-        'web/src/lib/utils.ts',
-      ];
-
-      for (const file of tsFiles) {
-        const filePath = path.join(projectDir, file);
-        expect(await fs.pathExists(filePath)).toBe(true);
-
-        const content = await fs.readFile(filePath, 'utf-8');
-        expect(content.length).toBeGreaterThan(0);
-        expect(content).not.toContain('<%'); // No unprocessed EJS
-        expect(content).not.toContain('%>'); // No unprocessed EJS
+    expect(files.length).toBeGreaterThan(0);
+    const offenders: string[] = [];
+    for (const rel of files) {
+      const contents = await fs.readFile(path.join(projectDir, rel), 'utf-8');
+      if (/<%[=_-]?/.test(contents) || /%>/.test(contents)) {
+        offenders.push(rel);
       }
+    }
+    expect(offenders, `Unrendered EJS in: ${offenders.join(', ')}`).toHaveLength(0);
+  });
+
+  it('every generated package.json is valid JSON', async () => {
+    const files = await globby('**/package.json', {
+      cwd: projectDir,
+      onlyFiles: true,
+      ignore: ['**/node_modules/**'],
     });
+    expect(files.length).toBeGreaterThan(0);
+    for (const rel of files) {
+      const raw = await fs.readFile(path.join(projectDir, rel), 'utf-8');
+      expect(() => JSON.parse(raw), `Invalid JSON in ${rel}`).not.toThrow();
+    }
+  });
 
-    it('should generate web project with Drizzle ORM', async () => {
-      const config: ProjectConfig = {
-        projectName: 'e2e-web-drizzle',
-        packageManager: 'npm',
-        appScheme: 'e2ewebdrizzle',
-        platforms: ['web'],
-        features: {
-          onboarding: { enabled: false, pages: 0, skipButton: false, showPaywall: false },
-          authentication: {
-            enabled: true,
-            providers: { emailPassword: true, google: false, apple: false, github: false },
-            emailVerification: false,
-            passwordReset: true,
-            twoFactor: false,
-          },
-          paywall: false,
-          sessionManagement: true,
-        },
-        integrations: {
-          revenueCat: { enabled: false, iosKey: '', androidKey: '' },
-          adjust: { enabled: false, appToken: '', environment: 'sandbox' },
-          scate: { enabled: false, apiKey: '' },
-          att: { enabled: false },
-        },
-        backend: {
-          database: 'postgresql',
-          orm: 'drizzle',
-          eventQueue: false,
-          docker: true,
-        },
-        preset: 'minimal',
-        customized: false,
-        aiTools: ['codex'],
-      };
-
-      const generator = new ProjectGenerator(config);
-      const projectDir = path.join(tempDir, 'e2e-web-drizzle');
-      await generator.generate(projectDir);
-
-      // Verify web exists
-      expect(await fs.pathExists(path.join(projectDir, 'web'))).toBe(true);
-
-      // Verify Drizzle backend
-      expect(await fs.pathExists(path.join(projectDir, 'backend/drizzle/schema.ts'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'backend/drizzle.config.ts'))).toBe(true);
-
-      const backendPkg = await fs.readJSON(path.join(projectDir, 'backend/package.json'));
-      expect(backendPkg.dependencies['drizzle-orm']).toBeDefined();
+  it('every generated .ts/.tsx file under */backend/ parses as TypeScript', async () => {
+    const files = await globby(['**/backend/**/*.ts', '**/backend/**/*.tsx'], {
+      cwd: projectDir,
+      onlyFiles: true,
+      dot: true,
+      ignore: ['**/node_modules/**'],
     });
+    expect(files.length).toBeGreaterThan(0);
+    const parseErrors: string[] = [];
+    for (const rel of files) {
+      const content = await fs.readFile(path.join(projectDir, rel), 'utf-8');
+      const sourceFile = ts.createSourceFile(
+        rel,
+        content,
+        ts.ScriptTarget.Latest,
+        /* setParentNodes */ false,
+        ts.ScriptKind.TSX
+      );
+      // parseDiagnostics is an internal property populated by the parser.
+      const diagnostics = (sourceFile as unknown as { parseDiagnostics?: ts.Diagnostic[] })
+        .parseDiagnostics;
+      if (diagnostics && diagnostics.length > 0) {
+        parseErrors.push(
+          `${rel}: ${diagnostics.map((d) => ts.flattenDiagnosticMessageText(d.messageText, '\n')).join('; ')}`
+        );
+      }
+    }
+    expect(parseErrors, parseErrors.join('\n')).toHaveLength(0);
+  });
+
+  it('docker-compose.yml and docker-compose.prod.yml parse as YAML', async () => {
+    const devRaw = await fs.readFile(path.join(projectDir, 'docker-compose.yml'), 'utf-8');
+    const prodRaw = await fs.readFile(path.join(projectDir, 'docker-compose.prod.yml'), 'utf-8');
+    const dev = YAML.parse(devRaw);
+    const prod = YAML.parse(prodRaw);
+    expect(dev).toBeTruthy();
+    expect(prod).toBeTruthy();
+    expect(dev.services).toBeTruthy();
+  });
+
+  it('stackr.config.json round-trips through loadStackrConfig', async () => {
+    const loaded = await loadStackrConfig(projectDir);
+    expect(loaded).toBeTruthy();
+    expect(loaded!.projectName).toBe('e2e-min');
+    expect(loaded!.services.map((s) => s.name).sort()).toEqual(['auth', 'core']);
+  });
+
+  it('per-service .env.example files exist for every service', async () => {
+    const loaded = await loadStackrConfig(projectDir);
+    for (const svc of loaded!.services) {
+      const envExample = path.join(projectDir, svc.name, 'backend', '.env.example');
+      expect(await fs.pathExists(envExample), `missing ${svc.name}/backend/.env.example`).toBe(
+        true
+      );
+    }
+  });
+
+  it('auth/backend lib/auth.ts uses the right ORM flavor (no .prisma/.drizzle suffix)', async () => {
+    const authLib = path.join(projectDir, 'auth/backend/lib/auth.ts');
+    expect(await fs.pathExists(authLib)).toBe(true);
+    // Ensure there are no dangling .prisma.ts or .drizzle.ts files in the
+    // auth/backend subtree
+    const files = await globby(
+      ['auth/backend/**/*.prisma.ts', 'auth/backend/**/*.drizzle.ts'],
+      { cwd: projectDir, onlyFiles: true, ignore: ['**/node_modules/**'] }
+    );
+    expect(files, files.join(', ')).toHaveLength(0);
+  });
+});
+
+describe('E2E — project generation file-level assertions (multi-service)', () => {
+  let tempDir: string;
+  let projectDir: string;
+
+  beforeAll(async () => {
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'e2e-project-multi-'));
+    projectDir = path.join(tempDir, multiServiceConfig.projectName);
+    await new MonorepoGenerator(multiServiceConfig).generate(projectDir);
+  }, 60000);
+
+  afterAll(async () => {
+    await fs.remove(tempDir);
+  });
+
+  it('all 4 services exist with their own backend/ dirs', async () => {
+    for (const svc of multiServiceConfig.services) {
+      expect(
+        await fs.pathExists(path.join(projectDir, svc.name, 'backend')),
+        `missing ${svc.name}/backend`
+      ).toBe(true);
+    }
+  });
+
+  it('no unreplaced EJS tokens in any .ts/.md/.json file', async () => {
+    const files = await globby(['**/*.ts', '**/*.tsx', '**/*.md', '**/*.json'], {
+      cwd: projectDir,
+      onlyFiles: true,
+      dot: true,
+      ignore: ['**/node_modules/**'],
+    });
+    const offenders: string[] = [];
+    for (const rel of files) {
+      const contents = await fs.readFile(path.join(projectDir, rel), 'utf-8');
+      if (/<%[=_-]?/.test(contents) || /%>/.test(contents)) {
+        offenders.push(rel);
+      }
+    }
+    expect(offenders, offenders.join(', ')).toHaveLength(0);
+  });
+
+  it('docker-compose.yml parses and has one rest_api service per monorepo service', async () => {
+    const raw = await fs.readFile(path.join(projectDir, 'docker-compose.yml'), 'utf-8');
+    const parsed = YAML.parse(raw);
+    for (const svc of multiServiceConfig.services) {
+      expect(Object.keys(parsed.services)).toContain(`${svc.name}_rest_api`);
+    }
   });
 });

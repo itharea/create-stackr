@@ -1,0 +1,194 @@
+# <%= projectName %> — System Design
+
+## Overview
+
+This is a **multi-microservice monorepo**. Each service owns its own
+Postgres database, Redis cache, backend image, and deployment lifecycle.
+The `auth` service is the trust anchor; every other service verifies
+requests by forwarding the user's cookie to it.
+
+```
+    ┌─────────────────────────────┐
+    │        clients              │
+    │  (web, mobile — per svc)    │
+    └──────────────┬──────────────┘
+                   │
+                   │  session cookie (BetterAuth)
+                   ▼
+    ┌─────────────────────────────┐
+    │        auth service         │
+    │   BetterAuth │ DB │ Redis   │
+    │   users, sessions, OAuth    │
+    └──────────────▲──────────────┘
+                   │
+                   │  cookie forward
+                   │  /api/auth/get-session
+                   │
+    ┌─────────────────────────────┐
+    │       base services         │
+    │                             │
+    │   <%= services.filter((s) => s.kind !== 'auth').map((s) => s.name).join(', ') %>
+    │                             │
+    │   (each owns its own DB     │
+    │    and Redis instance)      │
+    └─────────────────────────────┘
+```
+
+## Services in this monorepo
+
+<% services.forEach((svc) => { -%>
+### `<%= svc.name %>` (`<%= svc.kind %>`)
+
+- **Backend port:** `<%= svc.backend.port %>`
+- **Event queue:** <%= svc.backend.eventQueue ? 'enabled (BullMQ + Redis)' : 'disabled' %>
+- **Auth middleware flavor:** `<%= svc.backend.authMiddleware %>`
+<% if (svc.web && svc.web.enabled) { -%>
+- **Web frontend:** Next.js on port `<%= svc.web.port %>`
+<% } -%>
+<% if (svc.mobile && svc.mobile.enabled) { -%>
+- **Mobile frontend:** Expo / React Native
+<% } -%>
+
+<% }); -%>
+
+## Architecture principles
+
+### 1. Monorepo structure
+Each service lives under its own top-level directory. The generator
+loops over the `services` list in `stackr.config.json` and emits one
+subtree per service:
+
+<% services.forEach((svc) => { -%>
+- `<%= svc.name %>/backend/` — Fastify API server for `<%= svc.name %>`
+<% if (svc.web && svc.web.enabled) { -%>
+- `<%= svc.name %>/web/` — Next.js web app for `<%= svc.name %>`
+<% } -%>
+<% if (svc.mobile && svc.mobile.enabled) { -%>
+- `<%= svc.name %>/mobile/` — Expo mobile app for `<%= svc.name %>`
+<% } -%>
+<% }); -%>
+
+Shared types live alongside each service; there is no shared package.
+
+### 2. Backend-driven
+The `auth` service owns users, sessions, and account provisioning.
+Base services own domain logic and their own tables. Clients (web
+and mobile) are thin presentation layers; they never talk directly
+to another service's database.
+
+### 3. ORM locked monorepo-wide
+This monorepo uses **<%= orm %>** across every service, locked at init
+time by `stackr.config.json`. Mixing ORMs per service is an explicit
+non-goal — it would triple the template surface area for marginal
+benefit.
+
+### 4. Per-service isolation
+Each service has its own Postgres database and its own Redis instance
+so that:
+
+- **Blast radius is bounded.** A runaway migration in one service
+  cannot block or corrupt another service's data.
+- **Schemas evolve independently.** Drizzle/Prisma schemas can be
+  versioned at different cadences without cross-service coordination.
+- **Deployment is decoupled.** A service can be redeployed, scaled,
+  or even rewritten in a different stack without affecting its
+  neighbors.
+
+The cost is duplicated infrastructure (extra Docker containers) and
+slightly more involved local development. `./scripts/setup.sh` and
+the root-level docker-compose file exist to paper over that cost.
+
+## Communication
+
+### Client → service (per service)
+
+<% services.forEach((svc) => { -%>
+<% if (svc.mobile && svc.mobile.enabled) { -%>
+- **`<%= svc.name %>` mobile → backend**: REST over Axios. Auth cookies
+  managed by the BetterAuth client (cookies point at the `auth` service).
+<% } -%>
+<% if (svc.web && svc.web.enabled) { -%>
+- **`<%= svc.name %>` web → backend**: REST over fetch. Auth cookies
+  managed by the BetterAuth client (cookies point at the `auth` service).
+<% } -%>
+<% }); -%>
+
+### Non-auth service → auth (cookie forwarding)
+
+Non-auth services verify requests by forwarding the user's cookie to
+`${AUTH_SERVICE_URL}/api/auth/get-session`. The request flow is:
+
+1. Client authenticates against the `auth` service. A session cookie
+   is set on the client.
+2. Client sends a request to any non-auth service with the cookie
+   attached.
+3. The service's `requireAuth` plugin forwards the cookie to the auth
+   service's `/api/auth/get-session` endpoint.
+4. If the session is valid, the plugin decorates the request with
+   `user` and `session` pulled from the response.
+5. If the session user doesn't yet have a `has<ServiceName>Account`
+   flag set (flexible flavor), the service calls
+   `POST /api/auth/provision` to provision the user locally and tell
+   the auth service to flip the flag.
+
+Never add user/session tables outside the auth service — always use
+the forwarded `user` decorated on the request.
+
+## Tech stack
+
+| Layer | Technology |
+|-------|------------|
+<% services.forEach((svc) => { -%>
+| **`<%= svc.name %>` backend** | |
+| Runtime | <%= packageManager === 'bun' ? 'Bun' : 'Node.js' %> |
+| Framework | Fastify |
+| ORM | <%= orm.charAt(0).toUpperCase() + orm.slice(1) %> |
+| Database | PostgreSQL (isolated) |
+<% if (svc.backend.eventQueue) { -%>
+| Cache/Queue | Redis + BullMQ |
+<% } else { -%>
+| Cache | Redis (isolated) |
+<% } -%>
+| Validation | TypeBox |
+<% if (svc.web && svc.web.enabled) { -%>
+| **`<%= svc.name %>` web** | |
+| Framework | Next.js (App Router) |
+| Styling | Tailwind CSS |
+| Components | shadcn/ui |
+| State | Zustand |
+<% } -%>
+<% if (svc.mobile && svc.mobile.enabled) { -%>
+| **`<%= svc.name %>` mobile** | |
+| Framework | Expo |
+| Runtime | React Native |
+| Routing | Expo Router |
+| State | Zustand |
+| HTTP Client | Axios |
+<% } -%>
+<% }); -%>
+| **Shared** | |
+| Auth | BetterAuth (in the `auth` service) |
+| Language | TypeScript |
+
+## Security boundaries
+
+- Never trust client input — validate everything server-side with
+  TypeBox schemas.
+- Session tokens are httpOnly cookies, issued and rotated by
+  BetterAuth inside the `auth` service.
+- All database operations use parameterized queries
+  (<%= orm.charAt(0).toUpperCase() + orm.slice(1) %>).
+- Non-auth services must forward cookies to the auth service for
+  every protected route — never short-circuit by trusting a header
+  or client-supplied user ID.
+
+## stackr.config.json
+
+`stackr.config.json` in the repository root is the source of truth for
+which services exist, which ports they use, which auth middleware
+flavor they run, and which integrations they ship with. Phase 3's
+`stackr add service` reads and updates this file.
+
+Never edit `stackr.config.json` by hand to add a service — the
+`docker-compose.yml` and per-service `backend/package.json` will get
+out of sync. Always use `stackr add service <name>`.

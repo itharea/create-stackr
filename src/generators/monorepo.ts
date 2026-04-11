@@ -1,0 +1,213 @@
+import fs from 'fs-extra';
+import path from 'path';
+import chalk from 'chalk';
+import ejs from 'ejs';
+import { globby } from 'globby';
+import { TEMPLATE_DIR } from '../utils/template.js';
+import { saveStackrConfig } from '../utils/config-file.js';
+import { initializeGit } from '../utils/git.js';
+import { cleanup } from '../utils/cleanup.js';
+import type { InitConfig } from '../types/index.js';
+import { AI_TOOL_FILES } from '../types/index.js';
+import { ServiceGenerator } from './service.js';
+import { buildServiceContext, buildStackrConfig } from './service-context.js';
+import { renderDockerCompose } from './docker-compose.js';
+
+/**
+ * Orchestrates full-project generation for `create-stackr`.
+ *
+ * Steps (from `plans/meta_phases.md` §6 generator split):
+ *   1. ensureDir(targetDir)
+ *   2. Render project-shell templates once (README, DESIGN, scripts,
+ *      .env.example, .gitignore)
+ *   3. For each service: ServiceGenerator.generate(targetDir)
+ *   4. Render + write docker-compose.yml + docker-compose.prod.yml
+ *   5. Save stackr.config.json
+ *   6. Generate AI tool files
+ *   7. Make scripts executable
+ *   8. Initialize git
+ */
+export class MonorepoGenerator {
+  private targetDir: string = '';
+
+  constructor(private readonly initConfig: InitConfig, private readonly options: { verbose?: boolean } = {}) {}
+
+  async generate(targetDir: string): Promise<void> {
+    this.targetDir = targetDir;
+
+    try {
+      if (await fs.pathExists(targetDir)) {
+        throw new Error(`Directory "${path.basename(targetDir)}" already exists`);
+      }
+
+      await fs.ensureDir(targetDir);
+
+      // 1. Monorepo root files
+      await this.renderMonorepoRoot();
+
+      // 2. Per-service generation
+      for (const svc of this.initConfig.services) {
+        const ctx = buildServiceContext(this.initConfig, svc);
+        await new ServiceGenerator(ctx).generate(targetDir);
+      }
+
+      // 3. Docker compose files
+      const stackrConfig = buildStackrConfig(this.initConfig);
+      const devCompose = renderDockerCompose(stackrConfig, 'dev');
+      const prodCompose = renderDockerCompose(stackrConfig, 'prod');
+      await fs.writeFile(path.join(targetDir, 'docker-compose.yml'), devCompose);
+      await fs.writeFile(path.join(targetDir, 'docker-compose.prod.yml'), prodCompose);
+
+      // 3b. Seed root .env from .env.example so the user can `docker compose
+      //     up` immediately without running scripts/setup.sh first, and so
+      //     `stackr add service` has something to merge into.
+      const envExamplePath = path.join(targetDir, '.env.example');
+      const envPath = path.join(targetDir, '.env');
+      if ((await fs.pathExists(envExamplePath)) && !(await fs.pathExists(envPath))) {
+        await fs.copy(envExamplePath, envPath);
+      }
+
+      // 4. stackr.config.json
+      await saveStackrConfig(targetDir, stackrConfig);
+
+      // 5. AI tool guideline files (claude/cursor/codex/windsurf)
+      await this.generateAIToolFiles();
+
+      // 6. Make scripts executable (setup.sh, docker-dev.sh, docker-prod.sh)
+      await this.makeScriptsExecutable();
+
+      // 7. Initialize git
+      await this.initializeGit();
+    } catch (err) {
+      await this.handleError(err);
+      throw err;
+    }
+  }
+
+  /**
+   * Copy project-shell templates into the project root. These are the
+   * files rendered ONCE per project (README, DESIGN, scripts,
+   * .env.example, .gitignore, etc.) — not per service.
+   *
+   * Context is a thin wrapper around initConfig with the service list
+   * exposed so EJS templates can loop over `services`.
+   */
+  private async renderMonorepoRoot(): Promise<void> {
+    const rootCtx = {
+      projectName: this.initConfig.projectName,
+      packageManager: this.initConfig.packageManager,
+      orm: this.initConfig.orm,
+      appScheme: this.initConfig.appScheme,
+      aiTools: this.initConfig.aiTools,
+      services: this.initConfig.services,
+      preset: this.initConfig.preset,
+    };
+
+    const subtrees = ['project'];
+    for (const subtree of subtrees) {
+      const subtreeAbsolute = path.join(TEMPLATE_DIR, subtree);
+      if (!(await fs.pathExists(subtreeAbsolute))) {
+        continue;
+      }
+
+      const files = await globby(`${subtree}/**/*`, {
+        cwd: TEMPLATE_DIR,
+        dot: true,
+        onlyFiles: true,
+        ignore: ['**/node_modules/**'],
+      });
+
+      for (const file of files) {
+        // Strip the `project/` prefix so the file lands at the
+        // project root. Remove `.ejs` if present.
+        let rel = file.slice(`${subtree}/`.length);
+        if (rel.endsWith('.ejs')) {
+          rel = rel.slice(0, -4);
+        }
+
+        const destPath = path.join(this.targetDir, rel);
+        await fs.ensureDir(path.dirname(destPath));
+
+        if (file.endsWith('.ejs')) {
+          const content = await fs.readFile(path.join(TEMPLATE_DIR, file), 'utf-8');
+          const rendered = ejs.render(content, rootCtx);
+          await fs.writeFile(destPath, rendered);
+        } else {
+          await fs.copy(path.join(TEMPLATE_DIR, file), destPath);
+        }
+      }
+    }
+
+    // Also copy `templates/shared/.gitignore.ejs` if it still exists from
+    // phase 1 as the canonical root `.gitignore`. Phase 2 ships a root-level
+    // version under `project/` once created, but we keep this as a
+    // fallback so nothing goes missing if the move is incomplete.
+    const sharedGitignore = path.join(TEMPLATE_DIR, 'shared/.gitignore.ejs');
+    const rootGitignore = path.join(this.targetDir, '.gitignore');
+    if ((await fs.pathExists(sharedGitignore)) && !(await fs.pathExists(rootGitignore))) {
+      const content = await fs.readFile(sharedGitignore, 'utf-8');
+      const rendered = ejs.render(content, rootCtx);
+      await fs.writeFile(rootGitignore, rendered);
+    }
+  }
+
+  private async generateAIToolFiles(): Promise<void> {
+    if (!this.initConfig.aiTools || this.initConfig.aiTools.length === 0) {
+      return;
+    }
+
+    const templatePath = path.join(TEMPLATE_DIR, 'shared/AGENTS.md.ejs');
+    if (!(await fs.pathExists(templatePath))) {
+      return;
+    }
+    const templateContent = await fs.readFile(templatePath, 'utf-8');
+
+    for (const tool of this.initConfig.aiTools) {
+      const fileName = AI_TOOL_FILES[tool];
+      const rendered = ejs.render(templateContent, {
+        projectName: this.initConfig.projectName,
+        packageManager: this.initConfig.packageManager,
+        orm: this.initConfig.orm,
+        services: this.initConfig.services,
+        aiTools: this.initConfig.aiTools,
+        guidelineFileName: fileName,
+      });
+      await fs.writeFile(path.join(this.targetDir, fileName), rendered);
+    }
+  }
+
+  private async makeScriptsExecutable(): Promise<void> {
+    const scriptNames = ['setup.sh', 'docker-dev.sh', 'docker-prod.sh'];
+    for (const name of scriptNames) {
+      const scriptPath = path.join(this.targetDir, 'scripts', name);
+      try {
+        if (await fs.pathExists(scriptPath)) {
+          await fs.chmod(scriptPath, 0o755);
+        }
+      } catch {
+        console.log(
+          chalk.yellow(`\n⚠️  Could not chmod ${scriptPath}; run it manually.`)
+        );
+      }
+    }
+  }
+
+  private async initializeGit(): Promise<void> {
+    try {
+      await initializeGit(this.targetDir);
+    } catch {
+      console.log(chalk.yellow('\n⚠️  Git initialization failed. You can initialize it manually.'));
+    }
+  }
+
+  private async handleError(err: unknown): Promise<void> {
+    console.error(chalk.red('\n❌ Project generation failed'));
+    console.error(chalk.gray(`   Error: ${(err as Error).message}\n`));
+    await cleanup(this.targetDir);
+  }
+
+  // Accessor for verbose flag (hook for future progress UI).
+  get verbose(): boolean {
+    return Boolean(this.options.verbose);
+  }
+}

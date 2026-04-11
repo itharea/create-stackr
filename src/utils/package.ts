@@ -1,42 +1,48 @@
-import type { ProjectConfig } from '../types/index.js';
+import type { ServiceConfig, LegacyFeaturesShim } from '../types/index.js';
 import { DEPENDENCY_VERSIONS } from '../config/dependencies.js';
 
 /**
- * Build mobile package.json based on configuration
+ * Build mobile package.json for a given service.
  *
- * NOTE: The actual package.json generation in production happens via EJS templates.
- * This function serves as a programmatic representation for testing and validation.
+ * NOTE: The actual package.json generation in production happens via EJS
+ * templates. This helper exists as a programmatic representation for
+ * testing and validation. It's scoped to a single `ServiceConfig` plus the
+ * monorepo-wide projectName and a feature flag snapshot (used to decide
+ * whether to include the authentication mobile deps).
  */
-export function buildMobilePackageJson(config: ProjectConfig): Record<string, unknown> {
+export function buildMobilePackageJson(
+  service: ServiceConfig,
+  projectName: string,
+  features: LegacyFeaturesShim
+): Record<string, unknown> {
   const dependencies: Record<string, string> = {
     ...DEPENDENCY_VERSIONS.mobile.core,
   };
 
-  // Add conditional dependencies based on features
-  if (config.features.authentication) {
+  if (features.authentication.enabled) {
     Object.assign(dependencies, DEPENDENCY_VERSIONS.mobile.authentication);
   }
 
-  if (config.integrations.revenueCat.enabled) {
+  if (service.integrations.revenueCat.enabled) {
     Object.assign(dependencies, DEPENDENCY_VERSIONS.mobile.revenueCat);
   }
 
-  if (config.integrations.adjust.enabled) {
+  if (service.integrations.adjust.enabled) {
     Object.assign(dependencies, DEPENDENCY_VERSIONS.mobile.adjust);
   }
 
-  if (config.integrations.scate.enabled) {
+  if (service.integrations.scate.enabled) {
     Object.assign(dependencies, DEPENDENCY_VERSIONS.mobile.scate);
   }
 
-  if (config.integrations.att.enabled) {
+  if (service.integrations.att.enabled) {
     Object.assign(dependencies, DEPENDENCY_VERSIONS.mobile.att);
   }
 
   return {
-    name: `${config.projectName}-mobile`,
+    name: `${projectName}-${service.name}-mobile`,
     version: '1.0.0',
-    description: `React Native mobile app for ${config.projectName}`,
+    description: `React Native mobile app for ${projectName} / ${service.name}`,
     main: 'expo-router/entry',
     scripts: {
       start: 'expo start',
@@ -53,18 +59,18 @@ export function buildMobilePackageJson(config: ProjectConfig): Record<string, un
 }
 
 /**
- * Build backend package.json based on configuration
- *
- * NOTE: The actual package.json generation in production happens via EJS templates.
- * This function serves as a programmatic representation for testing and validation.
+ * Build backend package.json for a given service. Programmatic
+ * representation for tests — real package.json rendering uses EJS.
  */
-export function buildBackendPackageJson(config: ProjectConfig): Record<string, unknown> {
+export function buildBackendPackageJson(
+  service: ServiceConfig,
+  projectName: string
+): Record<string, unknown> {
   const dependencies: Record<string, string> = {
     ...DEPENDENCY_VERSIONS.backend.core,
   };
 
-  // Add event queue dependencies if enabled
-  if (config.backend.eventQueue) {
+  if (service.backend.eventQueue) {
     Object.assign(dependencies, DEPENDENCY_VERSIONS.backend.eventQueue);
   }
 
@@ -79,16 +85,15 @@ export function buildBackendPackageJson(config: ProjectConfig): Record<string, u
     postinstall: 'prisma generate',
   };
 
-  // Add event queue scripts if enabled
-  if (config.backend.eventQueue) {
+  if (service.backend.eventQueue) {
     scripts['dev:event-queue'] = 'bun --watch ./controllers/event-queue/index.ts | pino-pretty --colorize';
     scripts['start:event-queue'] = 'bun run dist/controllers/event-queue/index.js';
   }
 
   return {
-    name: `${config.projectName}-backend`,
+    name: `${projectName}-${service.name}-backend`,
     version: '1.0.0',
-    description: `Backend API for ${config.projectName}`,
+    description: `Backend API for ${projectName} / ${service.name}`,
     type: 'module',
     main: 'controllers/rest-api/index.ts',
     scripts,

@@ -1,0 +1,79 @@
+# <%= projectName %>
+
+A multi-microservice monorepo scaffolded by
+[create-stackr](https://github.com/itharea/create-stackr).
+
+## Services
+
+<% services.forEach((svc) => { -%>
+- **`<%= svc.name %>`** — <%= svc.kind === 'auth' ? 'Auth service (BetterAuth)' : 'Base service' %> on port `<%= svc.backend.port %>`<% if (svc.web && svc.web.enabled) { %> · web on `<%= svc.web.port %>`<% } %><% if (svc.mobile && svc.mobile.enabled) { %> · mobile<% } %><% if (svc.backend.eventQueue) { %> · event-queue<% } %>
+<% }); -%>
+
+## Getting started
+
+```bash
+./scripts/setup.sh
+docker compose up -d
+```
+
+The setup script walks through each service in `stackr.config.json`, creates
+per-service `.env` files from the committed `.env.example` templates, and
+installs dependencies for each subproject.
+
+## Per-service development
+
+<% services.forEach((svc) => { -%>
+### `<%= svc.name %>`
+
+```bash
+cd <%= svc.name %>/backend && <%= packageManager %> run dev:rest-api
+<% if (svc.web && svc.web.enabled) { -%>
+cd <%= svc.name %>/web && <%= packageManager %> run dev
+<% } -%>
+<% if (svc.mobile && svc.mobile.enabled) { -%>
+cd <%= svc.name %>/mobile && <%= packageManager %> start
+<% } -%>
+```
+
+<% }); -%>
+
+## Monorepo layout
+
+```
+<%= projectName %>/
+├── stackr.config.json          # Source of truth for services, orm, ports
+├── docker-compose.yml          # Managed by stackr (marker blocks)
+├── docker-compose.prod.yml     # Production overlay
+├── scripts/
+│   ├── setup.sh                # Loops services, installs deps
+│   ├── docker-dev.sh
+│   └── docker-prod.sh
+<% services.forEach((svc) => { -%>
+├── <%= svc.name %>/
+│   ├── backend/
+<% if (svc.web && svc.web.enabled) { -%>
+│   ├── web/
+<% } -%>
+<% if (svc.mobile && svc.mobile.enabled) { -%>
+│   ├── mobile/
+<% } -%>
+<% }); -%>
+```
+
+## Architecture
+
+Each service has its own isolated Postgres database and Redis cache.
+Non-auth services verify requests by forwarding cookies to
+`${AUTH_SERVICE_URL}/api/auth/get-session`. See `DESIGN.md` and each
+service's own `backend/DESIGN.md` for the full picture.
+
+## Adding a service later
+
+Once stackr v0.5 ships its `stackr add service` command, you'll be able
+to grow the monorepo without clobbering your docker-compose edits:
+
+```bash
+stackr add service wallet
+```
+
+For now, keep this monorepo's `stackr.config.json` as the source of truth.

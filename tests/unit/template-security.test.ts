@@ -5,7 +5,7 @@ import path from "path";
 describe("Security Configuration", () => {
   const nextConfigPath = path.join(
     process.cwd(),
-    "templates/base/web/next.config.ts"
+    "templates/services/base/web/next.config.ts"
   );
 
   it("should have next.config.ts with security settings", () => {

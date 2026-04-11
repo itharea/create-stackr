@@ -1,0 +1,207 @@
+# Backend Design
+
+## Architecture Overview
+
+The backend follows a **layered architecture**<%= backend.eventQueue ? ' with two entry points' : '' %>:
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                        Controllers                               │
+│  ┌─────────────────────────┐<% if (backend.eventQueue) { %>     ┌─────────────────────────┐<% } %>    │
+│  │      REST API           │<% if (backend.eventQueue) { %>     │     Event Queue         │<% } %>    │
+│  │      (Fastify)          │<% if (backend.eventQueue) { %>     │      (BullMQ)           │<% } %>    │
+│  │  controllers/rest-api/  │<% if (backend.eventQueue) { %>     │ controllers/event-queue/│<% } %>    │
+│  └───────────┬─────────────┘<% if (backend.eventQueue) { %>     └───────────┬─────────────┘<% } %>    │
+└──────────────┼──────────────────────────────<% if (backend.eventQueue) { %>─┼<% } %>──────────────────┘
+               │<% if (backend.eventQueue) { %>                               │<% } %>
+               ▼<% if (backend.eventQueue) { %>                               ▼<% } %>
+┌──────────────────────────────────────────────────────────────────┐
+│                        Domain Layer                              │
+│                         domain/                                  │
+│   ┌────────────────────────────────────────────────────────┐    │
+│   │  Each domain entity:                                    │    │
+│   │   - schema.ts     → TypeBox schemas + TypeScript types  │    │
+│   │   - repository.ts → Pure database operations            │    │
+│   │   - service.ts    → Business logic (optional)           │    │
+│   └────────────────────────────────────────────────────────┘    │
+└──────────────┬───────────────────────────────────────────────────┘
+               │
+               ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                       Infrastructure                             │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
+│  │  utils/db   │  │ utils/redis │  │  utils/     │              │
+│  │  (<%= backend.orm.charAt(0).toUpperCase() + backend.orm.slice(1) %>)  │  │  (ioredis)  │  │   errors    │              │
+│  └─────────────┘  └─────────────┘  └─────────────┘              │
+<% if (features.authentication.enabled) { %>
+│                            │                                     │
+│                ┌───────────┴───────────┐                        │
+│                │      lib/auth         │                        │
+│                │    (BetterAuth)       │                        │
+│                └───────────────────────┘                        │
+<% } %>
+└──────────────────────────────────────────────────────────────────┘
+```
+
+## Domain Layer Pattern
+
+Each domain entity (<%= features.authentication.enabled ? 'user, session, device-session' : 'device-session' %>) has up to three files:
+
+### schema.ts
+TypeBox schemas that serve as **single source of truth** for both runtime validation and TypeScript types:
+
+```typescript
+import { Type, Static } from "@sinclair/typebox";
+
+export const CreateUserBody = Type.Object({
+  email: Type.String({ format: 'email' }),
+  name: Type.String({ minLength: 1 }),
+});
+export type CreateUserBody = Static<typeof CreateUserBody>;
+```
+
+### repository.ts
+**Pure database operations only.** No business logic, no expiration checks, no token generation:
+
+```typescript
+<% if (backend.orm === 'drizzle') { %>
+// Pure fetch
+export const findDeviceSessionByToken = async (token: string): Promise<DeviceSession | null> => {
+  const [session] = await db.select()...
+  return session ? toDeviceSession(session) : null;
+};
+
+// Pure insert
+export const insertDeviceSession = async (data: InsertData): Promise<DeviceSession> => {
+  const [session] = await db.insert(schema.deviceSession).values(data).returning();
+  return toDeviceSession(session);
+};
+<% } %>
+<% if (backend.orm === 'prisma') { %>
+// Pure fetch
+export const findDeviceSessionByToken = async (token: string): Promise<DeviceSession | null> => {
+  const session = await prisma.deviceSession.findUnique({ where: { sessionToken: token } });
+  return session ? toDeviceSession(session) : null;
+};
+
+// Pure insert
+export const insertDeviceSession = async (data: InsertData): Promise<DeviceSession> => {
+  const session = await prisma.deviceSession.create({ data });
+  return toDeviceSession(session);
+};
+<% } %>
+```
+
+### service.ts
+**Business logic that orchestrates repository calls.** Token generation, expiration checks, validation rules:
+
+```typescript
+// Business logic: generates token, sets defaults, calls repository
+export const createDeviceSession = async (data: CreateDeviceSessionBody): Promise<CreateDeviceSessionResponse> => {
+  const sessionToken = crypto.randomUUID();  // Business logic
+
+  const session = await insertDeviceSession({  // Repository call
+    ...data,
+    sessionToken,
+    preferredCurrency: 'USD',  // Business default
+  });
+
+  return { session, sessionToken };
+};
+
+// Business logic: checks expiration, deletes if expired
+export const validateDeviceSession = async (sessionToken: string): Promise<DeviceSession | null> => {
+  const session = await findDeviceSessionByToken(sessionToken);
+
+  if (!session) return null;
+
+  // Business rule: 30-day expiration
+  if (new Date(session.lastActiveAt) < getExpirationThreshold()) {
+    await deleteDeviceSession(sessionToken);
+    return null;
+  }
+
+  return session;
+};
+```
+
+### Import Rules
+
+Routes import based on complexity:
+- **Business operations** → import from `service.ts`
+- **Simple CRUD** → can import directly from `repository.ts`
+
+## Controllers
+
+### REST API (`controllers/rest-api/`)
+
+```
+rest-api/
+├── index.ts        # Entry point
+├── server.ts       # Fastify instance, plugin registration
+├── plugins/        # Cross-cutting concerns
+│   ├── config.ts   # Environment validation
+<% if (features.authentication.enabled) { %>
+│   ├── auth.ts     # BetterAuth integration
+<% } %>
+│   └── error-handler.ts
+└── routes/         # Route handlers
+```
+
+**Plugin registration order matters:**
+1. `config` - Loads and validates environment
+2. `error-handler` - Catches all errors
+3. `cors` - Cross-origin settings
+<% if (features.authentication.enabled) { %>
+4. `auth` - BetterAuth setup
+<% } %>
+<% if (backend.eventQueue) { %>
+
+### Event Queue (`controllers/event-queue/`)
+
+BullMQ workers for async background jobs (emails, cleanup, etc.)
+<% } %>
+
+## Error Handling
+
+Centralized in `utils/errors.ts`. All errors flow through `ErrorFactory`:
+
+```typescript
+// In repository - wrap DB errors
+throw ErrorFactory.databaseError({
+  operation: 'findDeviceSessionByToken',
+  originalError: error.message,
+});
+
+// In service - use appropriate factory method
+throw ErrorFactory.sessionNotFound();
+throw ErrorFactory.validationFailed({ field: 'email' });
+
+// Error handler plugin formats response
+{
+  error: {
+    code: 'SESSION_NOT_FOUND',
+    message: 'Session not found or expired',
+    timestamp: '2024-01-20T12:00:00Z',
+    requestId: 'req_...'
+  }
+}
+```
+
+## Key Design Decisions
+
+| Layer | Responsibility |
+|-------|----------------|
+| Routes | Request handling, schema validation, response formatting |
+| Services | Business logic, orchestration, token generation |
+| Repositories | Pure database CRUD, error wrapping |
+| Schemas | Type definitions + runtime validation |
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Service optional | Not all entities need it | Simple CRUD doesn't need orchestration layer |
+| TypeBox schemas | Single source of truth | Types + validation in one place |
+| Error factories | Typed error creation | Consistent codes, proper HTTP status |
+<% if (backend.eventQueue) { %>
+| Two processes | REST + Queue | Independent scaling, separation of concerns |
+<% } %>

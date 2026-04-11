@@ -1,0 +1,62 @@
+# Dependencies - will be installed in container
+node_modules
+.pnp
+.pnp.js
+
+# Testing
+coverage
+
+# Build output
+dist
+build
+
+# Development
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+Dockerfile.*
+.dockerignore
+docker-compose*.yml
+
+# CI/CD
+.github
+.gitlab-ci.yml
+
+# Documentation
+*.md
+!README.md
+
+# Exclude lock files for package managers not being used
+<% if (packageManager !== 'bun') { %>bun.lockb<% } %>
+<% if (packageManager !== 'npm') { %>package-lock.json<% } %>
+<% if (packageManager !== 'yarn') { %>yarn.lock
+.yarn
+.yarnrc.yml<% } %>
+<% if (packageManager !== 'pnpm') { %>pnpm-lock.yaml
+.pnpm-store<% } %>

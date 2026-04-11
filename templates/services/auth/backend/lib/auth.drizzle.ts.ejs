@@ -1,0 +1,151 @@
+import { betterAuth } from "better-auth";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { expo } from "@better-auth/expo";
+<% const authConf = service.authConfig; -%>
+<% if (authConf.twoFactor || authConf.emailVerification) { -%>
+import { <% if (authConf.twoFactor) { %>twoFactor, <% } %><% if (authConf.emailVerification) { %>emailOTP<% } %> } from "better-auth/plugins";
+<% } -%>
+
+import { db } from "../utils/db";
+import * as schema from "../drizzle/schema";
+<% if (authConf.emailVerification || authConf.passwordReset) { -%>
+import { sendEmail } from "../utils/email";
+<% } -%>
+
+/**
+ * BetterAuth server for the <%= service.name %> service.
+ *
+ * Provisioning model: other services in this monorepo call
+ * `POST /api/auth/provision` to flip the per-service `has<Service>Account`
+ * flag on the user after they've been provisioned locally on that service.
+ */
+export const auth = betterAuth({
+  database: drizzleAdapter(db, {
+    provider: "pg",
+    schema: {
+      user: schema.user,
+      session: schema.session,
+      account: schema.account,
+      verification: schema.verification,
+<% if (authConf.twoFactor) { -%>
+      twoFactor: schema.twoFactor,
+<% } -%>
+    },
+  }),
+  basePath: "/api/auth",
+  user: {
+    additionalFields: {
+      role: {
+        type: "string",
+        defaultValue: "user",
+        input: false,
+      },
+<% provisioningTargets.forEach((target) => { const cap = target.charAt(0).toUpperCase() + target.slice(1).replace(/-([a-z])/g, (_, c) => c.toUpperCase()); -%>
+      has<%= cap %>Account: {
+        type: "boolean",
+        defaultValue: false,
+        input: false,
+      },
+<% }); -%>
+<% (authConf.additionalUserFields || []).forEach((field) => { -%>
+      <%= field.name %>: {
+        type: "<%= field.type %>",
+        defaultValue: <%- JSON.stringify(field.default) %>,
+        input: false,
+      },
+<% }); -%>
+    },
+  },
+  emailAndPassword: {
+    enabled: true,
+    requireEmailVerification: <%= authConf.emailVerification ? 'true' : 'false' %>,
+<% if (authConf.passwordReset) { -%>
+    sendResetPassword: async ({ user, url }) => {
+      await sendEmail({
+        to: user.email,
+        subject: "Reset your password",
+        html: `
+          <h1>Reset your password</h1>
+          <p>Click the link below to reset your password:</p>
+          <a href="${url}">Reset Password</a>
+          <p>If you didn't request this, you can safely ignore this email.</p>
+        `,
+      });
+    },
+<% } -%>
+  },
+<% if (authConf.providers.google || authConf.providers.apple || authConf.providers.github) { -%>
+  socialProviders: {
+<% if (authConf.providers.google) { -%>
+    google: {
+      clientId: process.env.GOOGLE_WEB_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    },
+<% } -%>
+<% if (authConf.providers.apple) { -%>
+    apple: {
+      clientId: process.env.APPLE_SERVICE_ID!,
+      clientSecret: process.env.APPLE_CLIENT_SECRET!,
+      appBundleIdentifier: process.env.APPLE_BUNDLE_ID!,
+    },
+<% } -%>
+<% if (authConf.providers.github) { -%>
+    github: {
+      clientId: process.env.GITHUB_CLIENT_ID!,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+    },
+<% } -%>
+  },
+<% } -%>
+  plugins: [
+    expo(),
+<% if (authConf.twoFactor) { -%>
+    twoFactor(),
+<% } -%>
+<% if (authConf.emailVerification) { -%>
+    emailOTP({
+      otpLength: 6,
+      expiresIn: 300,
+      sendVerificationOnSignUp: true,
+      async sendVerificationOTP({ email, otp, type }) {
+        if (type === 'email-verification') {
+          await sendEmail({
+            to: email,
+            subject: "Your verification code",
+            html: `
+              <h1>Verify your email</h1>
+              <p>Your verification code is:</p>
+              <h2 style="font-size: 32px; letter-spacing: 8px; font-family: monospace;">${otp}</h2>
+              <p>This code expires in 5 minutes.</p>
+            `,
+          });
+        }
+      },
+    }),
+<% } -%>
+  ],
+  session: {
+    expiresIn: 60 * 60 * 24 * 7, // 7 days
+    updateAge: 60 * 60 * 24,      // 1 day
+  },
+  advanced: {
+    useSecureCookies: false,
+  },
+  trustedOrigins: [
+    ...(process.env.TRUSTED_ORIGINS?.split(",").map(o => o.trim()) || [
+<% peerWebPorts.forEach((port) => { -%>
+      "http://localhost:<%= port %>",
+<% }); -%>
+<% if (peerWebPorts.length === 0) { -%>
+      "http://localhost:3000",
+<% } -%>
+    ]),
+    "<%= appScheme %>://",
+<% if (authConf.providers.apple) { -%>
+    "https://appleid.apple.com",
+<% } -%>
+    ...(process.env.NODE_ENV === "development" ? ["exp://*/*", "exp://192.168.*.*:*/*", "exp://172.*.*.*:*/*"] : []),
+  ],
+});
+
+export type Session = typeof auth.$Infer.Session;

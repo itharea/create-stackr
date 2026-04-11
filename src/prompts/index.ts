@@ -1,169 +1,181 @@
+import inquirer from 'inquirer';
 import { promptProjectName } from './project.js';
-import { selectPreset, customizePreset } from './preset.js';
-import { promptFeatures } from './features.js';
-import { promptSDKs } from './sdks.js';
-import { promptOnboarding } from './onboarding.js';
 import { promptPackageManager } from './packageManager.js';
 import { promptORM } from './orm.js';
-import { promptPlatforms } from './platform.js';
 import { promptAITools } from './aiTools.js';
-import inquirer from 'inquirer';
-import { PRESETS } from '../config/presets.js';
-import type { ProjectConfig, CLIOptions } from '../types/index.js';
+import { promptServices, buildExtraServicesFromFlag } from './services.js';
+import { PRESETS, loadPreset, coreEntry, noIntegrations } from '../config/presets.js';
+import type {
+  InitConfig,
+  CLIOptions,
+  ServiceConfig,
+} from '../types/index.js';
 import { deriveAppScheme } from '../types/index.js';
 
+/**
+ * Phase 2 prompt orchestrator. Produces a fully populated `InitConfig`.
+ *
+ * Flow:
+ *   --template <preset>  → load preset, skip most prompts
+ *   --defaults           → use minimal preset, skip all prompts
+ *   interactive          → preset selection or custom loop
+ *
+ * `--with-services` adds extra base services to whichever preset/custom
+ * config came out the other end (per meta_phases.md §1 flag semantics).
+ */
 export async function collectConfiguration(
   projectName: string | undefined,
   options: CLIOptions
-): Promise<ProjectConfig> {
-  // 1. Get project name
+): Promise<InitConfig> {
   const name = await promptProjectName(projectName);
 
-  // 2. If --template flag is provided, load that preset
-  if (options.template) {
-    const config = await loadPresetByName(options.template);
-    const aiTools = await promptAITools();
-    const packageManager = await promptPackageManager();
-    return {
-      ...config,
-      projectName: name,
-      appScheme: deriveAppScheme(name),
-      packageManager,
-      aiTools,
-    };
-  }
-
-  // 3. If --defaults flag, use minimal preset
+  // Non-interactive paths first.
   if (options.defaults) {
-    const config = await loadPresetByName('minimal');
-    return {
-      ...config,
-      projectName: name,
-      appScheme: deriveAppScheme(name),
-      packageManager: 'npm',
-    };
-  }
-
-  // 4. Interactive mode: Select preset or custom
-  let config = await selectPreset();
-
-  // 5. If custom selected, collect full configuration
-  if (!config) {
-    config = await collectCustomConfiguration();
-  } else {
-    // Ask if user wants to customize the preset
-    config = await customizePreset(config);
-  }
-
-  // Auto-enable ATT when Adjust is enabled (single source of truth)
-  if (config.integrations.adjust.enabled) {
-    config.integrations.att.enabled = true;
-  }
-
-  // 6. Get AI coding tools preference
-  const aiTools = await promptAITools();
-
-  // 7. Get package manager
-  const packageManager = await promptPackageManager();
-
-  return {
-    ...config,
-    projectName: name,
-    appScheme: deriveAppScheme(name),
-    packageManager,
-    aiTools,
-  };
-}
-
-async function collectCustomConfiguration(): Promise<
-  Omit<ProjectConfig, 'projectName' | 'packageManager' | 'appScheme'>
-> {
-  // Platform selection FIRST (foundational choice)
-  const platforms = await promptPlatforms();
-
-  const hasMobile = platforms.includes('mobile');
-
-  // ORM selection (foundational choice)
-  const orm = await promptORM();
-
-  // Collect features (with platform awareness)
-  const features = await promptFeatures(platforms);
-
-  // Collect SDK integrations only for mobile
-  const integrations = hasMobile
-    ? await promptSDKs()
-    : getDefaultIntegrations();
-
-  // If onboarding enabled AND mobile platform, collect onboarding config
-  if (features.onboarding.enabled && hasMobile) {
-    const onboardingConfig = await promptOnboarding(integrations.revenueCat.enabled);
-    features.onboarding = { ...features.onboarding, ...onboardingConfig };
-  }
-
-  // Event queue selection
-  const { eventQueue } = await inquirer.prompt([
-    {
-      type: 'confirm',
-      name: 'eventQueue',
-      message: 'Include event queue (BullMQ + Redis)?',
-      default: true,
-    },
-  ]);
-
-  return {
-    platforms,
-    features,
-    integrations,
-    backend: {
-      database: 'postgresql',
-      orm,
-      eventQueue,
-      docker: true,
-    },
-    preset: 'custom',
-    customized: false,
-    aiTools: [],
-  };
-}
-
-/**
- * Returns default (disabled) integrations for web-only projects.
- */
-function getDefaultIntegrations() {
-  return {
-    revenueCat: {
-      enabled: false,
-      iosKey: '',
-      androidKey: '',
-    },
-    adjust: {
-      enabled: false,
-      appToken: '',
-      environment: 'sandbox' as const,
-    },
-    scate: {
-      enabled: false,
-      apiKey: '',
-    },
-    att: {
-      enabled: false,
-    },
-  };
-}
-
-async function loadPresetByName(
-  presetName: string
-): Promise<Omit<ProjectConfig, 'projectName' | 'packageManager' | 'appScheme'>> {
-  const preset = PRESETS.find(
-    (p) => p.name.toLowerCase() === presetName.toLowerCase()
-  );
-
-  if (!preset) {
-    const available = PRESETS.map((p) => p.name.toLowerCase()).join(', ');
-    throw new Error(
-      `Unknown preset: ${presetName}. Available: ${available}`
+    return applyCliOptionsToPreset(
+      loadPreset('minimal'),
+      name,
+      'npm',
+      options
     );
   }
 
-  return preset.config;
+  if (options.template) {
+    const base = loadPreset(options.template);
+    const aiTools = await promptAITools();
+    const packageManager = await promptPackageManager();
+    return applyCliOptionsToPreset(
+      { ...base, aiTools },
+      name,
+      packageManager,
+      options
+    );
+  }
+
+  // Interactive: preset or custom
+  const { choice } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'choice',
+      message: 'Choose a starting template:',
+      choices: [
+        ...PRESETS.map((preset) => ({
+          name: `${preset.icon} ${preset.name} - ${preset.description}`,
+          value: preset.name.toLowerCase(),
+          short: preset.name,
+        })),
+        { name: '⚙️  Custom - Pick exactly what you need', value: 'custom', short: 'Custom' },
+      ],
+      pageSize: 10,
+    },
+  ]);
+
+  let body: Omit<InitConfig, 'projectName' | 'packageManager' | 'appScheme'>;
+
+  if (choice === 'custom') {
+    const services = await promptServices();
+    const orm = await promptORM();
+    const aiTools = await promptAITools();
+    body = {
+      orm,
+      aiTools,
+      services,
+      preset: 'custom',
+      customized: true,
+    };
+  } else {
+    body = { ...loadPreset(choice) };
+    // Preset may still get AI tools / package manager collected below.
+    const aiTools = await promptAITools();
+    body.aiTools = aiTools;
+  }
+
+  const packageManager = await promptPackageManager();
+  return applyCliOptionsToPreset(body, name, packageManager, options);
+}
+
+/**
+ * Apply CLI overrides (`--service-name`, `--no-auth`, `--with-services`)
+ * to a resolved `InitConfig` body and stamp in the project name + derived
+ * app scheme.
+ */
+export function applyCliOptionsToPreset(
+  body: Omit<InitConfig, 'projectName' | 'packageManager' | 'appScheme'>,
+  projectName: string,
+  packageManager: 'npm' | 'yarn' | 'bun',
+  options: CLIOptions
+): InitConfig {
+  let services: ServiceConfig[] = body.services.map((s) => ({ ...s }));
+
+  // --no-auth: strip the auth service entry and force every remaining
+  // service's middleware to 'none'.
+  if (options.auth === false) {
+    services = services.filter((s) => s.kind !== 'auth');
+    services = services.map((s) => ({
+      ...s,
+      backend: { ...s.backend, authMiddleware: 'none' as const },
+    }));
+  }
+
+  // --service-name: rename the first base service (or add one if the
+  // filtered list is empty).
+  if (options.serviceName && options.serviceName.length > 0) {
+    const baseIdx = services.findIndex((s) => s.kind === 'base');
+    if (baseIdx >= 0) {
+      services[baseIdx] = { ...services[baseIdx], name: options.serviceName };
+    } else {
+      services.push(
+        coreEntry({
+          name: options.serviceName,
+          backend: {
+            port: 8080,
+            eventQueue: false,
+            imageUploads: false,
+            authMiddleware: options.auth === false ? 'none' : 'standard',
+          },
+        })
+      );
+    }
+  }
+
+  // --with-services: append extra base services.
+  if (options.withServices && options.withServices.length > 0) {
+    const extras = buildExtraServicesFromFlag(
+      options.withServices,
+      services,
+      options.auth !== false
+    );
+    services.push(...extras);
+  }
+
+  // If auth service is still present, sync its provisioningTargets.
+  const authSvc = services.find((s) => s.kind === 'auth');
+  if (authSvc && authSvc.authConfig) {
+    authSvc.authConfig.provisioningTargets = services
+      .filter((s) => s.kind === 'base')
+      .map((s) => s.name);
+  }
+
+  // Ensure at least one service exists after --no-auth.
+  if (services.length === 0) {
+    services.push(
+      coreEntry({
+        name: options.serviceName ?? 'core',
+        backend: {
+          port: 8080,
+          eventQueue: false,
+          imageUploads: false,
+          authMiddleware: 'none',
+        },
+        integrations: noIntegrations(),
+      })
+    );
+  }
+
+  return {
+    ...body,
+    services,
+    projectName,
+    packageManager,
+    appScheme: deriveAppScheme(projectName),
+  };
 }

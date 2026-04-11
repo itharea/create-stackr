@@ -60,6 +60,60 @@ describe('Error Factories', () => {
     expect(error.message).toContain('pnpm');
     expect(error.recovery).toBeDefined();
   });
+
+  it('should create templateNotFound error', () => {
+    const error = errors.templateNotFound('some/template.ejs');
+    expect(error.message).toContain('some/template.ejs');
+    expect(error.hints && error.hints.length).toBeGreaterThan(0);
+    expect(error.recovery && error.recovery.length).toBeGreaterThan(0);
+  });
+
+  it('should create templateRenderFailed error carrying the cause', () => {
+    const cause = new Error('bad ejs');
+    const error = errors.templateRenderFailed('path/to/file.ejs', cause);
+    expect(error.message).toContain('path/to/file.ejs');
+    expect(error.cause).toBe(cause);
+    expect(error.hints && error.hints.length).toBeGreaterThan(0);
+    expect(error.recovery && error.recovery.length).toBeGreaterThan(0);
+  });
+
+  it('should create fileCopyFailed error with src/dest and cause', () => {
+    const cause = new Error('EPERM');
+    const error = errors.fileCopyFailed('from/here', 'to/there', cause);
+    expect(error.message).toContain('from/here');
+    expect(error.message).toContain('to/there');
+    expect(error.cause).toBe(cause);
+    expect(error.hints && error.hints.length).toBeGreaterThan(0);
+    expect(error.recovery && error.recovery.length).toBeGreaterThan(0);
+  });
+
+  it('should create dependencyInstallFailed error whose recovery steps reference the directory', () => {
+    const error = errors.dependencyInstallFailed('pnpm', '/tmp/myapp');
+    expect(error.hints?.some((h) => h.includes('pnpm'))).toBe(true);
+    expect(error.recovery?.every((r) => r.includes('/tmp/myapp'))).toBe(true);
+    expect(error.recovery?.some((r) => r.includes('pnpm install'))).toBe(true);
+  });
+
+  it('should create gitInitFailed error with cause and helpful recovery', () => {
+    const cause = new Error('no git');
+    const error = errors.gitInitFailed(cause);
+    expect(error.cause).toBe(cause);
+    expect(error.recovery?.some((r) => r.includes('git init'))).toBe(true);
+  });
+
+  it('should create nodeVersionTooLow error referencing both versions', () => {
+    const error = errors.nodeVersionTooLow('16.0.0', '18.0.0');
+    expect(error.message).toContain('16.0.0');
+    expect(error.message).toContain('18.0.0');
+    expect(error.recovery?.some((r) => r.includes('nvm install 18.0.0'))).toBe(true);
+  });
+
+  it('should create diskSpaceError with disk-space hints and recovery', () => {
+    const error = errors.diskSpaceError();
+    expect(error.message.toLowerCase()).toContain('disk space');
+    expect(error.hints && error.hints.length).toBeGreaterThan(0);
+    expect(error.recovery && error.recovery.length).toBeGreaterThan(0);
+  });
 });
 
 describe('Display Functions', () => {

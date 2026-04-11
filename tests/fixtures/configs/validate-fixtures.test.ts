@@ -1,30 +1,39 @@
 import { describe, it, expect } from 'vitest';
 import { validateConfiguration } from '../../../src/utils/validation.js';
-import { minimalConfig, fullFeaturedConfig, analyticsFocusedConfig, invalidConfigs } from './index.js';
+import { minimalConfig } from './minimal.js';
+import { fullFeaturedConfig } from './full-featured.js';
+import { analyticsFocusedConfig } from './analytics-focused.js';
+import { multiServiceConfig } from './multi-service.js';
+import { drizzleConfig } from './drizzle-config.js';
+import { invalidCases } from './invalid.js';
 
 /**
- * Ensure test fixtures stay in sync with ProjectConfig schema
+ * Guard test — ensures fixtures do not silently drift. Every "valid"
+ * fixture must pass `validateConfiguration`, and every invalid fixture
+ * must fail with the expected error substring.
  */
-describe('Fixture Validation', () => {
-  it('minimalConfig should be valid', () => {
-    const result = validateConfiguration(minimalConfig);
-    expect(result.valid).toBe(true);
-  });
+describe('fixture validation', () => {
+  const validFixtures = {
+    minimal: minimalConfig,
+    'full-featured': fullFeaturedConfig,
+    'analytics-focused': analyticsFocusedConfig,
+    'multi-service': multiServiceConfig,
+    drizzle: drizzleConfig,
+  };
 
-  it('fullFeaturedConfig should be valid', () => {
-    const result = validateConfiguration(fullFeaturedConfig);
-    expect(result.valid).toBe(true);
-  });
+  for (const [fixtureName, config] of Object.entries(validFixtures)) {
+    it(`${fixtureName} fixture passes validateConfiguration`, () => {
+      const result = validateConfiguration(config);
+      expect(result.valid, `${fixtureName}: ${result.error ?? ''}`).toBe(true);
+    });
+  }
 
-  it('analyticsFocusedConfig should be valid', () => {
-    const result = validateConfiguration(analyticsFocusedConfig);
-    expect(result.valid).toBe(true);
-  });
-
-  it('invalidConfigs should fail validation', () => {
-    expect(validateConfiguration(invalidConfigs.paywallWithoutRevenueCat).valid).toBe(false);
-    expect(validateConfiguration(invalidConfigs.onboardingTooManyPages).valid).toBe(false);
-    expect(validateConfiguration(invalidConfigs.emptyProjectName).valid).toBe(false);
-    expect(validateConfiguration(invalidConfigs.invalidPackageManager).valid).toBe(false);
-  });
+  for (const [key, invalid] of Object.entries(invalidCases)) {
+    it(`${key} fixture fails validateConfiguration with "${invalid.expectedError}"`, () => {
+      const result = validateConfiguration(invalid.config);
+      expect(result.valid).toBe(false);
+      expect(result.error).toBeDefined();
+      expect(result.error).toContain(invalid.expectedError);
+    });
+  }
 });

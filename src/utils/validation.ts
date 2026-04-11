@@ -1,13 +1,34 @@
 import validateNpmPackageName from 'validate-npm-package-name';
-import type { ProjectConfig } from '../types/index.js';
+import type { InitConfig, ServiceConfig } from '../types/index.js';
 
 export interface ValidationResult {
   valid: boolean;
   error?: string;
 }
 
+/** Reserved directory segments / OS-reserved names that must never be service names. */
+const RESERVED_SERVICE_NAMES = new Set([
+  'node_modules',
+  'src',
+  'dist',
+  'build',
+  'scripts',
+  'plans',
+  'docs',
+  'test',
+  'tests',
+  '.git',
+  '.github',
+  // Windows reserved
+  'con',
+  'prn',
+  'aux',
+  'nul',
+  'com1', 'com2', 'com3', 'com4', 'com5', 'com6', 'com7', 'com8', 'com9',
+  'lpt1', 'lpt2', 'lpt3', 'lpt4', 'lpt5', 'lpt6', 'lpt7', 'lpt8', 'lpt9',
+]);
+
 export function validateProjectName(name: string): ValidationResult {
-  // Check if empty
   if (!name || name.trim().length === 0) {
     return {
       valid: false,
@@ -15,7 +36,6 @@ export function validateProjectName(name: string): ValidationResult {
     };
   }
 
-  // Check npm package name validity
   const npmValidation = validateNpmPackageName(name);
   if (!npmValidation.validForNewPackages) {
     const errors = [
@@ -31,32 +51,60 @@ export function validateProjectName(name: string): ValidationResult {
   return { valid: true };
 }
 
-export function validateConfiguration(config: ProjectConfig): ValidationResult {
-  // Validate project name
+/**
+ * Validate a service name. Must be a valid directory segment:
+ * lowercase alphanumeric + dashes, non-empty, no path separators, no
+ * leading dots, not an OS-reserved name. The literal `auth` is reserved
+ * for the auth service — `allowAuth` lets the auth entry through.
+ */
+export function validateServiceName(
+  name: string,
+  options: { allowAuth?: boolean } = {}
+): ValidationResult {
+  if (!name || name.length === 0) {
+    return { valid: false, error: 'Service name cannot be empty' };
+  }
+
+  if (name.length > 40) {
+    return { valid: false, error: 'Service name must be 40 characters or fewer' };
+  }
+
+  if (!/^[a-z][a-z0-9-]*$/.test(name)) {
+    return {
+      valid: false,
+      error: `Service name "${name}" must be lowercase alphanumeric with dashes, starting with a letter`,
+    };
+  }
+
+  if (name.startsWith('.') || name.includes('/') || name.includes('\\')) {
+    return { valid: false, error: `Service name "${name}" contains invalid path characters` };
+  }
+
+  if (RESERVED_SERVICE_NAMES.has(name.toLowerCase())) {
+    return { valid: false, error: `Service name "${name}" is reserved` };
+  }
+
+  if (name === 'auth' && !options.allowAuth) {
+    return {
+      valid: false,
+      error: `Service name "auth" is reserved for the auth service`,
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Validate an `InitConfig`. Checks name uniqueness across services, valid
+ * service names, coherent auth-middleware references, and per-service
+ * invariants.
+ */
+export function validateConfiguration(config: InitConfig): ValidationResult {
   const nameValidation = validateProjectName(config.projectName);
   if (!nameValidation.valid) {
     return nameValidation;
   }
 
-  // Validate platforms
-  if (!config.platforms || config.platforms.length === 0) {
-    return {
-      valid: false,
-      error: 'At least one platform must be selected',
-    };
-  }
-
-  const validPlatforms = ['mobile', 'web'];
-  for (const platform of config.platforms) {
-    if (!validPlatforms.includes(platform)) {
-      return {
-        valid: false,
-        error: `Invalid platform: ${platform}. Must be one of: ${validPlatforms.join(', ')}`,
-      };
-    }
-  }
-
-  // Validate package manager
   const validPackageManagers = ['npm', 'yarn', 'bun'];
   if (!validPackageManagers.includes(config.packageManager)) {
     return {
@@ -65,83 +113,90 @@ export function validateConfiguration(config: ProjectConfig): ValidationResult {
     };
   }
 
-  // Validate mobile-only features on web-only config
-  // IMPORTANT: Check platform constraints BEFORE dependency constraints
-  // so users see the more fundamental error first
-  const hasMobile = config.platforms.includes('mobile');
+  if (!['prisma', 'drizzle'].includes(config.orm)) {
+    return { valid: false, error: 'ORM must be one of: prisma, drizzle' };
+  }
 
-  if (!hasMobile) {
-    if (config.features.onboarding.enabled) {
-      return {
-        valid: false,
-        error: 'Onboarding feature requires mobile platform',
-      };
+  if (!Array.isArray(config.services) || config.services.length === 0) {
+    return { valid: false, error: 'At least one service must be defined' };
+  }
+
+  // Name uniqueness
+  const names = new Set<string>();
+  let authServices = 0;
+  for (const svc of config.services) {
+    const svcNameValidation = validateServiceName(svc.name, { allowAuth: svc.kind === 'auth' });
+    if (!svcNameValidation.valid) {
+      return svcNameValidation;
+    }
+    if (names.has(svc.name)) {
+      return { valid: false, error: `Duplicate service name: ${svc.name}` };
+    }
+    names.add(svc.name);
+
+    if (svc.kind === 'auth') {
+      authServices++;
     }
 
-    if (config.features.paywall) {
-      return {
-        valid: false,
-        error: 'Paywall feature requires mobile platform',
-      };
-    }
-
-    if (config.integrations.revenueCat.enabled) {
-      return {
-        valid: false,
-        error: 'RevenueCat integration requires mobile platform',
-      };
-    }
-
-    if (config.integrations.adjust.enabled) {
-      return {
-        valid: false,
-        error: 'Adjust integration requires mobile platform',
-      };
-    }
-
-    if (config.integrations.scate.enabled) {
-      return {
-        valid: false,
-        error: 'Scate integration requires mobile platform',
-      };
-    }
-
-    if (config.integrations.att.enabled) {
-      return {
-        valid: false,
-        error: 'ATT integration requires mobile platform',
-      };
+    const perSvcResult = validateServiceConfig(svc);
+    if (!perSvcResult.valid) {
+      return perSvcResult;
     }
   }
 
-  // Validate paywall requires RevenueCat (only relevant when mobile platform is included)
-  if (config.features.paywall && !config.integrations.revenueCat.enabled) {
+  if (authServices > 1) {
+    return { valid: false, error: 'Only one auth service is allowed per monorepo' };
+  }
+
+  const hasAuth = authServices === 1;
+
+  // In a no-auth monorepo, no base service may forward to an auth service.
+  if (!hasAuth) {
+    for (const svc of config.services) {
+      if (svc.kind === 'base' && svc.backend.authMiddleware !== 'none') {
+        return {
+          valid: false,
+          error: `Service "${svc.name}" requests authMiddleware "${svc.backend.authMiddleware}" but no auth service is present`,
+        };
+      }
+    }
+  }
+
+  // Port uniqueness
+  const backendPorts = new Set<number>();
+  const webPorts = new Set<number>();
+  for (const svc of config.services) {
+    if (backendPorts.has(svc.backend.port)) {
+      return { valid: false, error: `Duplicate backend port: ${svc.backend.port}` };
+    }
+    backendPorts.add(svc.backend.port);
+
+    if (svc.web?.enabled) {
+      if (webPorts.has(svc.web.port)) {
+        return { valid: false, error: `Duplicate web port: ${svc.web.port}` };
+      }
+      webPorts.add(svc.web.port);
+    }
+  }
+
+  return { valid: true };
+}
+
+function validateServiceConfig(svc: ServiceConfig): ValidationResult {
+  if (typeof svc.backend.port !== 'number' || svc.backend.port <= 0 || svc.backend.port > 65535) {
     return {
       valid: false,
-      error: 'Paywall feature requires RevenueCat integration',
+      error: `Service "${svc.name}" has invalid backend port ${svc.backend.port}`,
     };
   }
 
-  // Validate onboarding pages
-  if (config.features.onboarding.enabled) {
-    const pages = config.features.onboarding.pages;
-    if (pages < 1 || pages > 5) {
+  if (svc.backend.authMiddleware === 'role-gated') {
+    if (!svc.backend.roles || svc.backend.roles.length === 0) {
       return {
         valid: false,
-        error: 'Onboarding pages must be between 1 and 5',
+        error: `Service "${svc.name}" uses role-gated auth but has no roles configured`,
       };
     }
-  }
-
-  // Validate onboarding paywall requires RevenueCat
-  if (
-    config.features.onboarding.showPaywall &&
-    !config.integrations.revenueCat.enabled
-  ) {
-    return {
-      valid: false,
-      error: 'Onboarding paywall requires RevenueCat integration',
-    };
   }
 
   return { valid: true };

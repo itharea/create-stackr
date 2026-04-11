@@ -76,17 +76,17 @@ export async function verifyFilesNotExist(
 /**
  * Verify package.json has expected dependencies
  * @param projectDir - Project root directory
- * @param subDir - Subdirectory (mobile/backend)
+ * @param subDir - Subdirectory within `core/` (`mobile`, `backend`, `web`)
  * @param expectedDeps - Dependencies that should exist
  * @param notExpectedDeps - Dependencies that should NOT exist
  */
 export async function verifyPackageJson(
   projectDir: string,
-  subDir: 'mobile' | 'backend',
+  subDir: 'mobile' | 'backend' | 'web',
   expectedDeps: string[],
   notExpectedDeps: string[] = []
 ): Promise<void> {
-  const pkgPath = path.join(projectDir, subDir, 'package.json');
+  const pkgPath = path.join(projectDir, 'core', subDir, 'package.json');
   const pkg = await fs.readJSON(pkgPath);
 
   // Check expected dependencies
@@ -164,28 +164,32 @@ export async function verifyFileNotContains(
 
 /**
  * Standard directory structure for minimal project
+ *
+ * Phase 1: generator output is nested under `core/`. `stackr.config.json`
+ * now lives at the project root.
  */
 export const MINIMAL_STRUCTURE = {
   directories: [
-    'mobile',
-    'mobile/app',
-    'mobile/src',
-    'mobile/src/components',
-    'mobile/src/services',
-    'mobile/src/store',
-    'backend',
-    'backend/controllers',
-    'backend/domain',
+    'core/mobile',
+    'core/mobile/app',
+    'core/mobile/src',
+    'core/mobile/src/components',
+    'core/mobile/src/services',
+    'core/mobile/src/store',
+    'core/backend',
+    'core/backend/controllers',
+    'core/backend/domain',
     'scripts',
   ],
   files: [
-    'mobile/package.json',
-    'mobile/app.json',
-    'mobile/tsconfig.json',
-    'backend/package.json',
-    'backend/tsconfig.json',
+    'core/mobile/package.json',
+    'core/mobile/app.json',
+    'core/mobile/tsconfig.json',
+    'core/backend/package.json',
+    'core/backend/tsconfig.json',
     'README.md',
     '.gitignore',
+    'stackr.config.json',
   ],
 };
 
@@ -195,14 +199,14 @@ export const MINIMAL_STRUCTURE = {
 export const FULL_FEATURED_STRUCTURE = {
   directories: [
     ...MINIMAL_STRUCTURE.directories,
-    'mobile/app/(onboarding)',
-    'mobile/app/(auth)',
+    'core/mobile/app/(onboarding)',
+    'core/mobile/app/(auth)',
   ],
   files: [
     ...MINIMAL_STRUCTURE.files,
-    'mobile/src/services/revenuecatService.ts',
-    'mobile/src/services/adjustService.ts',
-    'mobile/src/services/scateService.ts',
-    'mobile/src/services/attService.ts',
+    'core/mobile/src/services/revenuecatService.ts',
+    'core/mobile/src/services/adjustService.ts',
+    'core/mobile/src/services/scateService.ts',
+    'core/mobile/src/services/attService.ts',
   ],
 };

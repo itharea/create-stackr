@@ -1,37 +1,40 @@
 import fs from 'fs-extra';
 import path from 'path';
-import type { ProjectConfig } from '../types/index.js';
+import type { ServiceRenderContext } from '../types/index.js';
 
 /**
- * Generate dynamic onboarding pages based on configuration
- * Note: Templates already have pages 1-3, so we only generate pages 4-5 if needed
- * Onboarding is a mobile-only feature
+ * Generate dynamic onboarding pages for a single service's mobile subtree.
+ *
+ * Phase 2: takes a `ServiceRenderContext` so the correct per-service
+ * `<projectRoot>/<service.name>/mobile/` path can be targeted. Templates
+ * already ship pages 1-3; only pages 4-5 need to be generated at runtime
+ * when the user asks for more than 3.
+ *
+ * The `serviceRoot` argument is `<projectRoot>/<service.name>` — the
+ * caller joins the service name so this function never has to know about
+ * the `targetDir` vs `serviceRoot` split.
  */
 export async function generateOnboardingPages(
-  config: ProjectConfig,
-  targetDir: string
+  ctx: ServiceRenderContext,
+  serviceRoot: string
 ): Promise<void> {
-  // Onboarding is mobile-only - skip if mobile platform not selected
-  if (!config.platforms.includes('mobile')) {
+  if (!ctx.service.mobile?.enabled) {
     return;
   }
 
-  if (!config.features.onboarding.enabled) {
+  if (!ctx.features.onboarding.enabled) {
     return;
   }
 
-  const { pages, skipButton, showPaywall } = config.features.onboarding;
+  const { pages, skipButton, showPaywall } = ctx.features.onboarding;
 
-  // Templates already include pages 1-3
-  // Only generate additional pages if needed (4-5)
   if (pages <= 3) {
     return;
   }
 
-  const onboardingDir = path.join(targetDir, 'mobile/app/(onboarding)');
+  const onboardingDir = path.join(serviceRoot, 'mobile/app/(onboarding)');
   await fs.ensureDir(onboardingDir);
 
-  // Generate pages 4-5
   for (let i = 4; i <= pages; i++) {
     const isLastPage = i === pages;
 
@@ -42,13 +45,12 @@ export async function generateOnboardingPages(
       isLastPage,
       skipButton,
       showPaywall: showPaywall && isLastPage,
-      hasPaywall: config.integrations.revenueCat.enabled,
+      hasPaywall: ctx.integrations.revenueCat.enabled,
     });
 
     await fs.writeFile(path.join(onboardingDir, `page-${i}.tsx`), pageContent);
   }
 
-  // Update _layout.tsx to include all pages
   await updateOnboardingLayout(pages, onboardingDir);
 }
 
@@ -141,13 +143,10 @@ const styles = StyleSheet.create({
 async function updateOnboardingLayout(totalPages: number, onboardingDir: string): Promise<void> {
   const layoutPath = path.join(onboardingDir, '_layout.tsx');
 
-  // Check if layout exists
   if (!(await fs.pathExists(layoutPath))) {
-    // Create new layout
     const layoutContent = generateOnboardingLayout(totalPages);
     await fs.writeFile(layoutPath, layoutContent);
   } else {
-    // Update existing layout to include all pages
     const layoutContent = generateOnboardingLayout(totalPages);
     await fs.writeFile(layoutPath, layoutContent);
   }

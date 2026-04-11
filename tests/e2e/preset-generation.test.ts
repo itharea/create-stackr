@@ -1,98 +1,102 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { execa } from 'execa';
 import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
-import { ProjectGenerator } from '../../src/generators/index.js';
-import { PRESETS } from '../../src/config/presets.js';
+import { fileURLToPath } from 'url';
+import { MonorepoGenerator } from '../../src/generators/monorepo.js';
+import { loadPreset, PRESETS } from '../../src/config/presets.js';
+import { applyCliOptionsToPreset } from '../../src/prompts/index.js';
+import { loadStackrConfig } from '../../src/utils/config-file.js';
+import type { InitConfig } from '../../src/types/index.js';
 
-// Mock execa to avoid actual git operations
-vi.mock('execa', () => ({
-  execa: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
-}));
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const REPO_ROOT = path.resolve(__dirname, '../..');
+const SRC_ENTRY = path.join(REPO_ROOT, 'src/entrypoints/create.ts');
+const TSX_BIN = path.join(REPO_ROOT, 'node_modules/.bin/tsx');
 
-// Mock inquirer
-vi.mock('inquirer', () => ({
-  default: {
-    prompt: vi.fn().mockResolvedValue({ shouldCleanup: false }),
-  },
-}));
-
-describe('E2E: Preset Generation', () => {
+/**
+ * E2E preset generation — proves every preset yields a valid project
+ * tree containing `stackr.config.json` with the expected services.
+ *
+ * The minimal preset is exercised via a real CLI spawn (`tsx src/index.ts`)
+ * with `--defaults` because that's the only preset the CLI can run
+ * non-interactively today. Full-featured and analytics-focused presets
+ * still require prompts for aiTools / packageManager when invoked via
+ * `--template`, so for those we drive `MonorepoGenerator.generate`
+ * directly — still an end-to-end project-on-disk assertion, just without
+ * the subprocess.
+ */
+describe('E2E preset generation', () => {
   let tempDir: string;
 
   beforeEach(async () => {
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'preset-e2e-'));
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'e2e-preset-'));
   });
 
   afterEach(async () => {
     await fs.remove(tempDir);
   });
 
-  // Generate a test for each preset
-  for (const preset of PRESETS) {
-    const presetSlug = preset.name.toLowerCase().replace(/[^a-z0-9]/g, '-');
+  it('minimal preset via CLI spawn (--defaults) produces a valid project', async () => {
+    const projectName = 'minimal-cli-e2e';
 
-    it(`should generate valid project for "${preset.name}" preset`, async () => {
-      const config = {
-        ...preset.config,
-        projectName: `${presetSlug}-test`,
-        packageManager: 'npm' as const,
-        appScheme: `${presetSlug}test`.replace(/-/g, ''),
-      };
-
-      const projectDir = path.join(tempDir, config.projectName);
-      const generator = new ProjectGenerator(config);
-      await generator.generate(projectDir);
-
-      // Verify platform directories
-      if (config.platforms.includes('mobile')) {
-        expect(await fs.pathExists(path.join(projectDir, 'mobile'))).toBe(true);
-        expect(await fs.pathExists(path.join(projectDir, 'mobile/package.json'))).toBe(true);
-        expect(await fs.pathExists(path.join(projectDir, 'mobile/app.json'))).toBe(true);
-
-        // Verify package.json is valid JSON
-        const mobilePkg = await fs.readJSON(path.join(projectDir, 'mobile/package.json'));
-        expect(mobilePkg.name).toBe(`${config.projectName}-mobile`);
-      }
-
-      if (config.platforms.includes('web')) {
-        expect(await fs.pathExists(path.join(projectDir, 'web'))).toBe(true);
-        expect(await fs.pathExists(path.join(projectDir, 'web/package.json'))).toBe(true);
-
-        const webPkg = await fs.readJSON(path.join(projectDir, 'web/package.json'));
-        expect(webPkg.name).toBe(`${config.projectName}-web`);
-      }
-
-      // Backend always exists
-      expect(await fs.pathExists(path.join(projectDir, 'backend'))).toBe(true);
-      expect(await fs.pathExists(path.join(projectDir, 'backend/package.json'))).toBe(true);
-
-      const backendPkg = await fs.readJSON(path.join(projectDir, 'backend/package.json'));
-      expect(backendPkg.name).toBe(`${config.projectName}-backend`);
-
-      // Verify no unprocessed EJS in TypeScript files
-      const tsFiles = await findTypeScriptFiles(projectDir);
-      for (const file of tsFiles.slice(0, 10)) { // Check first 10 files
-        const content = await fs.readFile(file, 'utf-8');
-        expect(content).not.toContain('<%');
-        expect(content).not.toContain('%>');
-      }
+    const result = await execa(TSX_BIN, [SRC_ENTRY, projectName, '--defaults'], {
+      cwd: tempDir,
+      reject: false,
+      timeout: 60000,
     });
-  }
-});
 
-async function findTypeScriptFiles(dir: string): Promise<string[]> {
-  const files: string[] = [];
-  const entries = await fs.readdir(dir, { withFileTypes: true });
+    expect(result.exitCode, `CLI stderr: ${result.stderr}`).toBe(0);
 
-  for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name);
-    if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules') {
-      files.push(...await findTypeScriptFiles(fullPath));
-    } else if (entry.isFile() && (entry.name.endsWith('.ts') || entry.name.endsWith('.tsx'))) {
-      files.push(fullPath);
+    const projectDir = path.join(tempDir, projectName);
+    expect(await fs.pathExists(projectDir)).toBe(true);
+    expect(await fs.pathExists(path.join(projectDir, 'stackr.config.json'))).toBe(true);
+
+    const cfg = await loadStackrConfig(projectDir);
+    expect(cfg).toBeTruthy();
+    expect(cfg!.projectName).toBe(projectName);
+
+    const names = cfg!.services.map((s) => s.name).sort();
+    expect(names).toContain('auth');
+    expect(names).toContain('core');
+  }, 90000);
+
+  describe.each(PRESETS.map((p) => [p.name] as const))(
+    '%s preset (direct generator)',
+    (presetName) => {
+      it('generates a valid project with expected services', async () => {
+        const body = loadPreset(presetName);
+        const config: InitConfig = applyCliOptionsToPreset(
+          body,
+          `preset-${presetName.toLowerCase()}`,
+          'npm',
+          {}
+        );
+        const projectDir = path.join(tempDir, config.projectName);
+
+        await new MonorepoGenerator(config).generate(projectDir);
+
+        expect(await fs.pathExists(path.join(projectDir, 'stackr.config.json'))).toBe(true);
+
+        const cfg = await loadStackrConfig(projectDir);
+        expect(cfg).toBeTruthy();
+        expect(cfg!.projectName).toBe(config.projectName);
+
+        // Every expected service exists on disk as its own directory
+        for (const svc of config.services) {
+          expect(
+            await fs.pathExists(path.join(projectDir, svc.name, 'backend')),
+            `missing ${svc.name}/backend`
+          ).toBe(true);
+        }
+
+        // stackr.config.json matches the input services exactly
+        expect(cfg!.services.map((s) => s.name).sort()).toEqual(
+          config.services.map((s) => s.name).sort()
+        );
+      });
     }
-  }
-
-  return files;
-}
+  );
+});

@@ -1,0 +1,28 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+//
+// Service: <%= service.name %>
+//
+// Base services own their own domain tables. User / session / auth tables
+// live in the "<%= authServiceName || 'auth' %>" service and are accessed
+// by forwarding cookies to ${AUTH_SERVICE_URL}/api/auth/get-session.
+//
+// Add your service-specific models below. The `Example` placeholder shows
+// the pattern — delete it once you've added real entities.
+
+generator client {
+  provider = "prisma-client"
+  output   = "./generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Example {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  @@map("example")
+}

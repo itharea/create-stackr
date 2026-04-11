@@ -1,10 +1,11 @@
 {
   "name": "create-stackr",
-  "version": "0.4.0",
-  "description": "Create production-ready full-stack mobile apps with React Native (Expo) and Node.js backend",
+  "version": "0.5.0",
+  "description": "Scaffold production-ready multi-microservice monorepos with Fastify backends, BetterAuth, Docker, and more",
   "type": "module",
   "bin": {
-    "create-stackr": "./bin/cli.js"
+    "create-stackr": "./bin/create-stackr.js",
+    "stackr": "./bin/stackr.js"
   },
   "files": [
     "bin",
@@ -14,7 +15,8 @@
     "LICENSE"
   ],
   "scripts": {
-    "dev": "tsx src/index.ts",
+    "dev": "tsx src/entrypoints/create.ts",
+    "dev:stackr": "tsx src/entrypoints/stackr.ts",
     "build": "tsc",
     "test": "vitest run",
     "test:watch": "VITEST_WATCH=1 vitest",
@@ -74,7 +76,9 @@
     "globby": "^16.0.0",
     "inquirer": "^10.0.0",
     "ora": "^8.0.0",
-    "validate-npm-package-name": "^5.0.0"
+    "semver": "7.6.3",
+    "validate-npm-package-name": "^5.0.0",
+    "yaml": "2.6.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
@@ -82,6 +86,7 @@
     "@types/fs-extra": "^11.0.4",
     "@types/inquirer": "^9.0.0",
     "@types/node": "^22.0.0",
+    "@types/semver": "^7.7.1",
     "@types/validate-npm-package-name": "^4.0.2",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",

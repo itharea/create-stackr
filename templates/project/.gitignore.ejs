@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Environment files (never commit secrets)
+.env
+.env.local
+.env.*.local
+<% services.forEach((svc) => { -%>
+<%= svc.name %>/backend/.env
+<%= svc.name %>/backend/.env.local
+<% if (svc.web && svc.web.enabled) { -%>
+<%= svc.name %>/web/.env
+<%= svc.name %>/web/.env.local
+<% } -%>
+<% if (svc.mobile && svc.mobile.enabled) { -%>
+<%= svc.name %>/mobile/.env
+<%= svc.name %>/mobile/.env.local
+<% } -%>
+<% }); -%>
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+.next/
+.expo/
+.expo-shared/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+bun-debug.log*
+
+# IDE & editors
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Generated ORM clients
+<% services.forEach((svc) => { -%>
+<%= svc.name %>/backend/prisma/generated/
+<%= svc.name %>/backend/drizzle/meta/
+<% }); -%>

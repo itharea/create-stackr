@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 /**
  * Tests for DeviceSession type guards used in templates.
  * These type guards are duplicated in:
- * - templates/base/web/src/lib/device/types.ts
+ * - templates/services/base/web/src/lib/device/types.ts
  * - templates/features/mobile/auth/types/deviceSession.ts
  *
  * Since they're template files (not source code), we test the logic directly.
