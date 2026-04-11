@@ -6,10 +6,17 @@
 # stackr.config.json and:
 #   1. Creates the monorepo root .env from .env.example if missing
 #   2. Creates each service's backend/.env from backend/.env.example
-#   3. Runs `<%= packageManager %> install` in every backend / web / mobile
+#      (real random credentials are written at create-stackr time —
+#      this copy is only a safety net for users who deleted .env)
+#   3. If any .env file was regenerated this run AND docker volumes
+#      exist for this project, offers a confirmed reset so Postgres
+#      doesn't refuse to start with credentials that no longer match
+#      the existing volume
+#   4. Runs `<%= packageManager %> install` in every backend / web / mobile
 #      subproject
 #
-# Re-run safely — existing .env files are never overwritten.
+# Re-run safely — existing .env files are never overwritten, and the
+# volume reset prompt only appears when you've just rotated credentials.
 # =============================================================================
 
 set -euo pipefail
@@ -19,11 +26,20 @@ cd "$ROOT_DIR"
 
 echo "📦 Setting up <%= projectName %>..."
 
+# Track whether any .env file was (re)generated from .env.example this run.
+# When true, we treat existing docker volumes as potentially stale and
+# prompt the user to reset them — this is what v0.4's setup.sh did inline
+# via its `has_existing_volumes` / `remove_project_volumes` helpers. We
+# never prompt without the user having just rotated credentials, so
+# re-running setup.sh after a successful first run stays silent.
+REGEN_HAPPENED=false
+
 # --- Root .env ----------------------------------------------------------------
 if [ ! -f .env ]; then
   if [ -f .env.example ]; then
     cp .env.example .env
     echo "  ✅ Created root .env from .env.example"
+    REGEN_HAPPENED=true
   fi
 else
   echo "  ℹ️  Root .env already exists — skipping"
@@ -40,6 +56,7 @@ for svc in "${SERVICES[@]}"; do
     if [ ! -f "$svc/backend/.env" ] && [ -f "$svc/backend/.env.example" ]; then
       cp "$svc/backend/.env.example" "$svc/backend/.env"
       echo "  ✅ Created $svc/backend/.env"
+      REGEN_HAPPENED=true
     fi
 
     echo "  📦 Installing $svc/backend dependencies..."
@@ -56,6 +73,72 @@ for svc in "${SERVICES[@]}"; do
     (cd "$svc/mobile" && <%= packageManager %> install)
   fi
 done
+
+# --- Docker volume conflict check --------------------------------------------
+# If setup.sh just regenerated one or more env files from their examples,
+# the credentials in those files may no longer match what was baked into
+# existing Postgres volumes from a prior `docker compose up`. Postgres
+# will refuse to start with a different POSTGRES_PASSWORD than the volume
+# was initialised with, so we detect the collision, list the volumes, and
+# offer a confirmed `docker compose down -v` reset — matching the v0.4
+# behaviour that was lost when setup.sh was simplified in v0.5.
+#
+# We only prompt when `REGEN_HAPPENED=true` so re-running setup.sh on an
+# unchanged project stays silent.
+if [ "$REGEN_HAPPENED" = true ] && command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+  # Enumerate per-service postgres / redis volumes declared by this
+  # compose project. Docker prefixes declared volume names with the
+  # compose project name (defaults to the directory basename), so we
+  # probe for `<projectDir>_<svc>_postgres_data` etc.
+  COMPOSE_PROJECT="$(basename "$ROOT_DIR")"
+  EXISTING_VOLUMES=()
+
+  for svc in "${SERVICES[@]}"; do
+    for suffix in postgres_data redis_data; do
+      candidate="${COMPOSE_PROJECT}_${svc}_${suffix}"
+      if docker volume inspect "$candidate" >/dev/null 2>&1; then
+        EXISTING_VOLUMES+=("$candidate")
+      fi
+    done
+  done
+
+  if [ ${#EXISTING_VOLUMES[@]} -gt 0 ]; then
+    echo ""
+    echo "⚠️  Existing docker volumes detected for <%= projectName %>:"
+    for vol in "${EXISTING_VOLUMES[@]}"; do
+      echo "    • $vol"
+    done
+    echo ""
+    echo "Your .env credentials were just (re)generated, but Postgres / Redis"
+    echo "will refuse to start if the existing volumes were initialised with"
+    echo "different credentials. You can either:"
+    echo "  • keep the volumes (skip this prompt) and manually reconcile"
+    echo "  • reset the volumes now — this DESTROYS all data in them"
+    echo ""
+    read -r -p "Destroy the volumes above? Type 'RESET' to confirm: " REPLY
+    if [ "$REPLY" = "RESET" ]; then
+      echo "  🧹 Stopping containers and removing volumes..."
+      docker compose down -v 2>/dev/null || true
+      if [ -f docker-compose.prod.yml ]; then
+        docker compose -f docker-compose.prod.yml down -v 2>/dev/null || true
+      fi
+      # Belt-and-suspenders: in case some volumes weren't touched by
+      # `down -v` (e.g., leftover from a renamed service), remove them
+      # individually. Failures are logged but non-fatal.
+      for vol in "${EXISTING_VOLUMES[@]}"; do
+        if docker volume inspect "$vol" >/dev/null 2>&1; then
+          docker volume rm "$vol" >/dev/null 2>&1 \
+            && echo "    ✅ Removed $vol" \
+            || echo "    ⚠️  Could not remove $vol (in use?)"
+        fi
+      done
+      echo "  ✅ Volume reset complete"
+    else
+      echo "  ℹ️  Keeping existing volumes (answer was not 'RESET')"
+    fi
+    echo ""
+  fi
+fi
 
 echo ""
 echo "✅ Setup complete."

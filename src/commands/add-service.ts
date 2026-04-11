@@ -26,6 +26,11 @@ import {
 } from '../generators/service-context.js';
 import { ServiceGenerator } from '../generators/service.js';
 import { renderComposeInnerBlocks } from '../generators/docker-compose.js';
+import { writeEnvFilesWithCredentials } from '../generators/env-files.js';
+import {
+  generateServiceCredentials,
+  type ServiceCredentials,
+} from '../utils/credentials.js';
 import {
   readMarkedBlock,
   writeMarkedBlock,
@@ -217,6 +222,18 @@ export async function runAddService(
     const newServiceCtx = buildServiceContext(newInitConfig, newServiceInNewConfig);
     await new ServiceGenerator(newServiceCtx).generate(stagingDir);
 
+    // Generate strong random credentials for the new service, then
+    // stage <stagingDir>/<name>/backend/.env with them. The same
+    // credentials are threaded into the root .env regen below so the
+    // backend container and the root docker-compose env_vars agree.
+    const newServiceCredentials = new Map<string, ServiceCredentials>();
+    newServiceCredentials.set(name, generateServiceCredentials());
+    await writeEnvFilesWithCredentials({
+      targetDir: stagingDir,
+      serviceNames: [name],
+      credentialsByService: newServiceCredentials,
+    });
+
     // Compose regeneration. writeMarkedBlock refuses cleanly on missing or
     // corrupt markers; we translate that into a friendly error.
     const composePath = path.join(root, 'docker-compose.yml');
@@ -236,10 +253,19 @@ export async function runAddService(
     );
 
     // Root env marker-block append (non-fatal if .env is absent — it only
-    // exists after the user has run `setup.sh`).
+    // exists after the user has run `setup.sh`). Real random credentials
+    // for the new service are threaded in so the appended block has the
+    // same values the staged backend/.env will use.
     const envPath = path.join(root, '.env');
-    const plannedRootEnv = await planRootEnvRegen(envPath, newConfig, Boolean(options.force));
-    // .env.example is project-shell and always regeneratable.
+    const plannedRootEnv = await planRootEnvRegen(
+      envPath,
+      newConfig,
+      Boolean(options.force),
+      newServiceCredentials
+    );
+    // .env.example is project-shell and always regeneratable. No
+    // credentials passed — the committed file keeps the `change-me-*`
+    // placeholders so git stays human-readable.
     const envExamplePath = path.join(root, '.env.example');
     const plannedRootEnvExample = await planRootEnvRegen(envExamplePath, newConfig, Boolean(options.force));
 
@@ -619,11 +645,18 @@ function detectFileSeparator(content: string): '\n' | '\r\n' {
  * Merge managed-env marker block content: preserve existing values for
  * known keys, append any missing per-service keys at the end. Returns the
  * full planned file contents, or `null` if the file doesn't exist (no-op).
+ *
+ * `credsByService` is only used when appending NEW key rows — if the
+ * user already has a value for a key we preserve it byte-for-byte. Pass
+ * real credentials when planning the real `.env`; leave undefined when
+ * planning `.env.example` so the committed file keeps placeholder
+ * strings.
  */
 async function planRootEnvRegen(
   envPath: string,
   newConfig: StackrConfigFile,
-  force: boolean
+  force: boolean,
+  credsByService?: ReadonlyMap<string, ServiceCredentials>
 ): Promise<string | null> {
   const exists = await fs.pathExists(envPath);
   if (!exists) {
@@ -652,7 +685,7 @@ async function planRootEnvRegen(
       );
     }
     // Force: append a fresh managed block at the end of the file.
-    const inner = buildFreshEnvInner(newConfig);
+    const inner = buildFreshEnvInner(newConfig, credsByService);
     const sep = detectFileSeparator(content);
     const trimmed = content.replace(/(\r?\n)+$/, '');
     return (
@@ -666,7 +699,7 @@ async function planRootEnvRegen(
 
   const currentInner = block.inner;
   const existingKeys = parseEnvKeys(currentInner);
-  const requiredKeys = buildRequiredEnvKeys(newConfig);
+  const requiredKeys = buildRequiredEnvKeys(newConfig, credsByService);
 
   // Preserve any KEY=value lines the user already set; only append keys
   // that aren't present yet.
@@ -707,33 +740,49 @@ interface EnvKeySpec {
   defaultValue: string;
 }
 
-function buildRequiredEnvKeys(config: StackrConfigFile): EnvKeySpec[] {
+/**
+ * Build the list of env keys that every service requires in the root
+ * `.env`. When `credsByService` is supplied, the DB / Redis password
+ * defaults are taken from the corresponding `ServiceCredentials` entry
+ * (real random values, used when writing the real `.env`). When omitted,
+ * the defaults fall back to `change-me-*` placeholder strings — that path
+ * is used by the `.env.example` regeneration, which must stay
+ * human-readable in git.
+ */
+function buildRequiredEnvKeys(
+  config: StackrConfigFile,
+  credsByService?: ReadonlyMap<string, ServiceCredentials>
+): EnvKeySpec[] {
   const keys: EnvKeySpec[] = [];
   const dbName = (svcName: string): string =>
     `${config.projectName.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${svcName.replace(/-/g, '_')}`;
 
   for (const svc of config.services) {
     const upper = svc.name.toUpperCase().replace(/-/g, '_');
+    const creds = credsByService?.get(svc.name);
     keys.push(
       { service: svc.name, key: `${upper}_DB_USER`, defaultValue: 'postgres' },
       {
         service: svc.name,
         key: `${upper}_DB_PASSWORD`,
-        defaultValue: `change-me-${svc.name}-db`,
+        defaultValue: creds?.dbPassword ?? `change-me-${svc.name}-db`,
       },
       { service: svc.name, key: `${upper}_DB_NAME`, defaultValue: dbName(svc.name) },
       {
         service: svc.name,
         key: `${upper}_REDIS_PASSWORD`,
-        defaultValue: `change-me-${svc.name}-redis`,
+        defaultValue: creds?.redisPassword ?? `change-me-${svc.name}-redis`,
       }
     );
   }
   return keys;
 }
 
-function buildFreshEnvInner(config: StackrConfigFile): string {
-  const keys = buildRequiredEnvKeys(config);
+function buildFreshEnvInner(
+  config: StackrConfigFile,
+  credsByService?: ReadonlyMap<string, ServiceCredentials>
+): string {
+  const keys = buildRequiredEnvKeys(config, credsByService);
   const byService = new Map<string, EnvKeySpec[]>();
   for (const k of keys) {
     const list = byService.get(k.service) ?? [];
