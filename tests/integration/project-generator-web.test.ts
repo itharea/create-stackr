@@ -68,6 +68,35 @@ describe('path mapping (web / features)', () => {
       shouldIncludeFile('features/web/auth/app/(auth)/login/page.tsx.ejs', noAuthCtx)
     ).toBe(false);
   });
+
+  it('shouldIncludeFile includes services/base/web files for auth services with web enabled', () => {
+    // Regression guard: the symmetric kind filter used to drop every file
+    // under services/base/** for auth services, which also stripped the
+    // shared Next.js scaffolding under services/base/web/**. The filter is
+    // now narrowed to services/base/backend/, so base web must flow through.
+    const authWebCfg = cloneInitConfig(fullFeaturedConfig);
+    const authSvc = authWebCfg.services.find((s) => s.kind === 'auth')!;
+    const authCtx = buildServiceContext(authWebCfg, authSvc);
+    expect(shouldIncludeFile('services/base/web/next.config.ts', authCtx)).toBe(true);
+    expect(shouldIncludeFile('services/base/web/package.json.ejs', authCtx)).toBe(true);
+    expect(shouldIncludeFile('services/base/web/tsconfig.json', authCtx)).toBe(true);
+  });
+
+  it('shouldIncludeFile still excludes services/base/backend files for auth services', () => {
+    const authCfg = cloneInitConfig(fullFeaturedConfig);
+    const authSvc = authCfg.services.find((s) => s.kind === 'auth')!;
+    const authCtx = buildServiceContext(authCfg, authSvc);
+    expect(shouldIncludeFile('services/base/backend/lib/constants.ts.ejs', authCtx)).toBe(false);
+    expect(shouldIncludeFile('services/base/backend/package.json.ejs', authCtx)).toBe(false);
+  });
+
+  it('shouldIncludeFile still excludes services/auth/backend files for base services', () => {
+    const baseCfg = cloneInitConfig(fullFeaturedConfig);
+    const baseSvc = baseCfg.services.find((s) => s.kind === 'base')!;
+    const baseCtx = buildServiceContext(baseCfg, baseSvc);
+    expect(shouldIncludeFile('services/auth/backend/lib/auth.ts.ejs', baseCtx)).toBe(false);
+    expect(shouldIncludeFile('services/auth/backend/package.json.ejs', baseCtx)).toBe(false);
+  });
 });
 
 describe('project generator — web subtree', () => {
@@ -192,5 +221,114 @@ describe('project generator — web-only service (mobile disabled)', () => {
   it('generates core/web but not core/mobile', async () => {
     expect(await fs.pathExists(path.join(projectDir, 'core/web'))).toBe(true);
     expect(await fs.pathExists(path.join(projectDir, 'core/mobile'))).toBe(false);
+  });
+});
+
+describe('project generator — auth/web subtree (admin dashboard)', () => {
+  // Regression coverage for #52: when the auth service has adminDashboard
+  // enabled, auth/web must be scaffolded with the same root Next.js shell
+  // (package.json, tsconfig, next.config, shadcn ui, etc.) as core/web.
+  // Previously a too-broad kind filter in shouldIncludeFile stripped every
+  // file under services/base/web/** for auth services, leaving auth/web/
+  // with only the auth feature pages layered from features/web/auth/**.
+  let tempDir: string;
+  let projectDir: string;
+
+  beforeAll(async () => {
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'project-gen-authweb-'));
+    const cfg = cloneInitConfig(fullFeaturedConfig);
+    cfg.projectName = 'test-auth-web';
+    cfg.appScheme = 'testauthweb';
+    // fullFeaturedConfig already sets adminDashboard: true and populates
+    // auth.web from the authEntry factory, so no extra mutation is needed.
+    projectDir = path.join(tempDir, cfg.projectName);
+    await new MonorepoGenerator(cfg).generate(projectDir);
+  });
+
+  afterAll(async () => {
+    await fs.remove(tempDir);
+  });
+
+  it('creates auth/web/ directory with src/app/, src/components/, src/lib/', async () => {
+    expect(await fs.pathExists(path.join(projectDir, 'auth/web'))).toBe(true);
+    expect(await fs.pathExists(path.join(projectDir, 'auth/web/src/app'))).toBe(true);
+    expect(await fs.pathExists(path.join(projectDir, 'auth/web/src/components'))).toBe(true);
+    expect(await fs.pathExists(path.join(projectDir, 'auth/web/src/lib'))).toBe(true);
+  });
+
+  it('lands next.config.ts / components.json / eslint.config.mjs / postcss.config.mjs / tsconfig.json in auth/web/', async () => {
+    for (const f of [
+      'next.config.ts',
+      'components.json',
+      'eslint.config.mjs',
+      'postcss.config.mjs',
+      'tsconfig.json',
+    ]) {
+      expect(
+        await fs.pathExists(path.join(projectDir, 'auth/web', f)),
+        `missing auth/web/${f}`
+      ).toBe(true);
+    }
+  });
+
+  it('lands package.json / .env.example / .gitignore / .prettierrc / .prettierignore in auth/web/', async () => {
+    for (const f of [
+      'package.json',
+      '.env.example',
+      '.gitignore',
+      '.prettierrc',
+      '.prettierignore',
+    ]) {
+      expect(
+        await fs.pathExists(path.join(projectDir, 'auth/web', f)),
+        `missing auth/web/${f}`
+      ).toBe(true);
+    }
+  });
+
+  it('auth/web package.json name is <projectName>-auth-web and parses as JSON', async () => {
+    const raw = await fs.readFile(path.join(projectDir, 'auth/web/package.json'), 'utf-8');
+    const pkg = JSON.parse(raw);
+    expect(pkg.name).toBe('test-auth-web-auth-web');
+    expect(pkg.scripts?.dev).toBe('next dev');
+    expect(pkg.dependencies?.next).toBeDefined();
+    expect(pkg.dependencies?.react).toBeDefined();
+  });
+
+  it('lands the root layout.tsx and globals.css in auth/web/src/app/', async () => {
+    expect(
+      await fs.pathExists(path.join(projectDir, 'auth/web/src/app/layout.tsx'))
+    ).toBe(true);
+    expect(
+      await fs.pathExists(path.join(projectDir, 'auth/web/src/app/globals.css'))
+    ).toBe(true);
+  });
+
+  it('generates shadcn UI primitives under auth/web/src/components/ui/', async () => {
+    for (const f of ['button.tsx', 'card.tsx', 'input.tsx', 'label.tsx']) {
+      expect(
+        await fs.pathExists(path.join(projectDir, 'auth/web/src/components/ui', f)),
+        `missing auth/web/src/components/ui/${f}`
+      ).toBe(true);
+    }
+  });
+
+  it('still renders the auth service backend (no regression from narrowed kind filter)', async () => {
+    expect(await fs.pathExists(path.join(projectDir, 'auth/backend'))).toBe(true);
+    expect(
+      await fs.pathExists(path.join(projectDir, 'auth/backend/package.json'))
+    ).toBe(true);
+  });
+
+  it('does not render the base backend tree into auth/ (kind filter still guards backends)', async () => {
+    // Smoke check: auth/backend's package.json must be the auth-service
+    // variant, not the base backend variant — the narrowed kind filter
+    // should still keep services/base/backend/** out of the auth service.
+    const raw = await fs.readFile(
+      path.join(projectDir, 'auth/backend/package.json'),
+      'utf-8'
+    );
+    const pkg = JSON.parse(raw);
+    expect(pkg.name).toBe('test-auth-web-auth-backend');
   });
 });
