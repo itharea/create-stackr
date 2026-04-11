@@ -37,6 +37,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Single-project mode. The closest equivalent is `npx create-stackr myapp --defaults --no-auth --service-name core`, which produces a minimal monorepo with a single base service.
 
+### Fixed
+
+- **`auth/web` admin dashboard now scaffolds the full Next.js project shell** (`package.json`, `tsconfig.json`, `next.config.ts`, `postcss.config.mjs`, `eslint.config.mjs`, `components.json`, `.env.example`, `.gitignore`, `.prettierrc`, `.prettierignore`, `src/app/layout.tsx`, `src/app/globals.css`, `src/components/ui/*`). Previously the symmetric kind filter in `shouldIncludeFile` was written against `services/base/` and dropped every file under `services/base/web/**` for auth services, leaving `auth/web/` with only the auth feature pages and no project shell — the directory could not be installed or built. The predicates are now narrowed to `services/{auth,base}/backend/` so they gate only the per-kind backend divergence, matching the documented intent of `ServiceGenerator.pickSubtrees`. (#52)
+
 ### Deferred (tracked in backlog)
 
 - `stackr add auth` — retroactively add an auth service to a `--no-auth` project

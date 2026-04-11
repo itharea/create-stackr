@@ -50,12 +50,16 @@ export function shouldIncludeFile(
     return false;
   }
 
-  // Only the auth service should consume templates/services/auth/**
-  if (filePath.includes('services/auth/') && ctx.service.kind !== 'auth') {
+  // Per-kind backend divergence: only the auth service renders the auth
+  // backend tree, and only non-auth services render the base backend tree.
+  // The web/mobile trees under `services/base/{web,mobile}/` are shared
+  // scaffolding that applies to every service with the respective platform
+  // enabled (see ServiceGenerator.pickSubtrees), so they must NOT be gated
+  // by these predicates.
+  if (filePath.includes('services/auth/backend/') && ctx.service.kind !== 'auth') {
     return false;
   }
-  // Symmetrically, non-auth services don't render auth-specific trees
-  if (filePath.includes('services/base/') && ctx.service.kind === 'auth') {
+  if (filePath.includes('services/base/backend/') && ctx.service.kind === 'auth') {
     return false;
   }
 
