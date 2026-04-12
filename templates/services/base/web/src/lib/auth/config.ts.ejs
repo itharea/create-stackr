@@ -9,9 +9,8 @@ export const AUTH_CONFIG = {
   // Public URL of the web app (for OAuth callbacks)
   appUrl: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:<%= service.web.port %>",
 
-  // Backend URL for server-to-server calls
-  // In development, you can use the Next.js proxy or direct URL
-  backendUrl: process.env.BACKEND_URL || "http://localhost:<%= service.backend.port %>",
+  // Auth service URL for authentication calls (sign-in, sign-up, etc.)
+  backendUrl: process.env.AUTH_SERVICE_URL || "http://localhost:<%= authServicePort %>",
 
   // Session cookie max age in seconds (should match Fastify config)
   sessionMaxAge: 60 * 60 * 24 * 7, // 7 days
