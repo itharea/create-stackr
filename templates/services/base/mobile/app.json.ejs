@@ -61,7 +61,10 @@
       "eas": {
         "projectId": "your-eas-project-id-here"
       },
-      "apiUrl": "http://localhost:8080",
+      "apiUrl": "http://localhost:<%= service.backend.port %>",
+<% if (hasAuthService && service.kind !== 'auth') { %>
+      "authServiceUrl": "http://localhost:<%= authServicePort %>",
+<% } %>
       "features": {
         "onboarding": {
           "enabled": <%= features.onboarding.enabled %>

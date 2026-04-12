@@ -69,6 +69,8 @@ export interface WriteEnvFilesResult {
   readonly rootEnvWritten: boolean;
   /** Service names whose `backend/.env` file was written this call. */
   readonly backendEnvsWritten: readonly string[];
+  /** Service names whose `web/.env.local` file was written this call. */
+  readonly webEnvLocalsWritten: readonly string[];
 }
 
 export async function writeEnvFilesWithCredentials(
@@ -85,6 +87,7 @@ export async function writeEnvFilesWithCredentials(
 
   let rootEnvWritten = false;
   const backendEnvsWritten: string[] = [];
+  const webEnvLocalsWritten: string[] = [];
 
   // ---------------------------------------------------------------------------
   // Root .env
@@ -137,7 +140,36 @@ export async function writeEnvFilesWithCredentials(
     }
   }
 
-  return { credentialsByService, rootEnvWritten, backendEnvsWritten };
+  // ---------------------------------------------------------------------------
+  // Per-service web/.env.local
+  // ---------------------------------------------------------------------------
+  // Web directories have no secrets — just backend URLs with correct ports.
+  // The rendered `.env.example` already carries the right values from EJS, so
+  // a straight copy is sufficient. This mirrors the safety-net in setup.sh
+  // but runs at init time so `next dev` works immediately.
+  for (const svcName of options.serviceNames) {
+    const webExamplePath = path.join(
+      options.targetDir,
+      svcName,
+      'web',
+      '.env.example'
+    );
+    const webEnvLocalPath = path.join(
+      options.targetDir,
+      svcName,
+      'web',
+      '.env.local'
+    );
+    if (
+      (await fs.pathExists(webExamplePath)) &&
+      !(await fs.pathExists(webEnvLocalPath))
+    ) {
+      await fs.copy(webExamplePath, webEnvLocalPath);
+      webEnvLocalsWritten.push(svcName);
+    }
+  }
+
+  return { credentialsByService, rootEnvWritten, backendEnvsWritten, webEnvLocalsWritten };
 }
 
 /**

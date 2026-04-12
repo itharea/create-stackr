@@ -5,6 +5,9 @@ import auth from "./plugins/auth";
 import errorHandler from "./plugins/error-handler";
 import authRoutes from "./routes/auth";
 import deviceSessionRoutes from "./routes/device-sessions";
+<% if (service.authConfig?.adminDashboard) { %>
+import adminRoutes from "./routes/admin";
+<% } %>
 <% if (platforms.includes('web')) { %>
 import oauthWebRoutes from "./routes/oauth-web";
 import { initRedis } from "../../utils/redis";
@@ -71,6 +74,10 @@ await server.register(deviceSessionRoutes, { prefix: "/device-sessions" });
 <% if (platforms.includes('web')) { %>
 // Web OAuth routes for BFF pattern with PKCE
 await server.register(oauthWebRoutes, { prefix: "/api/auth/web/oauth" });
+<% } %>
+<% if (service.authConfig?.adminDashboard) { %>
+// Admin routes for user management dashboard
+await server.register(adminRoutes, { prefix: "/api/admin" });
 <% } %>
 
 // Root health check

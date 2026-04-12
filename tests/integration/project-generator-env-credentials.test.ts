@@ -126,7 +126,7 @@ describe('MonorepoGenerator — init-time credential generation', () => {
     // DATABASE_URL must not contain the `username:password` placeholder
     expect(content).not.toMatch(/postgresql:\/\/username:password@/);
     expect(content).toMatch(
-      /^DATABASE_URL="postgresql:\/\/postgres:[A-Za-z0-9]{20,}@localhost:5432\/test_env_creds_db\?schema=public"$/m
+      /^DATABASE_URL="postgresql:\/\/postgres:[A-Za-z0-9]{20,}@localhost:5432\/test_env_creds_auth\?schema=public"$/m
     );
 
     // BETTER_AUTH_SECRET must be a real 64-char hex secret
@@ -180,45 +180,189 @@ describe('MonorepoGenerator — init-time credential generation', () => {
 
   // ---------------------------------------------------------------------------
   // Setup.sh — docker volume conflict check (#55)
+  //
+  // Regression guard for the v0.5 bug where the volume-collision check
+  // was gated on a `REGEN_HAPPENED` flag that only fired when setup.sh
+  // itself re-copied a .env.example file. The CLI writes real creds at
+  // init time, so on a fresh `create-stackr` run the .env already exists
+  // and setup.sh never set the flag — the whole block was silently
+  // skipped and users who re-used a project name hit cryptic Postgres
+  // auth failures on the next `docker compose up`. The fix restores
+  // v0.4's unconditional `docker volume ls | grep '^<project>_'` probe.
   // ---------------------------------------------------------------------------
 
-  it('setup.sh contains a REGEN_HAPPENED flag gated docker volume reset block', async () => {
+  it('setup.sh runs the docker volume probe unconditionally (no REGEN_HAPPENED gate)', async () => {
     const setup = await fs.readFile(
       path.join(projectDir, 'scripts/setup.sh'),
       'utf-8'
     );
 
-    // The flag is set whenever a .env file is (re)generated this run.
-    expect(setup).toMatch(/REGEN_HAPPENED=false/);
-    expect(setup).toMatch(/REGEN_HAPPENED=true/);
+    // The broken gating flag must be gone. If this re-appears, the
+    // check will silently skip on fresh `create-stackr` runs again.
+    expect(setup).not.toMatch(/REGEN_HAPPENED/);
 
-    // The volume-detection block is gated on the flag + docker being
-    // installed + docker info responding.
+    // The volume-detection block is gated only on docker being
+    // installed + docker info responding — nothing else.
     expect(setup).toMatch(
-      /if \[ "\$REGEN_HAPPENED" = true \] && command -v docker/
+      /if command -v docker >\/dev\/null 2>&1 && docker info >\/dev\/null 2>&1; then/
+    );
+  });
+
+  it('setup.sh enumerates docker volumes by project prefix using v0.4 semantics', async () => {
+    const setup = await fs.readFile(
+      path.join(projectDir, 'scripts/setup.sh'),
+      'utf-8'
     );
 
-    // Per-service volume probe iterates SERVICES and checks
-    // postgres_data + redis_data per entry.
-    expect(setup).toMatch(/for svc in "\$\{SERVICES\[@\]\}"/);
-    expect(setup).toMatch(/postgres_data/);
-    expect(setup).toMatch(/redis_data/);
+    // Matches v0.4's has_existing_volumes: list every volume, filter by
+    // the compose project name prefix. Using a case-statement prefix
+    // match (not a per-service suffix enumeration) so custom volumes
+    // declared by future services are caught too.
+    expect(setup).toMatch(
+      /COMPOSE_PROJECT="\$\(basename "\$ROOT_DIR"\)"/
+    );
+    expect(setup).toMatch(/docker volume ls --format '\{\{\.Name\}\}'/);
+    expect(setup).toMatch(/"\$\{COMPOSE_PROJECT\}_"\*\) EXISTING_VOLUMES\+=/);
+  });
+
+  it('setup.sh prompts for a typed RESET and tears down both compose files', async () => {
+    const setup = await fs.readFile(
+      path.join(projectDir, 'scripts/setup.sh'),
+      'utf-8'
+    );
 
     // Confirmation prompt requires the literal word RESET.
     expect(setup).toMatch(/Type 'RESET' to confirm/);
     expect(setup).toMatch(/if \[ "\$REPLY" = "RESET" \]/);
 
-    // The reset path tears both compose files down with -v.
+    // The reset path tears both compose files down with -v, and
+    // follows up with individual `docker volume rm` for any stragglers
+    // (renamed services, etc.) that `down -v` wouldn't touch.
     expect(setup).toMatch(/docker compose down -v/);
     expect(setup).toMatch(
       /docker compose -f docker-compose\.prod\.yml down -v/
     );
+    expect(setup).toMatch(/docker volume rm "\$vol"/);
   });
 
-  it('setup.sh enumerates every service from the project config in its volume probe', async () => {
-    // The rendered SERVICES=(...) array must include every service name
-    // in the project, so the volume-reset loop is complete for multi-
-    // service monorepos.
+  it('setup.sh runs the volume check BEFORE installing dependencies', async () => {
+    // We moved the check above the install loop so the user isn't
+    // forced to wait through a full `<pm> install` pass only to hit
+    // a Postgres auth failure on `docker compose up` afterwards. If
+    // the check drifts back below the installs, this test fires.
+    const setup = await fs.readFile(
+      path.join(projectDir, 'scripts/setup.sh'),
+      'utf-8'
+    );
+
+    const volumeCheckIdx = setup.indexOf('Destroy the volumes above?');
+    const installIdx = setup.indexOf('Installing monorepo-root devDependencies');
+    expect(volumeCheckIdx).toBeGreaterThan(0);
+    expect(installIdx).toBeGreaterThan(0);
+    expect(volumeCheckIdx).toBeLessThan(installIdx);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Web .env.local generation (#60)
+  // ---------------------------------------------------------------------------
+
+  it('writes core/web/.env.local with correct ports at init time', async () => {
+    const envLocalPath = path.join(projectDir, 'core/web/.env.local');
+    expect(await fs.pathExists(envLocalPath)).toBe(true);
+    const content = await fs.readFile(envLocalPath, 'utf-8');
+
+    // Must contain the core service's configured ports, not hardcoded defaults
+    expect(content).toMatch(/^BACKEND_URL=http:\/\/localhost:8080$/m);
+    expect(content).toMatch(/^NEXT_PUBLIC_APP_URL=http:\/\/localhost:3000$/m);
+  });
+
+  it('writes auth/web/.env.local when auth has adminDashboard enabled', async () => {
+    const envLocalPath = path.join(projectDir, 'auth/web/.env.local');
+    expect(await fs.pathExists(envLocalPath)).toBe(true);
+    const content = await fs.readFile(envLocalPath, 'utf-8');
+
+    expect(content).toMatch(/^BACKEND_URL=http:\/\/localhost:8082$/m);
+  });
+
+  it('core/web/.env.local includes AUTH_SERVICE_URL pointing at auth backend', async () => {
+    const content = await fs.readFile(
+      path.join(projectDir, 'core/web/.env.local'),
+      'utf-8'
+    );
+    expect(content).toMatch(/^AUTH_SERVICE_URL=http:\/\/localhost:8082$/m);
+  });
+
+  it('web .env.example files are left untouched (not overwritten by .env.local generation)', async () => {
+    const example = await fs.readFile(
+      path.join(projectDir, 'core/web/.env.example'),
+      'utf-8'
+    );
+    // The .env.example must exist with real rendered values — it serves
+    // as committed documentation, while .env.local is gitignored.
+    expect(example).toMatch(/NEXT_PUBLIC_APP_URL/);
+    expect(example).toMatch(/BACKEND_URL/);
+  });
+
+  it('setup.sh creates web/.env.local from web/.env.example as safety net', async () => {
+    const setup = await fs.readFile(
+      path.join(projectDir, 'scripts/setup.sh'),
+      'utf-8'
+    );
+
+    expect(setup).toMatch(/\$svc\/web\/\.env\.local/);
+    expect(setup).toMatch(/\$svc\/web\/\.env\.example/);
+    expect(setup).toMatch(/Created \$svc\/web\/\.env\.local/);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Auth web admin dashboard (#60)
+  // ---------------------------------------------------------------------------
+
+  it('scaffolds auth/web as an admin dashboard, not the generic base template', async () => {
+    // The auth admin dashboard must have its own login, dashboard, and users pages
+    expect(await fs.pathExists(path.join(projectDir, 'auth/web/src/app/(auth)/login/page.tsx'))).toBe(true);
+    expect(await fs.pathExists(path.join(projectDir, 'auth/web/src/app/(dashboard)/dashboard/page.tsx'))).toBe(true);
+    expect(await fs.pathExists(path.join(projectDir, 'auth/web/src/app/(dashboard)/users/page.tsx'))).toBe(true);
+    expect(await fs.pathExists(path.join(projectDir, 'auth/web/src/app/(dashboard)/users/[id]/page.tsx'))).toBe(true);
+  });
+
+  it('auth/web root page redirects to /dashboard (not the generic landing page)', async () => {
+    const rootPage = await fs.readFile(
+      path.join(projectDir, 'auth/web/src/app/page.tsx'),
+      'utf-8'
+    );
+    expect(rootPage).toMatch(/redirect.*\/dashboard/);
+    // Must NOT contain the generic landing page content
+    expect(rootPage).not.toMatch(/Build something/);
+  });
+
+  it('auth/web package.json uses the auth web port for dev server', async () => {
+    const pkgJson = JSON.parse(
+      await fs.readFile(path.join(projectDir, 'auth/web/package.json'), 'utf-8')
+    );
+    expect(pkgJson.scripts.dev).toContain('--port 3002');
+    expect(pkgJson.dependencies).toHaveProperty('sonner');
+    expect(pkgJson.dependencies).toHaveProperty('@radix-ui/react-dialog');
+  });
+
+  it('auth/web has dashboard sidebar and admin actions', async () => {
+    expect(await fs.pathExists(path.join(projectDir, 'auth/web/src/components/dashboard-sidebar.tsx'))).toBe(true);
+    expect(await fs.pathExists(path.join(projectDir, 'auth/web/src/lib/admin/actions.ts'))).toBe(true);
+    expect(await fs.pathExists(path.join(projectDir, 'auth/web/src/lib/auth/actions.ts'))).toBe(true);
+  });
+
+  it('auth/web layout metadata references the project name', async () => {
+    const layout = await fs.readFile(
+      path.join(projectDir, 'auth/web/src/app/layout.tsx'),
+      'utf-8'
+    );
+    expect(layout).toMatch(/test-env-creds.*Auth Admin/);
+  });
+
+  it('setup.sh still enumerates every project service in SERVICES for the install loop', async () => {
+    // The rendered SERVICES=(...) array must still include every
+    // service name in the project — the install loop depends on it,
+    // even though the volume probe now uses a prefix match instead.
     const setup = await fs.readFile(
       path.join(projectDir, 'scripts/setup.sh'),
       'utf-8'
@@ -428,6 +572,66 @@ describe('writeEnvFilesWithCredentials — substitution semantics', () => {
     const match = env.match(/^AUTH_DB_PASSWORD=(.+)$/m);
     expect(match).not.toBeNull();
     expect(match![1]).toMatch(/^[A-Za-z0-9]{20,}$/);
+  });
+
+  it('copies web/.env.example to web/.env.local when the web dir exists', async () => {
+    const dir = await fs.mkdtemp(path.join(stagingDir, 'web-env-'));
+    await fs.ensureDir(path.join(dir, 'core/web'));
+    await fs.writeFile(
+      path.join(dir, 'core/web/.env.example'),
+      'NEXT_PUBLIC_APP_URL=http://localhost:3000\nBACKEND_URL=http://localhost:8080\n'
+    );
+
+    const result = await writeEnvFilesWithCredentials({
+      targetDir: dir,
+      serviceNames: ['core'],
+      credentialsByService: new Map([
+        [
+          'core',
+          {
+            dbPassword: 'CORE_DB_PW_16CHARSSS',
+            redisPassword: 'CORE_REDIS_PW_16CHR_',
+            authSecret: 'd'.repeat(64),
+          },
+        ],
+      ]),
+    });
+
+    expect(result.webEnvLocalsWritten).toEqual(['core']);
+    const envLocal = await fs.readFile(
+      path.join(dir, 'core/web/.env.local'),
+      'utf-8'
+    );
+    expect(envLocal).toMatch(/^NEXT_PUBLIC_APP_URL=http:\/\/localhost:3000$/m);
+    expect(envLocal).toMatch(/^BACKEND_URL=http:\/\/localhost:8080$/m);
+  });
+
+  it('skips web/.env.local if it already exists', async () => {
+    const dir = await fs.mkdtemp(path.join(stagingDir, 'web-existing-'));
+    await fs.ensureDir(path.join(dir, 'core/web'));
+    await fs.writeFile(
+      path.join(dir, 'core/web/.env.example'),
+      'BACKEND_URL=http://localhost:8080\n'
+    );
+    await fs.writeFile(
+      path.join(dir, 'core/web/.env.local'),
+      'BACKEND_URL=http://localhost:9999\n'
+    );
+
+    const result = await writeEnvFilesWithCredentials({
+      targetDir: dir,
+      serviceNames: ['core'],
+      credentialsByService: new Map([
+        ['core', { dbPassword: 'x'.repeat(24), redisPassword: 'y'.repeat(24), authSecret: 'z'.repeat(64) }],
+      ]),
+    });
+
+    expect(result.webEnvLocalsWritten).toEqual([]);
+    const envLocal = await fs.readFile(
+      path.join(dir, 'core/web/.env.local'),
+      'utf-8'
+    );
+    expect(envLocal).toBe('BACKEND_URL=http://localhost:9999\n');
   });
 
   it('PLACEHOLDER_TOKENS are exported and match the expected strings', () => {

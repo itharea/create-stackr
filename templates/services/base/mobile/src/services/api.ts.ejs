@@ -9,7 +9,7 @@ import { authClient } from '../lib/auth-client';
 const DEVICE_SESSION_TOKEN_KEY = 'device_session_token';
 
 // API Configuration
-const API_URL = Constants.expoConfig?.extra?.apiUrl || 'http://localhost:8080';
+const API_URL = Constants.expoConfig?.extra?.apiUrl || 'http://localhost:<%= service.backend.port %>';
 
 const api = axios.create({
   baseURL: API_URL,
