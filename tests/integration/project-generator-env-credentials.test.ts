@@ -126,7 +126,7 @@ describe('MonorepoGenerator — init-time credential generation', () => {
     // DATABASE_URL must not contain the `username:password` placeholder
     expect(content).not.toMatch(/postgresql:\/\/username:password@/);
     expect(content).toMatch(
-      /^DATABASE_URL="postgresql:\/\/postgres:[A-Za-z0-9]{20,}@localhost:5432\/test_env_creds_db\?schema=public"$/m
+      /^DATABASE_URL="postgresql:\/\/postgres:[A-Za-z0-9]{20,}@localhost:5432\/test_env_creds_auth\?schema=public"$/m
     );
 
     // BETTER_AUTH_SECRET must be a real 64-char hex secret

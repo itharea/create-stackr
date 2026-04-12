@@ -1,8 +1,7 @@
 import type { AuthFastifyRequest } from "fastify";
 import { FastifyPluginAsync } from "fastify";
 import { Type } from "@sinclair/typebox";
-import { eq, ilike, or, and } from "drizzle-orm";
-import { db, schema } from "../../../utils/db";
+import { listUsers, getUserWithRole, updateUserRole, deleteUser } from "../../../domain/user/repository";
 import { ErrorFactory } from "../../../utils/errors";
 
 const adminRoutes: FastifyPluginAsync = async (server) => {
@@ -30,34 +29,7 @@ const adminRoutes: FastifyPluginAsync = async (server) => {
     },
     async (request, reply) => {
       const { search, role } = request.query as { search?: string; role?: string };
-
-      const conditions = [];
-      if (role) {
-        conditions.push(eq(schema.user.role, role));
-      }
-      if (search) {
-        const pattern = `%${search}%`;
-        conditions.push(
-          or(
-            ilike(schema.user.email, pattern),
-            ilike(schema.user.name, pattern)
-          )!
-        );
-      }
-
-      const users = await db
-        .select({
-          id: schema.user.id,
-          email: schema.user.email,
-          name: schema.user.name,
-          role: schema.user.role,
-          emailVerified: schema.user.emailVerified,
-          image: schema.user.image,
-          createdAt: schema.user.createdAt,
-          updatedAt: schema.user.updatedAt,
-        })
-        .from(schema.user)
-        .where(conditions.length > 0 ? and(...conditions) : undefined);
+      const users = await listUsers({ search, role });
 
       return reply.send(
         users.map((u) => ({
@@ -79,21 +51,7 @@ const adminRoutes: FastifyPluginAsync = async (server) => {
     },
     async (request, reply) => {
       const { id } = request.params as { id: string };
-
-      const [user] = await db
-        .select({
-          id: schema.user.id,
-          email: schema.user.email,
-          name: schema.user.name,
-          role: schema.user.role,
-          emailVerified: schema.user.emailVerified,
-          image: schema.user.image,
-          createdAt: schema.user.createdAt,
-          updatedAt: schema.user.updatedAt,
-        })
-        .from(schema.user)
-        .where(eq(schema.user.id, id))
-        .limit(1);
+      const user = await getUserWithRole(id);
 
       if (!user) {
         throw ErrorFactory.resourceNotFound("user");
@@ -126,12 +84,7 @@ const adminRoutes: FastifyPluginAsync = async (server) => {
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const { role } = request.body as { role: string };
-
-      const [updated] = await db
-        .update(schema.user)
-        .set({ role, updatedAt: new Date() })
-        .where(eq(schema.user.id, id))
-        .returning({ id: schema.user.id, role: schema.user.role });
+      const updated = await updateUserRole(id, role);
 
       if (!updated) {
         throw ErrorFactory.resourceNotFound("user");
@@ -157,7 +110,7 @@ const adminRoutes: FastifyPluginAsync = async (server) => {
         throw ErrorFactory.clientError("Cannot delete your own account");
       }
 
-      await db.delete(schema.user).where(eq(schema.user.id, id));
+      await deleteUser(id);
 
       return reply.send({ success: true });
     }

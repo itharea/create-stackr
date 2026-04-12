@@ -20,11 +20,13 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "postinstall": "prisma generate"<% } %><% if (backend.orm === 'drizzle') { %>
+    "postinstall": "prisma generate",
+    "create-admin": "bun run scripts/create-admin.ts"<% } %><% if (backend.orm === 'drizzle') { %>
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"<% } %>
+    "db:studio": "drizzle-kit studio",
+    "create-admin": "bun run scripts/create-admin.ts"<% } %>
   },
   "dependencies": {
     "@fastify/cors": "~11.0.1",<% if (backend.orm === 'prisma') { %>
@@ -45,6 +47,7 @@
     "nodemailer": "~6.9.0"<% } %>
   },
   "devDependencies": {
+    "@inquirer/prompts": "~8.4.1",
     "@types/node": "~24.0.0",<% if (backend.orm === 'prisma') { %>
     "prisma": "~7.0.0",<% } %><% if (backend.orm === 'drizzle') { %>
     "drizzle-kit": "~0.30.0",

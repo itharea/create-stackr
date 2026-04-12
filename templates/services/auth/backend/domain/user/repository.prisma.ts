@@ -100,6 +100,80 @@ export const updateUserProfile = async (
   }
 };
 
+export const listUsers = async (params?: { search?: string; role?: string }) => {
+  try {
+    const where: Record<string, unknown> = {};
+    if (params?.role) {
+      where.role = params.role;
+    }
+    if (params?.search) {
+      where.OR = [
+        { email: { contains: params.search, mode: "insensitive" } },
+        { name: { contains: params.search, mode: "insensitive" } },
+      ];
+    }
+
+    return await db.user.findMany({
+      where,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        emailVerified: true,
+        image: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  } catch (error) {
+    throw ErrorFactory.databaseError({
+      operation: 'listUsers',
+      originalError: error instanceof Error ? error.message : String(error)
+    });
+  }
+};
+
+export const getUserWithRole = async (id: string) => {
+  try {
+    return await db.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        emailVerified: true,
+        image: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  } catch (error) {
+    throw ErrorFactory.databaseError({
+      operation: 'getUserWithRole',
+      userId: id,
+      originalError: error instanceof Error ? error.message : String(error)
+    });
+  }
+};
+
+export const updateUserRole = async (userId: string, role: string) => {
+  try {
+    return await db.user.update({
+      where: { id: userId },
+      data: { role },
+      select: { id: true, role: true },
+    });
+  } catch (error) {
+    throw ErrorFactory.databaseError({
+      operation: 'updateUserRole',
+      userId,
+      originalError: error instanceof Error ? error.message : String(error)
+    });
+  }
+};
+
 export const deleteUser = async (userId: string): Promise<void> => {
   try {
     await db.user.delete({
@@ -109,6 +183,39 @@ export const deleteUser = async (userId: string): Promise<void> => {
     throw ErrorFactory.databaseError({
       operation: 'deleteUser',
       userId,
+      originalError: error instanceof Error ? error.message : String(error)
+    });
+  }
+};
+
+export const createAdminUser = async (data: {
+  email: string;
+  name: string;
+  hashedPassword: string;
+}) => {
+  try {
+    await db.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          email: data.email,
+          name: data.name,
+          role: "admin",
+          emailVerified: true,
+        },
+      });
+
+      await tx.account.create({
+        data: {
+          userId: user.id,
+          accountId: user.id,
+          providerId: "credential",
+          password: data.hashedPassword,
+        },
+      });
+    });
+  } catch (error) {
+    throw ErrorFactory.databaseError({
+      operation: 'createAdminUser',
       originalError: error instanceof Error ? error.message : String(error)
     });
   }
