@@ -16,8 +16,8 @@ import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-si
 import * as AppleAuthentication from 'expo-apple-authentication';
 <% } %>
 
-// Get API URL from Expo config
-const API_URL = Constants.expoConfig?.extra?.apiUrl || 'http://localhost:8080';
+// Auth service URL — custom auth endpoints (profile, account, 2FA) live on the auth service
+const API_URL = Constants.expoConfig?.extra?.authServiceUrl || 'http://localhost:<%= authServicePort || 8082 %>';
 
 /**
  * Auth hook using BetterAuth's useSession() directly

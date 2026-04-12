@@ -9,8 +9,8 @@ import { twoFactorClient } from "better-auth/client/plugins";
 import * as SecureStore from "expo-secure-store";
 import Constants from "expo-constants";
 
-// Get API URL from Expo config or default
-const API_URL = Constants.expoConfig?.extra?.apiUrl || "http://localhost:8080";
+// Auth service URL — mobile talks directly to the central auth service
+const API_URL = Constants.expoConfig?.extra?.authServiceUrl || "http://localhost:<%= authServicePort || 8082 %>";
 
 // Get app scheme from Expo config (defined at expo.scheme in app.json)
 const APP_SCHEME = Constants.expoConfig?.scheme || "<%= appScheme %>";
