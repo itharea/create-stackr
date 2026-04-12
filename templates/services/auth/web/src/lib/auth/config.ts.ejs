@@ -1,0 +1,12 @@
+export const AUTH_CONFIG = {
+  backendUrl: process.env.BACKEND_URL || "http://localhost:<%= service.backend.port %>",
+  appUrl: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:<%= service.web.port %>",
+  sessionMaxAge: 60 * 60 * 24 * 7, // 7 days
+} as const;
+
+export const COOKIE_NAMES = {
+  SESSION: "session_token",
+} as const;
+
+// The auth backend's BetterAuth instance sets this cookie name.
+export const BETTER_AUTH_COOKIE_NAME = "better-auth.session_token";

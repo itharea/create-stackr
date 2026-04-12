@@ -50,16 +50,20 @@ export function shouldIncludeFile(
     return false;
   }
 
-  // Per-kind backend divergence: only the auth service renders the auth
-  // backend tree, and only non-auth services render the base backend tree.
-  // The web/mobile trees under `services/base/{web,mobile}/` are shared
-  // scaffolding that applies to every service with the respective platform
-  // enabled (see ServiceGenerator.pickSubtrees), so they must NOT be gated
-  // by these predicates.
+  // Per-kind divergence: only the auth service renders auth subtrees, and
+  // only non-auth services render base subtrees. This applies to both
+  // backend and web — the auth admin dashboard (`services/auth/web/`) is a
+  // standalone app, not a layer on top of `services/base/web/`.
   if (filePath.includes('services/auth/backend/') && ctx.service.kind !== 'auth') {
     return false;
   }
   if (filePath.includes('services/base/backend/') && ctx.service.kind === 'auth') {
+    return false;
+  }
+  if (filePath.includes('services/auth/web/') && ctx.service.kind !== 'auth') {
+    return false;
+  }
+  if (filePath.includes('services/base/web/') && ctx.service.kind === 'auth') {
     return false;
   }
 

@@ -61,8 +61,16 @@ export class ServiceGenerator {
     }
 
     if (service.web?.enabled) {
-      subtrees.push('services/base/web');
-      subtrees.push('features/web');
+      if (service.kind === 'auth') {
+        // Auth web is a standalone admin dashboard — it ships its own
+        // login, dashboard, and user-management pages. The generic base
+        // web template and the features/web auth overlays are NOT layered
+        // on top (those are consumer-facing pages for regular services).
+        subtrees.push('services/auth/web');
+      } else {
+        subtrees.push('services/base/web');
+        subtrees.push('features/web');
+      }
     }
 
     return subtrees;

@@ -69,17 +69,17 @@ describe('path mapping (web / features)', () => {
     ).toBe(false);
   });
 
-  it('shouldIncludeFile includes services/base/web files for auth services with web enabled', () => {
-    // Regression guard: the symmetric kind filter used to drop every file
-    // under services/base/** for auth services, which also stripped the
-    // shared Next.js scaffolding under services/base/web/**. The filter is
-    // now narrowed to services/base/backend/, so base web must flow through.
+  it('shouldIncludeFile routes auth services to services/auth/web, not services/base/web', () => {
+    // Auth services get a standalone admin dashboard from services/auth/web/.
+    // The generic services/base/web/ scaffolding must be excluded so the two
+    // trees don't collide (the generator's pickSubtrees also enforces this).
     const authWebCfg = cloneInitConfig(fullFeaturedConfig);
     const authSvc = authWebCfg.services.find((s) => s.kind === 'auth')!;
     const authCtx = buildServiceContext(authWebCfg, authSvc);
-    expect(shouldIncludeFile('services/base/web/next.config.ts', authCtx)).toBe(true);
-    expect(shouldIncludeFile('services/base/web/package.json.ejs', authCtx)).toBe(true);
-    expect(shouldIncludeFile('services/base/web/tsconfig.json', authCtx)).toBe(true);
+    expect(shouldIncludeFile('services/base/web/next.config.ts', authCtx)).toBe(false);
+    expect(shouldIncludeFile('services/base/web/package.json.ejs', authCtx)).toBe(false);
+    expect(shouldIncludeFile('services/auth/web/next.config.ts.ejs', authCtx)).toBe(true);
+    expect(shouldIncludeFile('services/auth/web/package.json.ejs', authCtx)).toBe(true);
   });
 
   it('shouldIncludeFile still excludes services/base/backend files for auth services', () => {
@@ -225,12 +225,10 @@ describe('project generator — web-only service (mobile disabled)', () => {
 });
 
 describe('project generator — auth/web subtree (admin dashboard)', () => {
-  // Regression coverage for #52: when the auth service has adminDashboard
-  // enabled, auth/web must be scaffolded with the same root Next.js shell
-  // (package.json, tsconfig, next.config, shadcn ui, etc.) as core/web.
-  // Previously a too-broad kind filter in shouldIncludeFile stripped every
-  // file under services/base/web/** for auth services, leaving auth/web/
-  // with only the auth feature pages layered from features/web/auth/**.
+  // Auth web is a standalone admin dashboard (login, dashboard, user
+  // management) scaffolded from `templates/services/auth/web/`, NOT the
+  // generic base web template. See #52 for the original regression and #60
+  // for the admin dashboard rewrite.
   let tempDir: string;
   let projectDir: string;
 
@@ -290,9 +288,13 @@ describe('project generator — auth/web subtree (admin dashboard)', () => {
     const raw = await fs.readFile(path.join(projectDir, 'auth/web/package.json'), 'utf-8');
     const pkg = JSON.parse(raw);
     expect(pkg.name).toBe('test-auth-web-auth-web');
-    expect(pkg.scripts?.dev).toBe('next dev');
+    // Auth web dev server runs on its reserved port (3002)
+    expect(pkg.scripts?.dev).toBe('next dev --port 3002');
     expect(pkg.dependencies?.next).toBeDefined();
     expect(pkg.dependencies?.react).toBeDefined();
+    // Auth dashboard dependencies
+    expect(pkg.dependencies?.sonner).toBeDefined();
+    expect(pkg.dependencies?.['@radix-ui/react-dialog']).toBeDefined();
   });
 
   it('lands the root layout.tsx and globals.css in auth/web/src/app/', async () => {
@@ -330,5 +332,67 @@ describe('project generator — auth/web subtree (admin dashboard)', () => {
     );
     const pkg = JSON.parse(raw);
     expect(pkg.name).toBe('test-auth-web-auth-backend');
+  });
+
+  it('scaffolds the admin dashboard pages (login, dashboard, users)', async () => {
+    for (const f of [
+      'src/app/page.tsx',
+      'src/app/(auth)/layout.tsx',
+      'src/app/(auth)/login/page.tsx',
+      'src/app/(dashboard)/layout.tsx',
+      'src/app/(dashboard)/dashboard/page.tsx',
+      'src/app/(dashboard)/users/page.tsx',
+      'src/app/(dashboard)/users/users-client.tsx',
+      'src/app/(dashboard)/users/[id]/page.tsx',
+      'src/app/(dashboard)/users/[id]/user-detail-client.tsx',
+    ]) {
+      expect(
+        await fs.pathExists(path.join(projectDir, 'auth/web', f)),
+        `missing auth/web/${f}`
+      ).toBe(true);
+    }
+  });
+
+  it('scaffolds admin lib (auth actions, admin actions, sidebar)', async () => {
+    for (const f of [
+      'src/lib/auth/actions.ts',
+      'src/lib/auth/cookies.ts',
+      'src/lib/auth/config.ts',
+      'src/lib/auth/types.ts',
+      'src/lib/admin/actions.ts',
+      'src/components/dashboard-sidebar.tsx',
+      'src/components/ui/dialog.tsx',
+    ]) {
+      expect(
+        await fs.pathExists(path.join(projectDir, 'auth/web', f)),
+        `missing auth/web/${f}`
+      ).toBe(true);
+    }
+  });
+
+  it('auth/web root page redirects to /dashboard (not the generic landing page)', async () => {
+    const rootPage = await fs.readFile(
+      path.join(projectDir, 'auth/web/src/app/page.tsx'),
+      'utf-8'
+    );
+    expect(rootPage).toMatch(/redirect.*\/dashboard/);
+    expect(rootPage).not.toMatch(/Build something/);
+  });
+
+  it('auth/web layout metadata references the project name', async () => {
+    const layout = await fs.readFile(
+      path.join(projectDir, 'auth/web/src/app/layout.tsx'),
+      'utf-8'
+    );
+    expect(layout).toMatch(/test-auth-web.*Auth Admin/);
+  });
+
+  it('auth/web next.config.ts has backend proxy rewrite for /api/*', async () => {
+    const nextConfig = await fs.readFile(
+      path.join(projectDir, 'auth/web/next.config.ts'),
+      'utf-8'
+    );
+    expect(nextConfig).toMatch(/\/api\/:path\*/);
+    expect(nextConfig).toMatch(/8082/);
   });
 });
