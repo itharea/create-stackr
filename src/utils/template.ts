@@ -140,6 +140,11 @@ export function shouldIncludeFile(
     return false;
   }
 
+  // Admin routes — only include when auth admin dashboard is enabled
+  if (filePath.includes('controllers/rest-api/routes/admin') && !ctx.service.authConfig?.adminDashboard) {
+    return false;
+  }
+
   // Email service — only include when email verification or password reset is enabled
   if (
     filePath.includes('utils/email') &&
