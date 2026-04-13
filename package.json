@@ -1,6 +1,6 @@
 {
   "name": "create-stackr",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Scaffold production-ready multi-microservice monorepos with Fastify backends, BetterAuth, Docker, and more",
   "type": "module",
   "bin": {
