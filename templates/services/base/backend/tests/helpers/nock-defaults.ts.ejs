@@ -1,0 +1,31 @@
+import nock from 'nock';
+
+export interface AuthSessionMockUser {
+  id: string;
+  email: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Install a persistent interceptor that answers `GET /api/auth/get-session`
+ * on the configured auth service with a fabricated user + session. Return
+ * value is the nock scope — callers can .persist() or .done() as needed.
+ */
+export function installAuthSessionMock(user: Partial<AuthSessionMockUser> = {}) {
+  const baseUrl = process.env.AUTH_SERVICE_URL || 'http://mock.local';
+  const url = new URL(baseUrl);
+  return nock(url.origin)
+    .get('/api/auth/get-session')
+    .reply(200, {
+      user: { id: 'usr_test', email: 'test@example.com', ...user },
+      session: {
+        id: 'ses_test',
+        expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+      },
+    })
+    .persist();
+}
+
+export function clearAuthSessionMocks() {
+  nock.cleanAll();
+}

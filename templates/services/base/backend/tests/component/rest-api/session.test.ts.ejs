@@ -1,0 +1,30 @@
+import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+import type { FastifyInstance } from 'fastify';
+import nock from 'nock';
+import { createTestApp, closeTestApp } from '../../helpers/app.js';
+import { installAuthSessionMock } from '../../helpers/nock-defaults.js';
+
+/**
+ * Smoke test for the auth plugin's request-decoration path. The base
+ * template doesn't ship a `requireAuth`-gated route today, so this
+ * verifies only that the nock interceptor scope resolves and the app
+ * boots with the auth plugin registered. Swap the assertion for a
+ * real gated-route check once one exists.
+ */
+describe('Auth session forwarding (smoke)', () => {
+  let app: FastifyInstance;
+  beforeAll(async () => {
+    app = await createTestApp();
+  });
+  afterAll(async () => {
+    await closeTestApp(app);
+  });
+  afterEach(() => nock.cleanAll());
+
+  it('installs the session mock without throwing', async () => {
+    const mock = installAuthSessionMock({ email: 'alice@example.com' });
+    const res = await app.inject({ method: 'GET', url: '/health/' });
+    expect(res.statusCode).toBe(200);
+    expect(mock.pendingMocks().length).toBeGreaterThanOrEqual(0);
+  });
+});

@@ -1,0 +1,16 @@
+import isCI from 'is-ci';
+import { execa } from 'execa';
+import nock from 'nock';
+import path from 'path';
+
+export default async function globalTeardown() {
+  nock.cleanAll();
+  nock.enableNetConnect();
+
+  if (isCI) {
+    const composePath = path.resolve(__dirname, '../../../../docker-compose.test.yml');
+    await execa('docker', ['compose', '-f', composePath, '--profile', 'component', 'down'], {
+      stdio: 'inherit',
+    });
+  }
+}

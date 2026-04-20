@@ -164,6 +164,33 @@ export function shouldIncludeFile(
     return false;
   }
 
+  // Testing infra (phase 3) — emit the tests/ subtree + per-service
+  // test config only when this service opts in. Nock defaults ship only
+  // to base services that forward to a sibling auth service.
+  if (filePath.includes('/tests/') && !ctx.backend.tests) {
+    return false;
+  }
+  if (filePath.endsWith('/vitest.config.ts.ejs') && !ctx.backend.tests) {
+    return false;
+  }
+  if (filePath.endsWith('/.env.test.ejs') && !ctx.backend.tests) {
+    return false;
+  }
+  if (
+    filePath.endsWith('nock-defaults.ts.ejs') &&
+    (!ctx.hasAuthService || ctx.service.kind === 'auth')
+  ) {
+    return false;
+  }
+  // Session smoke test only exists for base services that forward to
+  // a sibling auth service — it depends on nock-defaults above.
+  if (
+    filePath.endsWith('tests/component/rest-api/session.test.ts.ejs') &&
+    (!ctx.hasAuthService || ctx.service.kind === 'auth')
+  ) {
+    return false;
+  }
+
   // ORM-specific file filtering
   const orm = ctx.backend.orm;
 

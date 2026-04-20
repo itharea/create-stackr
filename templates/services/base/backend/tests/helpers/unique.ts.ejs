@@ -1,0 +1,13 @@
+import { randomBytes } from 'crypto';
+
+/**
+ * Short, URL-safe random suffix for unique per-test data. Parallel-safe
+ * — uses crypto.randomBytes, not a module-level counter.
+ */
+export function getShortUnique(length = 6): string {
+  return randomBytes(Math.ceil(length / 2)).toString('hex').slice(0, length);
+}
+
+export function uniqueEmail(prefix = 'test'): string {
+  return `${prefix}-${getShortUnique()}@example.com`;
+}

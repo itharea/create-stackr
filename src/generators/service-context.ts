@@ -10,6 +10,15 @@ import { noIntegrations } from '../config/presets.js';
 import type { ServiceEntry, StackrConfigFile } from '../types/config-file.js';
 import { readStackrVersion } from '../utils/version.js';
 import { computeTestPorts, type ServiceTestPorts } from '../utils/port-allocator.js';
+import type { ServiceCredentials } from '../utils/credentials.js';
+
+/**
+ * Derive the root `.env` DB name for a service — kept in sync with
+ * `.env.example.ejs` and `add-service.ts::buildRequiredEnvKeys`.
+ */
+function deriveDbName(projectName: string, serviceName: string): string {
+  return `${projectName.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${serviceName.replace(/-/g, '_')}`;
+}
 
 /**
  * Build the `ServiceRenderContext` passed to every EJS file inside a single
@@ -22,7 +31,8 @@ import { computeTestPorts, type ServiceTestPorts } from '../utils/port-allocator
 export function buildServiceContext(
   initConfig: InitConfig,
   service: ServiceConfig,
-  testPorts?: Record<string, ServiceTestPorts>
+  testPorts?: Record<string, ServiceTestPorts>,
+  credentialsByService?: ReadonlyMap<string, ServiceCredentials>
 ): ServiceRenderContext {
   const authService = initConfig.services.find((s) => s.kind === 'auth') ?? null;
   const hasAuthService = authService !== null;
@@ -39,9 +49,24 @@ export function buildServiceContext(
       `buildServiceContext: no test-infra ports computed for service "${service.name}"`
     );
   }
+
+  // Credentials default to the `change-me-*` placeholders used in the
+  // committed `.env.example`. Callers writing a real `.env` (monorepo.ts,
+  // add-service.ts) pass a `credentialsByService` map so `.env.test`
+  // embeds the same random values the root `.env` publishes.
+  const creds = credentialsByService?.get(service.name);
   const serviceWithTestInfra: ServiceConfig & {
     testInfra: NonNullable<ServiceConfig['testInfra']>;
-  } = { ...service, testInfra: serviceTestPorts };
+  } = {
+    ...service,
+    testInfra: {
+      ...serviceTestPorts,
+      dbUser: 'postgres',
+      dbName: deriveDbName(initConfig.projectName, service.name),
+      dbPassword: creds?.dbPassword ?? `change-me-${service.name}-db`,
+      redisPassword: creds?.redisPassword ?? `change-me-${service.name}-redis`,
+    },
+  };
 
   const peerServices = initConfig.services.filter((s) => s.name !== service.name);
   const peerServiceNames = peerServices.map((s) => s.name);

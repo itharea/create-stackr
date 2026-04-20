@@ -1,0 +1,14 @@
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  test: {
+    globalSetup: ['./tests/helpers/global-setup.ts'],
+    globalTeardown: ['./tests/helpers/global-teardown.ts'],
+    setupFiles: ['./tests/helpers/load-env.ts'],
+    include: ['tests/component/**/*.test.ts', 'tests/unit/**/*.test.ts'],
+    testTimeout: 30000,
+    hookTimeout: 30000,
+    pool: 'forks',
+    poolOptions: { forks: { singleFork: false } },
+  },
+});

@@ -1,10 +1,11 @@
-import fastify from "fastify";
+import fastify, { type FastifyInstance, type FastifyServerOptions } from "fastify";
 
 import config from "./plugins/config";
 import auth from "./plugins/auth";
 import errorHandler from "./plugins/error-handler";
 import authRoutes from "./routes/auth";
 import deviceSessionRoutes from "./routes/device-sessions";
+import healthRoutes from "./routes/health";
 <% if (service.authConfig?.adminDashboard) { %>
 import adminRoutes from "./routes/admin";
 <% } %>
@@ -13,14 +14,14 @@ import oauthWebRoutes from "./routes/oauth-web";
 import { initRedis } from "../../utils/redis";
 <% } %>
 
-const server = fastify({
+const baseOptions: FastifyServerOptions = {
   ajv: {
     customOptions: {
       removeAdditional: "all",
       coerceTypes: true,
       useDefaults: true,
       formats: {
-        'date-time': true, // Accept any string for date-time format
+        'date-time': true,
       },
     },
   },
@@ -34,61 +35,52 @@ const server = fastify({
       },
     } : undefined,
   },
-  // Generate request IDs for better error tracking
   genReqId: () => `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-});
+};
 
-// Register core plugins first
-await server.register(config);
+/**
+ * Build and fully-register the auth Fastify instance. Each call returns
+ * a fresh instance so component tests can spin up isolated in-process
+ * servers via `app.inject()`.
+ */
+export async function buildServer(overrides: FastifyServerOptions = {}): Promise<FastifyInstance> {
+  const server = fastify({ ...baseOptions, ...overrides });
 
-// Register error handler early to catch all errors
-await server.register(errorHandler);
+  await server.register(config);
+  await server.register(errorHandler);
+  await server.register(import('@fastify/cors'), {
+    origin: process.env.NODE_ENV === 'production'
+      ? (process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()) || [])
+      : true,
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Cookie', 'X-Device-Session-Token'],
+    exposedHeaders: ['set-cookie'],
+  });
 
-// Register CORS with credentials support for cookie-based auth
-await server.register(import('@fastify/cors'), {
-  // In production, use explicit origins; in development, allow all
-  origin: process.env.NODE_ENV === 'production'
-    ? (process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()) || [])
-    : true,
-  // Required for cookie-based auth - allows cookies to be sent cross-origin
-  credentials: true,
-  // Allowed headers for requests
-  allowedHeaders: ['Content-Type', 'Cookie', 'X-Device-Session-Token'],
-  // Expose Set-Cookie header so clients can receive cookies
-  exposedHeaders: ['set-cookie'],
-});
-
-// Register auth plugin
-await server.register(auth);
-
+  await server.register(auth);
 <% if (platforms.includes('web')) { %>
-// Initialize Redis for web OAuth PKCE flow
-await initRedis();
-
+  await initRedis();
 <% } %>
-// Register routes
-// Auth routes at /api/auth to match BetterAuth basePath
-await server.register(authRoutes, { prefix: "/api/auth" });
-// Device session routes for anonymous sessions
-await server.register(deviceSessionRoutes, { prefix: "/device-sessions" });
+
+  await server.register(healthRoutes, { prefix: "/health" });
+  await server.register(authRoutes, { prefix: "/api/auth" });
+  await server.register(deviceSessionRoutes, { prefix: "/device-sessions" });
 <% if (platforms.includes('web')) { %>
-// Web OAuth routes for BFF pattern with PKCE
-await server.register(oauthWebRoutes, { prefix: "/api/auth/web/oauth" });
+  await server.register(oauthWebRoutes, { prefix: "/api/auth/web/oauth" });
 <% } %>
 <% if (service.authConfig?.adminDashboard) { %>
-// Admin routes for user management dashboard
-await server.register(adminRoutes, { prefix: "/api/admin" });
+  await server.register(adminRoutes, { prefix: "/api/admin" });
 <% } %>
 
-// Root health check
-server.get("/", async (request, reply) => {
-  return reply.code(200).send({
-    message: "API is running",
-    timestamp: new Date().toISOString(),
-    version: "1.0.0"
+  server.get("/", async (_request, reply) => {
+    return reply.code(200).send({
+      message: "<%= service.name %> API is running",
+      service: "<%= service.name %>",
+      timestamp: new Date().toISOString(),
+      version: "1.0.0"
+    });
   });
-});
 
-await server.ready();
-
-export default server;
+  await server.ready();
+  return server;
+}

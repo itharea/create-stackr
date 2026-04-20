@@ -1,0 +1,17 @@
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
+import * as schema from '../../drizzle/schema.js';
+
+let pool: Pool | null = null;
+
+export function getTestDb() {
+  if (!pool) pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  return drizzle(pool, { schema });
+}
+
+export async function closeTestDb() {
+  if (pool) {
+    await pool.end();
+    pool = null;
+  }
+}

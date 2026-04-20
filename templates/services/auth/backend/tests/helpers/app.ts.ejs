@@ -1,0 +1,10 @@
+import type { FastifyInstance } from 'fastify';
+import { buildServer } from '../../controllers/rest-api/server.js';
+
+export async function createTestApp(): Promise<FastifyInstance> {
+  return buildServer({ logger: false });
+}
+
+export async function closeTestApp(app: FastifyInstance): Promise<void> {
+  await app.close();
+}

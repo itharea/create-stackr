@@ -106,12 +106,26 @@ export interface ServiceConfig {
   integrations: ServiceIntegrationsRuntime;
 
   /**
-   * Populated by `buildServiceContext` from `computeTestPorts` before the
-   * service reaches EJS rendering. Optional at the type level so
-   * `InitConfig` can be constructed before port computation, but guaranteed
+   * Populated by `buildServiceContext` from `computeTestPorts` + the
+   * monorepo's per-service `ServiceCredentials` before the service reaches
+   * EJS rendering. Optional at the type level so `InitConfig` can be
+   * constructed before port + credential computation, but guaranteed
    * populated on every service inside `ServiceRenderContext`.
+   *
+   * The credential fields (`dbUser`, `dbPassword`, `dbName`,
+   * `redisPassword`) mirror the values the monorepo generator writes into
+   * the root `.env` — they are baked into the per-service `.env.test`
+   * at generation time because `dotenv` does not expand `${VAR}`.
    */
-  testInfra?: { dbPort: number; redisPort: number; appPort: number };
+  testInfra?: {
+    dbPort: number;
+    redisPort: number;
+    appPort: number;
+    dbUser: string;
+    dbPassword: string;
+    dbName: string;
+    redisPassword: string;
+  };
 }
 
 /**

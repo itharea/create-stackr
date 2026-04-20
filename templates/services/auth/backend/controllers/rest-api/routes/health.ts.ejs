@@ -1,0 +1,16 @@
+import { FastifyPluginAsync } from "fastify";
+
+/**
+ * Health check route for the <%= service.name %> service.
+ */
+const healthRoutes: FastifyPluginAsync = async (server) => {
+  server.get("/", async (_request, reply) => {
+    return reply.send({
+      status: "ok",
+      service: "<%= service.name %>",
+      timestamp: new Date().toISOString(),
+    });
+  });
+};
+
+export default healthRoutes;

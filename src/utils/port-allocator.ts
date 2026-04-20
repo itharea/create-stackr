@@ -143,6 +143,19 @@ export interface ServiceTestPorts {
 }
 
 /**
+ * Full per-service test-infra record — ports plus the credentials that
+ * must land in `.env.test` at generation time (dotenv doesn't expand
+ * `${VAR}`, so `.env.test` embeds literal values). Credentials mirror
+ * what `writeEnvFilesWithCredentials` publishes into the root `.env`.
+ */
+export interface ServiceTestInfra extends ServiceTestPorts {
+  dbUser: string;
+  dbPassword: string;
+  dbName: string;
+  redisPassword: string;
+}
+
+/**
  * Minimum shape `computeTestPorts` needs to walk. Both `ServiceConfig` (the
  * runtime shape) and `ServiceEntry` (the on-disk `stackr.config.json` shape)
  * satisfy it, so callers can pass either without threading a conversion.

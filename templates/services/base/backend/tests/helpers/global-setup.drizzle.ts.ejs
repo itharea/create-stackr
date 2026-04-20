@@ -1,0 +1,56 @@
+import { execa } from 'execa';
+import nock from 'nock';
+
+async function waitForPostgres(url: string, timeoutMs = 30000) {
+  const { Client } = await import('pg');
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const client = new Client({ connectionString: url });
+      await client.connect();
+      await client.query('SELECT 1');
+      await client.end();
+      return;
+    } catch {
+      await new Promise((r) => setTimeout(r, 500));
+    }
+  }
+  throw new Error(`Postgres at ${url} not ready within ${timeoutMs}ms`);
+}
+
+async function waitForRedis(host: string, port: number, password: string, timeoutMs = 30000) {
+  const { default: Redis } = await import('ioredis');
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const redis = new Redis({ host, port, password, lazyConnect: true, maxRetriesPerRequest: 0 });
+    try {
+      await redis.connect();
+      await redis.ping();
+      redis.disconnect();
+      return;
+    } catch {
+      redis.disconnect();
+      await new Promise((r) => setTimeout(r, 500));
+    }
+  }
+  throw new Error(`Redis at ${host}:${port} not ready within ${timeoutMs}ms`);
+}
+
+export default async function globalSetup() {
+  await waitForPostgres(process.env.DATABASE_URL!);
+  await waitForRedis(process.env.REDIS_HOST!, Number(process.env.REDIS_PORT!), process.env.REDIS_PASSWORD!);
+
+  // --force is safe: the test DB lives on its own port and is never
+  // shared with dev or prod.
+  await execa('bun', ['x', 'drizzle-kit', 'push', '--force'], {
+    env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
+    stdio: 'inherit',
+  });
+
+  const { seedMetadata } = await import('./seed.js');
+  await seedMetadata();
+
+  // Block all outbound network; allow localhost for the app + test infra.
+  nock.disableNetConnect();
+  nock.enableNetConnect('127.0.0.1');
+}
