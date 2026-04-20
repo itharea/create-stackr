@@ -131,6 +131,7 @@ export function applyCliOptionsToPreset(
             eventQueue: false,
             imageUploads: false,
             authMiddleware: options.auth === false ? 'none' : 'standard',
+            tests: true,
           },
         })
       );
@@ -165,10 +166,21 @@ export function applyCliOptionsToPreset(
           eventQueue: false,
           imageUploads: false,
           authMiddleware: 'none',
+          tests: true,
         },
         integrations: noIntegrations(),
       })
     );
+  }
+
+  // --no-tests sweep runs LAST so it reaches every service — including ones
+  // freshly constructed above via `coreEntry` (for `--service-name`,
+  // `--with-services`, or the empty-list fallback).
+  if (options.tests === false) {
+    services = services.map((s) => ({
+      ...s,
+      backend: { ...s.backend, tests: false },
+    }));
   }
 
   return {

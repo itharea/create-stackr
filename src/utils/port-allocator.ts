@@ -122,3 +122,53 @@ export function allocateWebPort(
 
 export const AUTH_BACKEND_PORT = RESERVED_AUTH_BACKEND_PORT;
 export const AUTH_WEB_PORT = RESERVED_AUTH_WEB_PORT;
+
+/*
+ * +10000 offset applied uniformly to DB, Redis, and app ports in the
+ * unified test compose. Leaves headroom for ~1000 services before
+ * crossing into ephemeral-port space (linux default `ip_local_port_range`
+ * starts at 32768). No collision with dev compose: dev DB host ports are
+ * `5432, 5433, …`, dev Redis host ports are `6379, 6380, …`, dev app
+ * ports are `8080, 8082, 8081, …` — test equivalents are `15432+`,
+ * `16379+`, and `18080+`, disjoint on every axis. If you relocate this
+ * offset, existing generated projects' `.env.test` and
+ * `docker-compose.test.yml` both hard-code it.
+ */
+export const TEST_PORT_OFFSET = 10000;
+
+export interface ServiceTestPorts {
+  dbPort: number;
+  redisPort: number;
+  appPort: number;
+}
+
+/**
+ * Compute host-port assignments for the test compose. Walks `services` in
+ * declaration order and pairs each with a `dbPort` / `redisPort` / `appPort`
+ * that is exactly `TEST_PORT_OFFSET` above its dev-compose counterpart.
+ *
+ * The DB/Redis index walk must match `assignInfraPorts` in
+ * `src/generators/docker-compose.ts` (`5432++` / `6379++` in declaration
+ * order) so the mapping is deterministic across the two codepaths.
+ * `assignInfraPorts` walks `ServiceEntry[]` while this walks
+ * `ServiceConfig[]`; both the monorepo generator and `add-service.ts`
+ * preserve declaration order when mapping between the two, so the walks
+ * stay aligned.
+ */
+export function computeTestPorts(
+  services: readonly ServiceConfig[]
+): Record<string, ServiceTestPorts> {
+  const out: Record<string, ServiceTestPorts> = {};
+  let dbBase = 5432;
+  let redisBase = 6379;
+  for (const svc of services) {
+    out[svc.name] = {
+      dbPort: dbBase + TEST_PORT_OFFSET,
+      redisPort: redisBase + TEST_PORT_OFFSET,
+      appPort: svc.backend.port + TEST_PORT_OFFSET,
+    };
+    dbBase++;
+    redisBase++;
+  }
+  return out;
+}

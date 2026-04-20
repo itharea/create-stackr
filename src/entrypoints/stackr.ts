@@ -43,6 +43,7 @@ addCommand
   .option('--no-event-queue', 'Disable the event queue')
   .option('--port <n>', 'Explicit REST API port', (value) => Number.parseInt(value, 10))
   .option('--no-install', 'Skip package manager install in the new service')
+  .option('--no-tests', 'skip Vitest scaffolding for this service')
   .option('--force', 'Bypass pending-migration refusal and missing compose markers')
   .option('--verbose', 'Show detailed progress logging')
   .action(async (name: string, options: Record<string, unknown>) => {
@@ -62,6 +63,9 @@ addCommand
         port: options.port as number | undefined,
         // Commander's `--no-install` flips `install` to `false`. Default true.
         install: (options.install as boolean | undefined) ?? true,
+        // Commander's `--no-tests` flips `tests` to `false`. Default true
+        // is applied inside `runAddService` via `options.tests ?? true`.
+        tests: options.tests as boolean | undefined,
         force: options.force as boolean | undefined,
         verbose: options.verbose as boolean | undefined,
       });

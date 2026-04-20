@@ -149,6 +149,7 @@ export function buildExtraServicesFromFlag(
           eventQueue: false,
           imageUploads: false,
           authMiddleware: hasAuthService ? 'standard' : 'none',
+          tests: true,
         },
         web: null,
         mobile: null,

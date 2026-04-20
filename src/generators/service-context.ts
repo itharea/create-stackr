@@ -9,6 +9,7 @@ import type {
 import { noIntegrations } from '../config/presets.js';
 import type { ServiceEntry, StackrConfigFile } from '../types/config-file.js';
 import { readStackrVersion } from '../utils/version.js';
+import { computeTestPorts, type ServiceTestPorts } from '../utils/port-allocator.js';
 
 /**
  * Build the `ServiceRenderContext` passed to every EJS file inside a single
@@ -20,10 +21,27 @@ import { readStackrVersion } from '../utils/version.js';
  */
 export function buildServiceContext(
   initConfig: InitConfig,
-  service: ServiceConfig
+  service: ServiceConfig,
+  testPorts?: Record<string, ServiceTestPorts>
 ): ServiceRenderContext {
   const authService = initConfig.services.find((s) => s.kind === 'auth') ?? null;
   const hasAuthService = authService !== null;
+
+  // Resolve the test-infra port map. Callers that drive multi-service
+  // generation (monorepo.ts, add-service.ts) should compute this once and
+  // thread it through so every service sees the same assignments; when
+  // omitted we recompute from `initConfig.services` as a convenience for
+  // single-use call sites (tests, ad-hoc renders).
+  const resolvedTestPorts = testPorts ?? computeTestPorts(initConfig.services);
+  const serviceTestPorts = resolvedTestPorts[service.name];
+  if (!serviceTestPorts) {
+    throw new Error(
+      `buildServiceContext: no test-infra ports computed for service "${service.name}"`
+    );
+  }
+  const serviceWithTestInfra: ServiceConfig & {
+    testInfra: NonNullable<ServiceConfig['testInfra']>;
+  } = { ...service, testInfra: serviceTestPorts };
 
   const peerServices = initConfig.services.filter((s) => s.name !== service.name);
   const peerServiceNames = peerServices.map((s) => s.name);
@@ -68,7 +86,7 @@ export function buildServiceContext(
     peerWebPorts,
     peerServiceNames,
 
-    service,
+    service: serviceWithTestInfra,
 
     // Shim fields (for templates that haven't been rewritten yet)
     platforms,
@@ -125,6 +143,7 @@ function deriveLegacyBackend(service: ServiceConfig, initConfig: InitConfig): Le
     orm: initConfig.orm,
     eventQueue: service.backend.eventQueue,
     docker: true,
+    tests: service.backend.tests,
   };
 }
 
@@ -188,6 +207,7 @@ function serviceEntryToServiceConfig(entry: ServiceEntry): ServiceConfig {
       eventQueue: entry.backend.eventQueue,
       imageUploads: entry.backend.imageUploads,
       authMiddleware: entry.backend.authMiddleware,
+      tests: entry.backend.tests,
       ...(entry.backend.roles ? { roles: [...entry.backend.roles] } : {}),
     },
     web: entry.web ? { ...entry.web } : null,
@@ -227,6 +247,7 @@ function buildServiceEntry(
       eventQueue: svc.backend.eventQueue,
       imageUploads: svc.backend.imageUploads,
       authMiddleware: svc.backend.authMiddleware,
+      tests: svc.backend.tests,
       ...(svc.backend.roles ? { roles: svc.backend.roles } : {}),
     },
     web: svc.web,

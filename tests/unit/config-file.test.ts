@@ -50,6 +50,7 @@ function makeCfg(overrides: Partial<StackrConfigFile> = {}): StackrConfigFile {
           eventQueue: false,
           imageUploads: false,
           authMiddleware: 'none',
+          tests: false,
         },
         web: null,
         mobile: null,
