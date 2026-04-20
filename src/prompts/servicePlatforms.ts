@@ -104,6 +104,7 @@ export function buildServiceFromPlatformAnswers(
       eventQueue: answers.eventQueue,
       imageUploads: false,
       authMiddleware: answers.authMiddleware,
+      tests: true,
       ...(answers.roles ? { roles: answers.roles } : {}),
     },
     web: answers.web ? { enabled: true, port: webPort } : null,

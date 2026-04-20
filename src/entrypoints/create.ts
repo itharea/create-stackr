@@ -51,6 +51,7 @@ program
     '--with-services <list>',
     'Comma-separated list of extra base services to scaffold (e.g. scout,manage)'
   )
+  .option('--no-tests', 'skip Vitest scaffolding')
   .action(async (projectName: string | undefined, options: Record<string, unknown>) => {
     try {
       displayWelcome();
@@ -61,6 +62,7 @@ program
         serviceName: options.serviceName as string | undefined,
         auth: options.auth as boolean | undefined,
         withServices: options.withServices as string | undefined,
+        tests: options.tests as boolean | undefined,
       });
     } catch (error) {
       displayError(error as Error);

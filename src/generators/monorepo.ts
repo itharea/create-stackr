@@ -14,6 +14,7 @@ import { buildServiceContext, buildStackrConfig } from './service-context.js';
 import { renderDockerCompose } from './docker-compose.js';
 import { writeEnvFilesWithCredentials } from './env-files.js';
 import { readStackrVersion } from '../utils/version.js';
+import { computeTestPorts } from '../utils/port-allocator.js';
 
 /**
  * Orchestrates full-project generation for `create-stackr`.
@@ -47,9 +48,11 @@ export class MonorepoGenerator {
       // 1. Monorepo root files
       await this.renderMonorepoRoot();
 
-      // 2. Per-service generation
+      // 2. Per-service generation. Test-infra ports are computed once per
+      //    monorepo so every service sees the same +10000 assignments.
+      const testPorts = computeTestPorts(this.initConfig.services);
       for (const svc of this.initConfig.services) {
-        const ctx = buildServiceContext(this.initConfig, svc);
+        const ctx = buildServiceContext(this.initConfig, svc, testPorts);
         await new ServiceGenerator(ctx).generate(targetDir);
       }
 

@@ -144,5 +144,19 @@ export function migrateConfig(raw: unknown): StackrConfigFile {
     throw new Error('Malformed stackr.config.json — failed type guard');
   }
 
+  // Normalize `services[].backend.tests` for configs written by older CLIs
+  // that pre-date the field. `isStackrConfigFile` deliberately doesn't
+  // recurse into `backend`, so legacy configs pass the shape check and we
+  // fill in `false` here. Default is `false` so regenerating an existing
+  // project doesn't unexpectedly scaffold test files.
+  for (const entry of raw.services) {
+    if (entry && typeof entry === 'object' && 'backend' in entry) {
+      const backend = (entry as { backend: Record<string, unknown> }).backend;
+      if (backend && typeof backend === 'object' && backend.tests === undefined) {
+        backend.tests = false;
+      }
+    }
+  }
+
   return raw;
 }

@@ -51,6 +51,13 @@ export interface ServiceEntry {
      * Phase 2 adds the other three flavors.
      */
     authMiddleware: 'none' | 'standard' | 'role-gated' | 'flexible';
+    /**
+     * Whether Vitest scaffolding should be generated for this service.
+     * Additive in v1: legacy configs that pre-date this field default to
+     * `false` via `migrateConfig` so regenerating an existing project
+     * doesn't drop test files onto it unexpectedly.
+     */
+    tests: boolean;
     /** Only populated when `authMiddleware === 'role-gated'`. */
     roles?: string[];
   };

@@ -38,7 +38,12 @@ import {
   MarkerCorruptionError,
   MarkerNotFoundError,
 } from '../utils/compose-merge.js';
-import { allocateBackendPort, allocateWebPort, PortCollisionError } from '../utils/port-allocator.js';
+import {
+  allocateBackendPort,
+  allocateWebPort,
+  computeTestPorts,
+  PortCollisionError,
+} from '../utils/port-allocator.js';
 import { validateServiceName, validateConfiguration } from '../utils/validation.js';
 import { renderTemplate } from '../utils/template.js';
 import { readStackrVersion } from '../utils/version.js';
@@ -57,6 +62,12 @@ export interface AddServiceOptions {
   install?: boolean;
   force?: boolean;
   verbose?: boolean;
+  /**
+   * Whether to scaffold Vitest test infrastructure for the new service.
+   * Commander's `--no-tests` flips this to `false`; absence / `true`
+   * means "scaffold tests" (default).
+   */
+  tests?: boolean;
 }
 
 /**
@@ -164,6 +175,7 @@ export async function runAddService(
       eventQueue: Boolean(options.eventQueue),
       imageUploads: false,
       authMiddleware: requestedAuthMiddleware,
+      tests: options.tests ?? true,
     },
     web: webEnabled ? { enabled: true, port: webPort } : null,
     mobile: options.mobile ? { enabled: true } : null,
@@ -219,7 +231,8 @@ export async function runAddService(
   try {
     // Render the new service subtree into <stagingDir>/<name>/...
     const newServiceInNewConfig = newInitConfig.services.find((s) => s.name === name)!;
-    const newServiceCtx = buildServiceContext(newInitConfig, newServiceInNewConfig);
+    const testPorts = computeTestPorts(newInitConfig.services);
+    const newServiceCtx = buildServiceContext(newInitConfig, newServiceInNewConfig, testPorts);
     await new ServiceGenerator(newServiceCtx).generate(stagingDir);
 
     // Generate strong random credentials for the new service, then
@@ -487,7 +500,17 @@ function rebuildConfigFromRuntime(
       // Pre-existing service — keep its original generatedAt/By, but pick
       // up any authConfig changes we may have staged (e.g. updated
       // provisioningTargets on the auth service).
-      const merged: ServiceEntry = { ...prior };
+      const merged: ServiceEntry = {
+        ...prior,
+        backend: {
+          port: prior.backend.port,
+          eventQueue: prior.backend.eventQueue,
+          imageUploads: prior.backend.imageUploads,
+          authMiddleware: prior.backend.authMiddleware,
+          tests: svc.backend.tests,
+          ...(prior.backend.roles ? { roles: [...prior.backend.roles] } : {}),
+        },
+      };
       if (svc.kind === 'auth' && svc.authConfig) {
         merged.authConfig = {
           providers: { ...svc.authConfig.providers },
@@ -511,6 +534,7 @@ function rebuildConfigFromRuntime(
         eventQueue: svc.backend.eventQueue,
         imageUploads: svc.backend.imageUploads,
         authMiddleware: svc.backend.authMiddleware,
+        tests: svc.backend.tests,
         ...(svc.backend.roles ? { roles: [...svc.backend.roles] } : {}),
       },
       web: svc.web ? { ...svc.web } : null,

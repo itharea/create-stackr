@@ -93,6 +93,7 @@ export interface ServiceConfig {
     eventQueue: boolean;
     imageUploads: boolean;
     authMiddleware: 'none' | 'standard' | 'role-gated' | 'flexible';
+    tests: boolean;
     roles?: string[];
   };
 
@@ -103,6 +104,14 @@ export interface ServiceConfig {
   authConfig?: AuthServiceConfig;
 
   integrations: ServiceIntegrationsRuntime;
+
+  /**
+   * Populated by `buildServiceContext` from `computeTestPorts` before the
+   * service reaches EJS rendering. Optional at the type level so
+   * `InitConfig` can be constructed before port computation, but guaranteed
+   * populated on every service inside `ServiceRenderContext`.
+   */
+  testInfra?: { dbPort: number; redisPort: number; appPort: number };
 }
 
 /**
@@ -152,8 +161,9 @@ export interface ServiceRenderContext {
   /** Other services' names (non-auth) — used by auth templates. */
   peerServiceNames: string[];
 
-  // Primary per-service accessor
-  service: ServiceConfig;
+  // Primary per-service accessor. `testInfra` is narrowed to NonNullable at
+  // this boundary — `buildServiceContext` is the single construction site.
+  service: ServiceConfig & { testInfra: NonNullable<ServiceConfig['testInfra']> };
 
   // --- Backwards-compat shim fields (mirror ProjectConfig) ---
   platforms: Platform[];
@@ -190,6 +200,7 @@ export interface LegacyBackendShim {
   orm: ORMChoice;
   eventQueue: boolean;
   docker: boolean;
+  tests: boolean;
 }
 
 /**
@@ -239,4 +250,5 @@ export interface CLIOptions {
   serviceName?: string;
   auth?: boolean; // Commander's --no-auth flips this to false
   withServices?: string;
+  tests?: boolean; // Commander's --no-tests flips this to false
 }

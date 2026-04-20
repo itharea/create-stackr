@@ -83,6 +83,15 @@ describe('MonorepoGenerator — preset end-to-end', () => {
       const parsed = YAML.parse(prod);
       expect(parsed).toBeTruthy();
     });
+
+    it('every service entry has backend.tests === true by default', async () => {
+      const { projectDir } = await generateIntoTemp();
+      const onDisk = await loadStackrConfig(projectDir);
+      expect(onDisk.services.length).toBeGreaterThan(0);
+      for (const svc of onDisk.services) {
+        expect(svc.backend.tests, `${svc.name} should have backend.tests === true`).toBe(true);
+      }
+    });
   });
 });
 
