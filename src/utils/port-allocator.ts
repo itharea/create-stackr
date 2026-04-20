@@ -143,6 +143,16 @@ export interface ServiceTestPorts {
 }
 
 /**
+ * Minimum shape `computeTestPorts` needs to walk. Both `ServiceConfig` (the
+ * runtime shape) and `ServiceEntry` (the on-disk `stackr.config.json` shape)
+ * satisfy it, so callers can pass either without threading a conversion.
+ */
+interface TestPortsServiceShape {
+  name: string;
+  backend: { port: number };
+}
+
+/**
  * Compute host-port assignments for the test compose. Walks `services` in
  * declaration order and pairs each with a `dbPort` / `redisPort` / `appPort`
  * that is exactly `TEST_PORT_OFFSET` above its dev-compose counterpart.
@@ -150,13 +160,13 @@ export interface ServiceTestPorts {
  * The DB/Redis index walk must match `assignInfraPorts` in
  * `src/generators/docker-compose.ts` (`5432++` / `6379++` in declaration
  * order) so the mapping is deterministic across the two codepaths.
- * `assignInfraPorts` walks `ServiceEntry[]` while this walks
- * `ServiceConfig[]`; both the monorepo generator and `add-service.ts`
- * preserve declaration order when mapping between the two, so the walks
- * stay aligned.
+ * `assignInfraPorts` walks `ServiceEntry[]` while this walks a minimal
+ * `{ name; backend: { port } }` shape satisfied by both `ServiceConfig` and
+ * `ServiceEntry`; both the monorepo generator and `add-service.ts` preserve
+ * declaration order when mapping between the two, so the walks stay aligned.
  */
 export function computeTestPorts(
-  services: readonly ServiceConfig[]
+  services: readonly TestPortsServiceShape[]
 ): Record<string, ServiceTestPorts> {
   const out: Record<string, ServiceTestPorts> = {};
   let dbBase = 5432;
