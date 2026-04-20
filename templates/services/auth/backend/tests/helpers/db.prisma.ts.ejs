@@ -1,0 +1,17 @@
+import { PrismaClient } from '@prisma/client';
+
+let client: PrismaClient | null = null;
+
+export function getTestDb(): PrismaClient {
+  if (!client) {
+    client = new PrismaClient({ datasources: { db: { url: process.env.DATABASE_URL } } });
+  }
+  return client;
+}
+
+export async function closeTestDb() {
+  if (client) {
+    await client.$disconnect();
+    client = null;
+  }
+}

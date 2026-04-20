@@ -1,11 +1,11 @@
-import fastify from "fastify";
+import fastify, { type FastifyInstance, type FastifyServerOptions } from "fastify";
 
 import config from "./plugins/config";
 import auth from "./plugins/auth";
 import errorHandler from "./plugins/error-handler";
 import healthRoutes from "./routes/health";
 
-const server = fastify({
+const baseOptions: FastifyServerOptions = {
   ajv: {
     customOptions: {
       removeAdditional: "all",
@@ -27,42 +27,43 @@ const server = fastify({
     } : undefined,
   },
   genReqId: () => `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-});
+};
 
-// Register core plugins first
-await server.register(config);
+/**
+ * Build and fully-register a Fastify instance for this service. Each
+ * call returns a fresh instance — required so component tests can spin
+ * up isolated in-process servers via `app.inject()`.
+ *
+ * Production bootstraps in `controllers/rest-api/index.ts` use a single
+ * call + `server.listen()`; tests call it with `{ logger: false }`.
+ */
+export async function buildServer(overrides: FastifyServerOptions = {}): Promise<FastifyInstance> {
+  const server = fastify({ ...baseOptions, ...overrides });
 
-// Register error handler early to catch all errors
-await server.register(errorHandler);
-
-// Register CORS with credentials support for cookie-forwarding auth
-await server.register(import('@fastify/cors'), {
-  origin: process.env.NODE_ENV === 'production'
-    ? (process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()) || [])
-    : true,
-  credentials: true,
-  allowedHeaders: ['Content-Type', 'Cookie', 'X-Device-Session-Token'],
-  exposedHeaders: ['set-cookie'],
-});
-
-<% if (service.backend.authMiddleware !== 'none') { %>
-// Register auth plugin (forwards to AUTH_SERVICE_URL)
-await server.register(auth);
-<% } %>
-
-// Register routes
-await server.register(healthRoutes, { prefix: "/health" });
-
-// Root health check
-server.get("/", async (_request, reply) => {
-  return reply.code(200).send({
-    message: "<%= service.name %> API is running",
-    service: "<%= service.name %>",
-    timestamp: new Date().toISOString(),
-    version: "1.0.0"
+  await server.register(config);
+  await server.register(errorHandler);
+  await server.register(import('@fastify/cors'), {
+    origin: process.env.NODE_ENV === 'production'
+      ? (process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()) || [])
+      : true,
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Cookie', 'X-Device-Session-Token'],
+    exposedHeaders: ['set-cookie'],
   });
-});
+<% if (service.backend.authMiddleware !== 'none') { %>
+  await server.register(auth);
+<% } %>
+  await server.register(healthRoutes, { prefix: "/health" });
 
-await server.ready();
+  server.get("/", async (_request, reply) => {
+    return reply.code(200).send({
+      message: "<%= service.name %> API is running",
+      service: "<%= service.name %>",
+      timestamp: new Date().toISOString(),
+      version: "1.0.0"
+    });
+  });
 
-export default server;
+  await server.ready();
+  return server;
+}

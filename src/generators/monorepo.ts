@@ -16,6 +16,10 @@ import { renderDockerComposeTest } from './docker-compose-test.js';
 import { writeEnvFilesWithCredentials } from './env-files.js';
 import { readStackrVersion } from '../utils/version.js';
 import { computeTestPorts } from '../utils/port-allocator.js';
+import {
+  generateServiceCredentials,
+  type ServiceCredentials,
+} from '../utils/credentials.js';
 
 /**
  * Orchestrates full-project generation for `create-stackr`.
@@ -51,9 +55,21 @@ export class MonorepoGenerator {
 
       // 2. Per-service generation. Test-infra ports are computed once per
       //    monorepo so every service sees the same +10000 assignments.
+      //    Credentials are generated UPFRONT (before rendering) so each
+      //    service's `.env.test` can embed the same literal values the
+      //    root `.env` will publish — dotenv doesn't expand `${VAR}`.
       const testPorts = computeTestPorts(this.initConfig.services);
+      const credentialsByService = new Map<string, ServiceCredentials>();
       for (const svc of this.initConfig.services) {
-        const ctx = buildServiceContext(this.initConfig, svc, testPorts);
+        credentialsByService.set(svc.name, generateServiceCredentials());
+      }
+      for (const svc of this.initConfig.services) {
+        const ctx = buildServiceContext(
+          this.initConfig,
+          svc,
+          testPorts,
+          credentialsByService
+        );
         await new ServiceGenerator(ctx).generate(targetDir);
       }
 
@@ -88,6 +104,7 @@ export class MonorepoGenerator {
       await writeEnvFilesWithCredentials({
         targetDir,
         serviceNames: this.initConfig.services.map((s) => s.name),
+        credentialsByService,
       });
 
       // 4. stackr.config.json

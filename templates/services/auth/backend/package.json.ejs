@@ -26,7 +26,10 @@
     "db:push": "drizzle-kit push",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
-    "create-admin": "bun run scripts/create-admin.ts"<% } %>
+    "create-admin": "bun run scripts/create-admin.ts"<% } %><% if (backend.tests) { %>,
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"<% } %>
   },
   "dependencies": {
     "@fastify/cors": "~11.0.1",<% if (backend.orm === 'prisma') { %>
@@ -54,6 +57,11 @@
     "@types/pg": "~8.11.0",<% } %>
     "tsx": "~4.20.1",
     "typescript": "~5.8.3"<% if (features.authentication.emailVerification || features.authentication.passwordReset) { %>,
-    "@types/nodemailer": "~6.4.0"<% } %>
+    "@types/nodemailer": "~6.4.0"<% } %><% if (backend.tests) { %>,
+    "vitest": "~3.2.0",
+    "@vitest/coverage-v8": "~3.2.0",
+    "is-ci": "~4.1.0",
+    "execa": "~9.5.0",
+    "nock": "~13.5.0"<% } %>
   }
 }

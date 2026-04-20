@@ -1,0 +1,7 @@
+import dotenv from 'dotenv';
+import path from 'path';
+
+// Load root monorepo .env first (shared defaults), then the service's
+// own .env.test with override so test-scoped values win.
+dotenv.config({ path: path.resolve(__dirname, '../../../../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../../.env.test'), override: true });

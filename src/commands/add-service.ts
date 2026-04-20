@@ -230,18 +230,25 @@ export async function runAddService(
   let warnings: string[] = [];
   let committed = false;
   try {
+    // Generate strong random credentials for the new service BEFORE
+    // rendering so the staged `.env.test` can embed literal values that
+    // match what the root `.env` will publish — dotenv doesn't expand
+    // `${VAR}`. The same credentials feed both the staged backend `.env`
+    // and the root `.env` regen below.
+    const newServiceCredentials = new Map<string, ServiceCredentials>();
+    newServiceCredentials.set(name, generateServiceCredentials());
+
     // Render the new service subtree into <stagingDir>/<name>/...
     const newServiceInNewConfig = newInitConfig.services.find((s) => s.name === name)!;
     const testPorts = computeTestPorts(newInitConfig.services);
-    const newServiceCtx = buildServiceContext(newInitConfig, newServiceInNewConfig, testPorts);
+    const newServiceCtx = buildServiceContext(
+      newInitConfig,
+      newServiceInNewConfig,
+      testPorts,
+      newServiceCredentials
+    );
     await new ServiceGenerator(newServiceCtx).generate(stagingDir);
 
-    // Generate strong random credentials for the new service, then
-    // stage <stagingDir>/<name>/backend/.env with them. The same
-    // credentials are threaded into the root .env regen below so the
-    // backend container and the root docker-compose env_vars agree.
-    const newServiceCredentials = new Map<string, ServiceCredentials>();
-    newServiceCredentials.set(name, generateServiceCredentials());
     await writeEnvFilesWithCredentials({
       targetDir: stagingDir,
       serviceNames: [name],

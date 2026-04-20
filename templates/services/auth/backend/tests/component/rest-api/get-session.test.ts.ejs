@@ -1,0 +1,45 @@
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import type { FastifyInstance } from 'fastify';
+import { createTestApp, closeTestApp } from '../../helpers/app.js';
+import { uniqueEmail } from '../../helpers/unique.js';
+
+function extractCookie(setCookie: string | string[] | undefined): string {
+  if (!setCookie) return '';
+  const arr = Array.isArray(setCookie) ? setCookie : [setCookie];
+  return arr.map((c) => c.split(';')[0]).join('; ');
+}
+
+describe('GET /api/auth/get-session', () => {
+  let app: FastifyInstance;
+  beforeAll(async () => {
+    app = await createTestApp();
+  });
+  afterAll(async () => {
+    await closeTestApp(app);
+  });
+
+  it('returns user + session for a signed-in cookie', async () => {
+    const email = uniqueEmail('getsession');
+    const password = 'correcthorsebatterystaple';
+
+    const signUp = await app.inject({
+      method: 'POST',
+      url: '/api/auth/sign-up/email',
+      payload: { email, password, name: 'Test User' },
+      headers: { 'content-type': 'application/json' },
+    });
+    expect(signUp.statusCode, signUp.body).toBe(200);
+
+    const cookie = extractCookie(signUp.headers['set-cookie']);
+    expect(cookie.length).toBeGreaterThan(0);
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/auth/get-session',
+      headers: { cookie },
+    });
+    expect(res.statusCode, res.body).toBe(200);
+    const body = res.json() as { user?: { email: string } } | null;
+    expect(body?.user?.email).toBe(email);
+  });
+});

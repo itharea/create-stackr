@@ -1,0 +1,33 @@
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import type { FastifyInstance } from 'fastify';
+import { createTestApp, closeTestApp } from '../../helpers/app.js';
+import { uniqueEmail } from '../../helpers/unique.js';
+
+describe('POST /api/auth/sign-up/email', () => {
+  let app: FastifyInstance;
+  beforeAll(async () => {
+    app = await createTestApp();
+  });
+  afterAll(async () => {
+    await closeTestApp(app);
+  });
+
+  it('creates a user and sets a session cookie', async () => {
+    const email = uniqueEmail('signup');
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/auth/sign-up/email',
+      payload: {
+        email,
+        password: 'correcthorsebatterystaple',
+        name: 'Test User',
+      },
+      headers: { 'content-type': 'application/json' },
+    });
+    expect(res.statusCode, res.body).toBe(200);
+    const setCookie = res.headers['set-cookie'];
+    expect(setCookie).toBeDefined();
+    const cookieStr = Array.isArray(setCookie) ? setCookie.join('\n') : String(setCookie);
+    expect(cookieStr).toMatch(/session|auth/i);
+  });
+});

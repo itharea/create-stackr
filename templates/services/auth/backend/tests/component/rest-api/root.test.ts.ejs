@@ -1,0 +1,19 @@
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import type { FastifyInstance } from 'fastify';
+import { createTestApp, closeTestApp } from '../../helpers/app.js';
+
+describe('GET /', () => {
+  let app: FastifyInstance;
+  beforeAll(async () => {
+    app = await createTestApp();
+  });
+  afterAll(async () => {
+    await closeTestApp(app);
+  });
+
+  it('returns service identity', async () => {
+    const res = await app.inject({ method: 'GET', url: '/' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ service: '<%= service.name %>' });
+  });
+});
