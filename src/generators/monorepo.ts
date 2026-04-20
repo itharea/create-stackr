@@ -12,6 +12,7 @@ import { AI_TOOL_FILES } from '../types/index.js';
 import { ServiceGenerator } from './service.js';
 import { buildServiceContext, buildStackrConfig } from './service-context.js';
 import { renderDockerCompose } from './docker-compose.js';
+import { renderDockerComposeTest } from './docker-compose-test.js';
 import { writeEnvFilesWithCredentials } from './env-files.js';
 import { readStackrVersion } from '../utils/version.js';
 import { computeTestPorts } from '../utils/port-allocator.js';
@@ -62,6 +63,16 @@ export class MonorepoGenerator {
       const prodCompose = renderDockerCompose(stackrConfig, 'prod');
       await fs.writeFile(path.join(targetDir, 'docker-compose.yml'), devCompose);
       await fs.writeFile(path.join(targetDir, 'docker-compose.prod.yml'), prodCompose);
+
+      // 3a. Test compose — emitted only when at least one service opts in
+      //     (backend.tests === true). --no-tests at init leaves this off.
+      if (stackrConfig.services.some((s) => s.backend.tests)) {
+        const testCompose = renderDockerComposeTest(stackrConfig);
+        await fs.writeFile(
+          path.join(targetDir, 'docker-compose.test.yml'),
+          testCompose
+        );
+      }
 
       // 3b. Write real .env files with strong random credentials. Each
       //     service gets fresh Postgres / Redis / BetterAuth secrets that
