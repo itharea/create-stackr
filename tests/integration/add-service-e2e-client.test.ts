@@ -47,7 +47,7 @@ describe('stackr add service — monorepo-level e2e regen', () => {
     const pkg = JSON.parse(
       await fs.readFile(path.join(fx.projectDir, 'package.json'), 'utf-8')
     );
-    expect(pkg.scripts['test:e2e']).toBe('./scripts/test-e2e.sh');
+    expect(pkg.scripts['test:e2e']).toBe('node scripts/test-e2e.mjs');
   });
 
   it('tests: false → new service is absent from clients.ts + stack-smoke.test.ts', async () => {

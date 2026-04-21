@@ -179,87 +179,78 @@ describe('MonorepoGenerator — init-time credential generation', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Setup.sh — docker volume conflict check (#55)
+  // setup.mjs — docker volume conflict check (#55)
   //
   // Regression guard for the v0.5 bug where the volume-collision check
   // was gated on a `REGEN_HAPPENED` flag that only fired when setup.sh
-  // itself re-copied a .env.example file. The CLI writes real creds at
-  // init time, so on a fresh `create-stackr` run the .env already exists
-  // and setup.sh never set the flag — the whole block was silently
-  // skipped and users who re-used a project name hit cryptic Postgres
-  // auth failures on the next `docker compose up`. The fix restores
-  // v0.4's unconditional `docker volume ls | grep '^<project>_'` probe.
+  // itself re-copied a .env.example file. Ported forward to the .mjs
+  // rewrite: the probe must still run unconditionally (docker-gated only),
+  // enumerate volumes by project-name prefix, and prompt for a typed
+  // RESET before tearing anything down.
   // ---------------------------------------------------------------------------
 
-  it('setup.sh runs the docker volume probe unconditionally (no REGEN_HAPPENED gate)', async () => {
+  it('setup.mjs runs the docker volume probe unconditionally (no REGEN_HAPPENED gate)', async () => {
     const setup = await fs.readFile(
-      path.join(projectDir, 'scripts/setup.sh'),
+      path.join(projectDir, 'scripts/setup.mjs'),
       'utf-8'
     );
 
-    // The broken gating flag must be gone. If this re-appears, the
-    // check will silently skip on fresh `create-stackr` runs again.
+    // The broken gating flag must be gone.
     expect(setup).not.toMatch(/REGEN_HAPPENED/);
 
-    // The volume-detection block is gated only on docker being
-    // installed + docker info responding — nothing else.
-    expect(setup).toMatch(
-      /if command -v docker >\/dev\/null 2>&1 && docker info >\/dev\/null 2>&1; then/
-    );
+    // Volume probe is gated on `docker info` responding — nothing else.
+    expect(setup).toMatch(/function dockerAvailable\(\)/);
+    expect(setup).toMatch(/spawnSync\('docker', \['info'\]/);
   });
 
-  it('setup.sh enumerates docker volumes by project prefix using v0.4 semantics', async () => {
+  it('setup.mjs enumerates docker volumes by project prefix using v0.4 semantics', async () => {
     const setup = await fs.readFile(
-      path.join(projectDir, 'scripts/setup.sh'),
+      path.join(projectDir, 'scripts/setup.mjs'),
       'utf-8'
     );
 
-    // Matches v0.4's has_existing_volumes: list every volume, filter by
-    // the compose project name prefix. Using a case-statement prefix
-    // match (not a per-service suffix enumeration) so custom volumes
-    // declared by future services are caught too.
-    expect(setup).toMatch(
-      /COMPOSE_PROJECT="\$\(basename "\$ROOT_DIR"\)"/
-    );
-    expect(setup).toMatch(/docker volume ls --format '\{\{\.Name\}\}'/);
-    expect(setup).toMatch(/"\$\{COMPOSE_PROJECT\}_"\*\) EXISTING_VOLUMES\+=/);
+    // Prefix match on basename(ROOT_DIR) instead of per-service suffix
+    // enumeration so custom volumes declared by future services are caught.
+    expect(setup).toMatch(/path\.basename\(ROOT_DIR\)/);
+    expect(setup).toMatch(/'volume', 'ls', '--format', '\{\{\.Name\}\}'/);
+    expect(setup).toMatch(/startsWith\(prefix\)/);
   });
 
-  it('setup.sh prompts for a typed RESET and tears down both compose files', async () => {
+  it('setup.mjs prompts for a typed RESET and tears down both compose files', async () => {
     const setup = await fs.readFile(
-      path.join(projectDir, 'scripts/setup.sh'),
+      path.join(projectDir, 'scripts/setup.mjs'),
       'utf-8'
     );
 
     // Confirmation prompt requires the literal word RESET.
     expect(setup).toMatch(/Type 'RESET' to confirm/);
-    expect(setup).toMatch(/if \[ "\$REPLY" = "RESET" \]/);
+    expect(setup).toMatch(/answer !== 'RESET'/);
+    // Prompt driver is inquirer (dynamic import so it resolves after install).
+    expect(setup).toMatch(/await import\('inquirer'\)/);
 
     // The reset path tears both compose files down with -v, and
     // follows up with individual `docker volume rm` for any stragglers
     // (renamed services, etc.) that `down -v` wouldn't touch.
-    expect(setup).toMatch(/docker compose down -v/);
-    expect(setup).toMatch(
-      /docker compose -f docker-compose\.prod\.yml down -v/
-    );
-    expect(setup).toMatch(/docker volume rm "\$vol"/);
+    expect(setup).toMatch(/'compose', 'down', '-v'/);
+    expect(setup).toMatch(/'-f', 'docker-compose\.prod\.yml', 'down', '-v'/);
+    expect(setup).toMatch(/'volume', 'rm', v/);
   });
 
-  it('setup.sh runs the volume check BEFORE installing dependencies', async () => {
-    // We moved the check above the install loop so the user isn't
-    // forced to wait through a full `<pm> install` pass only to hit
-    // a Postgres auth failure on `docker compose up` afterwards. If
-    // the check drifts back below the installs, this test fires.
+  it('setup.mjs runs root install BEFORE the volume prompt (inquirer bootstrap ordering)', async () => {
+    // setup.mjs imports `inquirer` dynamically inside maybeResetVolumes().
+    // That dep only exists after the root `<pm> install` completes, so the
+    // install must run first or the prompt can't be shown. If the order
+    // drifts, this test fires.
     const setup = await fs.readFile(
-      path.join(projectDir, 'scripts/setup.sh'),
+      path.join(projectDir, 'scripts/setup.mjs'),
       'utf-8'
     );
 
-    const volumeCheckIdx = setup.indexOf('Destroy the volumes above?');
     const installIdx = setup.indexOf('Installing monorepo-root devDependencies');
-    expect(volumeCheckIdx).toBeGreaterThan(0);
+    const promptIdx = setup.indexOf('Destroy the volumes above?');
     expect(installIdx).toBeGreaterThan(0);
-    expect(volumeCheckIdx).toBeLessThan(installIdx);
+    expect(promptIdx).toBeGreaterThan(0);
+    expect(installIdx).toBeLessThan(promptIdx);
   });
 
   // ---------------------------------------------------------------------------
@@ -303,15 +294,16 @@ describe('MonorepoGenerator — init-time credential generation', () => {
     expect(example).toMatch(/BACKEND_URL/);
   });
 
-  it('setup.sh creates web/.env.local from web/.env.example as safety net', async () => {
+  it('setup.mjs creates web/.env.local from web/.env.example as safety net', async () => {
     const setup = await fs.readFile(
-      path.join(projectDir, 'scripts/setup.sh'),
+      path.join(projectDir, 'scripts/setup.mjs'),
       'utf-8'
     );
 
-    expect(setup).toMatch(/\$svc\/web\/\.env\.local/);
-    expect(setup).toMatch(/\$svc\/web\/\.env\.example/);
-    expect(setup).toMatch(/Created \$svc\/web\/\.env\.local/);
+    // copyIfMissing(src, dest, label) is the single rename-guarded helper.
+    expect(setup).toMatch(/'\.env\.example'/);
+    expect(setup).toMatch(/'\.env\.local'/);
+    expect(setup).toMatch(/\$\{svc\}\/web\/\.env\.local/);
   });
 
   // ---------------------------------------------------------------------------
@@ -359,20 +351,20 @@ describe('MonorepoGenerator — init-time credential generation', () => {
     expect(layout).toMatch(/test-env-creds.*Auth Admin/);
   });
 
-  it('setup.sh still enumerates every project service in SERVICES for the install loop', async () => {
-    // The rendered SERVICES=(...) array must still include every
-    // service name in the project — the install loop depends on it,
-    // even though the volume probe now uses a prefix match instead.
+  it('setup.mjs still enumerates every project service in SERVICES for the install loop', async () => {
+    // The rendered `const SERVICES = [...]` array must still include every
+    // service name in the project — the install loop depends on it, even
+    // though the volume probe now uses a prefix match instead.
     const setup = await fs.readFile(
-      path.join(projectDir, 'scripts/setup.sh'),
+      path.join(projectDir, 'scripts/setup.mjs'),
       'utf-8'
     );
 
-    const match = setup.match(/^SERVICES=\((.+)\)$/m);
+    const match = setup.match(/^const SERVICES = \[(.+)\];$/m);
     expect(match).not.toBeNull();
     const servicesLine = match![1];
-    expect(servicesLine).toContain('"auth"');
-    expect(servicesLine).toContain('"core"');
+    expect(servicesLine).toContain("'auth'");
+    expect(servicesLine).toContain("'core'");
   });
 });
 

@@ -1,0 +1,63 @@
+# Writing tests in <%= service.name %>/backend
+
+## The Arrange / Act / Assert shape
+
+```ts
+import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+import nock from 'nock';
+import { createTestApp, closeTestApp } from '../../helpers/app.js';
+import { uniqueEmail, getShortUnique } from '../../helpers/unique.js';
+import { getTestDb } from '../../helpers/db.js';
+import { installAuthSessionMock } from '../../helpers/nock-defaults.js';
+
+describe('POST /api/widgets', () => {
+  let app; beforeAll(async () => { app = await createTestApp(); });
+  afterAll(async () => { await closeTestApp(app); });
+  afterEach(() => nock.cleanAll());
+
+  it('creates a widget for an authenticated user', async () => {
+    // Arrange — inline. No shared fixtures.
+    const userId = `usr_${getShortUnique()}`;
+    installAuthSessionMock({ id: userId, email: uniqueEmail() });
+    const payload = { name: `Widget ${getShortUnique()}` };
+
+    // Act
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/widgets',
+      headers: { cookie: 'session=abc' },
+      payload,
+    });
+
+    // Assert — five exit doors
+    // 1. Response
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toMatchObject({ name: payload.name });
+    // 2. New state (via public GET, not direct DB read)
+    const listed = await app.inject({ method: 'GET', url: '/api/widgets', headers: { cookie: 'session=abc' } });
+    expect(listed.json()).toContainEqual(expect.objectContaining({ name: payload.name }));
+    // 3. Outgoing calls — nock verifies expected mocks were hit
+    // 4. Message queue publishes — if your route enqueues, await the job and assert state
+    // 5. Observability — if you rely on logs/metrics, assert the side-effect here
+  });
+});
+```
+
+## Rules of thumb
+
+- **Arrange inline.** No shared `fixtures.ts`, no factories. A reader must see every record the test needs without jumping.
+- **Unique data.** `uniqueEmail()`, `getShortUnique()`. Parallel workers share the DB; unique suffixes are what keeps them from colliding.
+- **Mock at the network edge.** `nock` intercepts outbound HTTP. Never mock your own repositories or services.
+- **Assert state via the public API**, not direct DB reads. (`getTestDb()` is for setup — use the public API for assertions.)
+- **Five exit doors.** Every test asserts the response, the new state, outgoing HTTP calls, queue publishes (if relevant), and observability (if your route emits logs/metrics that matter).
+- **No per-test cleanup.** Do not truncate tables between tests. Rely on unique suffixes.
+- **No transaction rollback wrapper.** Breaks parallelism and hides concurrency bugs.
+
+## When to mock vs run real
+
+- **Mock**: external HTTP (auth service, 3rd-party APIs), email (nodemailer), OAuth providers.
+- **Run real**: Postgres, Redis, BullMQ, internal business logic, auth middleware.
+
+## Adding a new queue test
+
+See `tests/component/queue/user-worker.test.ts` for the five canonical cases (ack, nack, poison, idempotency, batch partial failure). Reuse `helpers/bullmq.ts` — don't reinvent the connection wiring.

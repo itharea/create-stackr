@@ -12,13 +12,13 @@ A multi-microservice monorepo scaffolded by
 ## Getting started
 
 ```bash
-./scripts/setup.sh
-docker compose up -d
+<%= packageManager %> run setup
+<%= packageManager %> run docker:dev
 ```
 
-The setup script walks through each service in `stackr.config.json`, creates
-per-service `.env` files from the committed `.env.example` templates, and
-installs dependencies for each subproject.
+`<%= packageManager %> run setup` walks through each service in
+`stackr.config.json`, creates per-service `.env` files from the committed
+`.env.example` templates, and installs dependencies for each subproject.
 
 ## Per-service development
 
@@ -46,9 +46,9 @@ cd <%= svc.name %>/mobile && <%= packageManager %> start
 ├── docker-compose.yml          # Managed by stackr (marker blocks)
 ├── docker-compose.prod.yml     # Production overlay
 ├── scripts/
-│   ├── setup.sh                # Loops services, installs deps, wires stackr CLI
-│   ├── docker-dev.sh
-│   └── docker-prod.sh
+│   ├── setup.mjs               # `<%= packageManager %> run setup` — loops services, installs deps, wires stackr CLI
+│   ├── test-all.mjs            # `<%= packageManager %> run test` — component + unit across backends
+│   └── test-e2e.mjs            # `<%= packageManager %> run test:e2e` — cross-service E2E
 <% services.forEach((svc) => { -%>
 ├── <%= svc.name %>/
 │   ├── backend/
@@ -71,9 +71,9 @@ service's own `backend/DESIGN.md` for the full picture.
 ## Adding a service later
 
 The root `package.json` pins `create-stackr` as a devDependency, so
-after `./scripts/setup.sh` has run the root install the `stackr` CLI is
-available locally. To grow the monorepo without clobbering your
-docker-compose edits:
+after `<%= packageManager %> run setup` finishes the root install the
+`stackr` CLI is available locally. To grow the monorepo without
+clobbering your docker-compose edits:
 
 ```bash
 npx stackr add service wallet

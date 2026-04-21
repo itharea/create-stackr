@@ -229,7 +229,10 @@ export function shouldIncludeFile(
  */
 export function shouldIncludeProjectFile(
   filePath: string,
-  ctx: { services: { kind: 'auth' | 'base'; backend: { tests: boolean; authMiddleware: string } }[] }
+  ctx: {
+    services: { kind: 'auth' | 'base'; backend: { tests: boolean; authMiddleware: string } }[];
+    ciWorkflow?: boolean;
+  }
 ): boolean {
   const normalized = filePath.split(path.sep).join('/');
 
@@ -241,7 +244,19 @@ export function shouldIncludeProjectFile(
   // opts into tests. Keeps --no-tests projects free of vitest config,
   // axios clients, and the test-e2e wrapper.
   if (normalized.includes('project/tests/e2e/') && !anyTests) return false;
-  if (normalized.endsWith('scripts/test-e2e.sh.ejs') && !anyTests) return false;
+  if (normalized.endsWith('scripts/test-e2e.mjs.ejs') && !anyTests) return false;
+
+  // Phase 6 — `scripts/test-all.mjs` runs the component+unit layer across
+  // every backend. Same gate as `test-e2e.mjs`: at least one service opts in.
+  if (normalized.endsWith('scripts/test-all.mjs.ejs') && !anyTests) return false;
+
+  // Phase 6 — optional GitHub Actions workflow. Opt-in via `--ci-workflow`
+  // at init; `stackr add service` re-derives the flag from whether the file
+  // already exists on disk (see add-service.ts::planProjectE2ERegen).
+  // Also gated on `anyTests` — an empty matrix is invalid YAML for GHA.
+  if (normalized.endsWith('.github/workflows/test.yml.ejs') && (!ctx.ciWorkflow || !anyTests)) {
+    return false;
+  }
 
   // cross-service-auth.test.ts requires an auth peer AND a base peer with
   // tests enabled AND auth middleware active on that base. Without all

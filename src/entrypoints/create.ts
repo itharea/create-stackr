@@ -52,6 +52,7 @@ program
     'Comma-separated list of extra base services to scaffold (e.g. scout,manage)'
   )
   .option('--no-tests', 'skip Vitest scaffolding')
+  .option('--ci-workflow', 'generate .github/workflows/test.yml')
   .action(async (projectName: string | undefined, options: Record<string, unknown>) => {
     try {
       displayWelcome();
@@ -63,6 +64,7 @@ program
         auth: options.auth as boolean | undefined,
         withServices: options.withServices as string | undefined,
         tests: options.tests as boolean | undefined,
+        ciWorkflow: options.ciWorkflow as boolean | undefined,
       });
     } catch (error) {
       displayError(error as Error);
@@ -81,11 +83,11 @@ Examples:
   $ npx create-stackr my-app --defaults --with-services scout,manage
   $ npx create-stackr my-app --no-auth --service-name api
 
-After your project is generated, run \`./scripts/setup.sh\` once — it
+After your project is generated, run \`<pm> run setup\` once — it
 installs the monorepo-root devDependency on \`create-stackr\`, which
 drops the \`stackr\` binary into \`node_modules/.bin\` so you can run:
   $ cd my-app
-  $ ./scripts/setup.sh
+  $ bun run setup    # or: npm run setup / yarn setup
   $ npx stackr add service wallet
 If you prefer a system-wide install: \`npm i -g create-stackr\` once,
 then \`stackr add service wallet\` works from any generated project.

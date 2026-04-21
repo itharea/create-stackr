@@ -1,0 +1,58 @@
+// Brings up the `e2e` profile of docker-compose.test.yml, runs the
+// monorepo-level cross-service tests, and tears the stack down on CI.
+// Locally, the stack is left running so subsequent runs skip the cold
+// docker-build.
+
+import { spawnSync } from 'node:child_process';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ROOT_DIR = path.resolve(__dirname, '..');
+process.chdir(ROOT_DIR);
+
+const PM = '<%= packageManager %>';
+
+function run(cmd, args, opts = {}) {
+  const r = spawnSync(cmd, args, { stdio: 'inherit', ...opts });
+  if (r.status !== 0) {
+    process.exitCode = r.status ?? 1;
+    throw new Error(`${cmd} ${args.join(' ')} failed (exit ${r.status})`);
+  }
+}
+
+function teardown() {
+  if (process.env.CI) {
+    spawnSync(
+      'docker',
+      ['compose', '-f', 'docker-compose.test.yml', '--profile', 'e2e', 'down'],
+      { stdio: 'inherit' }
+    );
+  }
+}
+
+process.on('exit', teardown);
+for (const sig of ['SIGINT', 'SIGTERM']) {
+  process.on(sig, () => process.exit(1));
+}
+
+try {
+  console.log('▶ Building and starting e2e profile...');
+  run('docker', [
+    'compose',
+    '-f',
+    'docker-compose.test.yml',
+    '--profile',
+    'e2e',
+    'up',
+    '-d',
+    '--build',
+    '--wait',
+  ]);
+
+  run(PM, ['install'], { cwd: path.join('tests', 'e2e') });
+  run(PM, ['run', 'test'], { cwd: path.join('tests', 'e2e') });
+} catch (err) {
+  console.error(err.message);
+  process.exit(process.exitCode ?? 1);
+}

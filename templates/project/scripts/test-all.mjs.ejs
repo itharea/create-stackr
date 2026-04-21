@@ -1,0 +1,74 @@
+// Runs `<%= packageManager %> run test` (component + unit) across every
+// backend with tests enabled. Uses docker-compose.test.yml --profile component
+// (infra only — Postgres + Redis, no app containers).
+// For end-to-end tests, run `<%= packageManager %> run test:e2e`.
+
+import { spawnSync } from 'node:child_process';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ROOT_DIR = path.resolve(__dirname, '..');
+process.chdir(ROOT_DIR);
+
+const PM = '<%= packageManager %>';
+const TEST_SERVICES = [<% services.filter((s) => s.backend.tests).forEach((s) => { -%>'<%= s.name %>', <% }) -%>];
+
+<% if (services.some((s) => s.backend.tests)) { -%>
+if (TEST_SERVICES.length === 0) {
+  console.log('No services have tests enabled.');
+  process.exit(0);
+}
+
+function run(cmd, args, opts = {}) {
+  const r = spawnSync(cmd, args, { stdio: 'inherit', ...opts });
+  if (r.status !== 0) {
+    process.exitCode = r.status ?? 1;
+    throw new Error(`${cmd} ${args.join(' ')} failed (exit ${r.status})`);
+  }
+}
+
+function teardown() {
+  if (process.env.CI) {
+    spawnSync(
+      'docker',
+      ['compose', '-f', 'docker-compose.test.yml', '--profile', 'component', 'down'],
+      { stdio: 'inherit' }
+    );
+  }
+}
+
+process.on('exit', teardown);
+for (const sig of ['SIGINT', 'SIGTERM']) {
+  process.on(sig, () => process.exit(1));
+}
+
+try {
+  console.log('▶ Bringing up component-test infra (Postgres + Redis)...');
+  run('docker', [
+    'compose',
+    '-f',
+    'docker-compose.test.yml',
+    '--profile',
+    'component',
+    'up',
+    '-d',
+    '--wait',
+  ]);
+
+  for (const svc of TEST_SERVICES) {
+    console.log('');
+    console.log(`▶ Testing ${svc}/backend`);
+    run(PM, ['run', 'test'], { cwd: path.join(svc, 'backend') });
+  }
+
+  console.log('');
+  console.log('✅ Component + unit tests passed.');
+  console.log('   (E2E tests: run `<%= packageManager %> run test:e2e`.)');
+} catch (err) {
+  console.error(err.message);
+  process.exit(process.exitCode ?? 1);
+}
+<% } else { -%>
+console.log('No services have tests enabled.');
+<% } -%>

@@ -230,6 +230,7 @@ export async function runAddService(
   verboseLog(verbose, `Staging dir: ${stagingDir}`);
 
   let warnings: string[] = [];
+  let infos: string[] = [];
   let committed = false;
   try {
     // Generate strong random credentials for the new service BEFORE
@@ -336,12 +337,24 @@ export async function runAddService(
     }
 
     // Monorepo-level E2E regen. The tests/e2e subtree + root package.json
-    // + scripts/test-e2e.sh all iterate over `services`, so they go stale
-    // the moment a new service lands. Re-render every project-level file
-    // that's gated by `shouldIncludeProjectFile` and stage the results
-    // for Phase D. Untouched project-level files (setup.sh, README.md,
-    // etc.) are left alone — that's a pre-existing gap.
-    const plannedProjectE2E = await planProjectE2ERegen(root, newConfig);
+    // + scripts/test-{all,e2e}.sh all iterate over `services`, so they go
+    // stale the moment a new service lands. Re-render every project-level
+    // file that's gated by `shouldIncludeProjectFile` and stage the
+    // results for Phase D. Untouched project-level files (setup.sh,
+    // README.md, etc.) are left alone — that's a pre-existing gap.
+    //
+    // The CI workflow is opt-in at init via `--ci-workflow`; here we
+    // re-derive the flag from whether the file already exists on disk.
+    // A project that opted in stays opted in (and the new service lands
+    // in the matrix); a project without the workflow stays workflow-free.
+    const ciWorkflowPath = path.join(root, '.github/workflows/test.yml');
+    const ciWorkflow = await fs.pathExists(ciWorkflowPath);
+    if (ciWorkflow) {
+      infos.push(
+        `Regenerated .github/workflows/test.yml with ${name} in the component matrix.`
+      );
+    }
+    const plannedProjectE2E = await planProjectE2ERegen(root, newConfig, ciWorkflow);
 
     // =======================================================================
     // Phase C — dry-run validation
@@ -431,13 +444,6 @@ export async function runAddService(
       } else {
         await fs.writeFile(entry.destPath, entry.contents!, 'utf-8');
       }
-      if (entry.executable) {
-        try {
-          await fs.chmod(entry.destPath, 0o755);
-        } catch {
-          /* non-fatal */
-        }
-      }
     }
 
     // 5. Save stackr.config.json LAST so an interrupted run leaves the
@@ -474,6 +480,7 @@ export async function runAddService(
     webPort: webEnabled ? webPort : null,
     hasAuthService,
     warnings,
+    infos,
     orm: newConfig.orm,
     packageManager: newConfig.packageManager,
     authServiceName: newConfig.services.find((s) => s.kind === 'auth')?.name ?? null,
@@ -1050,6 +1057,7 @@ function printNextSteps(args: {
   webPort: number | null;
   hasAuthService: boolean;
   warnings: string[];
+  infos: string[];
   orm: 'prisma' | 'drizzle';
   packageManager: 'npm' | 'yarn' | 'bun';
   authServiceName: string | null;
@@ -1108,6 +1116,13 @@ function printNextSteps(args: {
     }
     console.log();
   }
+
+  if (args.infos.length > 0) {
+    for (const info of args.infos) {
+      console.log(`  ${chalk.cyan('ℹ️')}  ${info}`);
+    }
+    console.log();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1120,13 +1135,12 @@ interface ProjectE2EPlanEntry {
   contents?: string;
   srcPath?: string;
   isCopy?: boolean;
-  executable?: boolean;
 }
 
 /**
  * Plan the rewrite of monorepo-level files under `templates/project/` whose
  * contents depend on the current `services` list: the e2e test subtree,
- * the e2e shell script, and the root `package.json`'s `test:e2e` script.
+ * the e2e runner script, and the root `package.json`'s `test:e2e` script.
  *
  * Untouched project-level files (README, DESIGN, setup.sh, etc.) are a
  * known gap — add-service does not refresh them. Scope is deliberately
@@ -1135,10 +1149,11 @@ interface ProjectE2EPlanEntry {
  */
 async function planProjectE2ERegen(
   root: string,
-  newConfig: StackrConfigFile
+  newConfig: StackrConfigFile,
+  ciWorkflow: boolean
 ): Promise<ProjectE2EPlanEntry[]> {
   const plan: ProjectE2EPlanEntry[] = [];
-  const rootCtx = buildProjectRootCtx(newConfig);
+  const rootCtx = buildProjectRootCtx(newConfig, ciWorkflow);
 
   const e2eFiles = await globby('project/tests/e2e/**/*', {
     cwd: TEMPLATE_DIR,
@@ -1146,9 +1161,11 @@ async function planProjectE2ERegen(
     onlyFiles: true,
     ignore: ['**/node_modules/**'],
   });
-  const scriptFile = 'project/scripts/test-e2e.sh.ejs';
+  const testE2eScript = 'project/scripts/test-e2e.mjs.ejs';
+  const testAllScript = 'project/scripts/test-all.mjs.ejs';
   const pkgFile = 'project/package.json.ejs';
-  const managed = [...e2eFiles, scriptFile, pkgFile];
+  const ciWorkflowFile = 'project/.github/workflows/test.yml.ejs';
+  const managed = [...e2eFiles, testE2eScript, testAllScript, pkgFile, ciWorkflowFile];
 
   for (const file of managed) {
     const absTemplatePath = path.join(TEMPLATE_DIR, file);
@@ -1156,7 +1173,10 @@ async function planProjectE2ERegen(
     const destRel = rel.endsWith('.ejs') ? rel.slice(0, -4) : rel;
     const destPath = path.join(root, destRel);
 
-    const included = shouldIncludeProjectFile(file, { services: newConfig.services });
+    const included = shouldIncludeProjectFile(file, {
+      services: newConfig.services,
+      ciWorkflow,
+    });
 
     if (!included) {
       if (await fs.pathExists(destPath)) {
@@ -1176,7 +1196,6 @@ async function planProjectE2ERegen(
         destPath,
         action: 'write',
         contents: rendered,
-        executable: destRel === 'scripts/test-e2e.sh',
       });
     } else {
       plan.push({
@@ -1203,13 +1222,17 @@ async function planProjectE2ERegen(
   return plan;
 }
 
-function buildProjectRootCtx(cfg: StackrConfigFile): Record<string, unknown> {
+function buildProjectRootCtx(
+  cfg: StackrConfigFile,
+  ciWorkflow: boolean
+): Record<string, unknown> {
   return {
     projectName: cfg.projectName,
     packageManager: cfg.packageManager,
     orm: cfg.orm,
     aiTools: cfg.aiTools,
     services: cfg.services,
+    ciWorkflow,
     stackrVersion: readStackrVersion(),
   };
 }
