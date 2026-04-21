@@ -141,6 +141,15 @@ export interface InitConfig {
   services: ServiceConfig[];
   preset?: 'minimal' | 'full-featured' | 'analytics-focused' | 'custom';
   customized: boolean;
+  /**
+   * Runtime-only monorepo-level flag: when `true`, emit
+   * `.github/workflows/test.yml` at the project root. Set via the
+   * `--ci-workflow` CLI flag on `create-stackr`; for `stackr add service`
+   * the flag is re-derived from whether the file already exists on disk
+   * (see `add-service.ts`). Not persisted to `stackr.config.json` — the
+   * file is the source of truth.
+   */
+  ciWorkflow?: boolean;
 }
 
 /**
@@ -265,4 +274,5 @@ export interface CLIOptions {
   auth?: boolean; // Commander's --no-auth flips this to false
   withServices?: string;
   tests?: boolean; // Commander's --no-tests flips this to false
+  ciWorkflow?: boolean;
 }

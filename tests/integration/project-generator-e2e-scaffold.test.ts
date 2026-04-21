@@ -9,7 +9,7 @@ import type { InitConfig } from '../../src/types/index.js';
 
 /**
  * Phase 5: the monorepo-level `<project>/tests/e2e/` package, the
- * `scripts/test-e2e.sh` wrapper, and the `test:e2e` script in the root
+ * `scripts/test-e2e.mjs` runner, and the `test:e2e` script in the root
  * `package.json` all ship whenever at least one service opts into tests.
  * cross-service-auth.test.ts is an additional gate: auth peer + a base
  * service with tests enabled + non-`none` authMiddleware.
@@ -39,7 +39,7 @@ describe('MonorepoGenerator — monorepo-level e2e scaffold', () => {
       return { projectDir, config };
     }
 
-    it('tests/e2e package + scripts/test-e2e.sh + root test:e2e all land on disk', async () => {
+    it('tests/e2e package + scripts/test-e2e.mjs + root test:e2e all land on disk', async () => {
       const { projectDir, config } = await generate();
       const hasTests = config.services.some((s) => s.backend.tests);
       expect(hasTests).toBe(true); // default preset state
@@ -66,16 +66,13 @@ describe('MonorepoGenerator — monorepo-level e2e scaffold', () => {
         expect(await fs.pathExists(crossSvcAuth)).toBe(false);
       }
 
-      const scriptPath = path.join(projectDir, 'scripts/test-e2e.sh');
+      const scriptPath = path.join(projectDir, 'scripts/test-e2e.mjs');
       expect(await fs.pathExists(scriptPath)).toBe(true);
-      const stat = await fs.stat(scriptPath);
-      // Owner-exec bit set.
-      expect((stat.mode & 0o100) !== 0).toBe(true);
 
       const pkg = JSON.parse(
         await fs.readFile(path.join(projectDir, 'package.json'), 'utf-8')
       );
-      expect(pkg.scripts['test:e2e']).toBe('./scripts/test-e2e.sh');
+      expect(pkg.scripts['test:e2e']).toBe('node scripts/test-e2e.mjs');
     });
 
     it('e2e package.json declares vitest + axios devDeps', async () => {
@@ -89,7 +86,7 @@ describe('MonorepoGenerator — monorepo-level e2e scaffold', () => {
     });
   });
 
-  it('--no-tests preset → no tests/e2e, no test-e2e.sh, no test:e2e script', async () => {
+  it('--no-tests preset → no tests/e2e, no test-e2e.mjs, no test:e2e script', async () => {
     const body = loadPreset('minimal');
     const config: InitConfig = applyCliOptionsToPreset(
       body,
@@ -105,7 +102,7 @@ describe('MonorepoGenerator — monorepo-level e2e scaffold', () => {
     await new MonorepoGenerator(config).generate(projectDir);
 
     expect(await fs.pathExists(path.join(projectDir, 'tests/e2e'))).toBe(false);
-    expect(await fs.pathExists(path.join(projectDir, 'scripts/test-e2e.sh'))).toBe(false);
+    expect(await fs.pathExists(path.join(projectDir, 'scripts/test-e2e.mjs'))).toBe(false);
 
     const pkg = JSON.parse(
       await fs.readFile(path.join(projectDir, 'package.json'), 'utf-8')

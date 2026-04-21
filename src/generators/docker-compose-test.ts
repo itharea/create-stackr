@@ -114,17 +114,28 @@ function renderRedisTest(svc: ServiceEntry, redisPort: number): string {
 
 function renderDbMigrate(svc: ServiceEntry, config: StackrConfigFile): string {
   const upper = envPrefix(svc.name);
+  // The migration container targets the `base` stage rather than
+  // `rest-api-prod`. rest-api-prod runs `npm prune --production` which
+  // strips the prisma/drizzle-kit CLIs (both devDeps); migrations need
+  // them. The `base` stage keeps full deps and already has the schema
+  // copied in for the ORM client generation step.
+  const pm = config.packageManager;
+  const runner = pm === 'bun' ? 'bun x' : pm === 'npm' ? 'npx' : 'yarn';
+  // `prisma db push` in v7 no longer accepts `--skip-generate` (the flag was
+  // removed). The migration container's sole job is to run the schema push;
+  // `prisma generate` already ran during the image build (postinstall), so
+  // there's nothing to skip here.
   const migrateCmd =
     config.orm === 'drizzle'
-      ? 'bun x drizzle-kit push --force'
-      : 'bun x prisma db push --accept-data-loss --skip-generate';
+      ? `${runner} drizzle-kit push --force`
+      : `${runner} prisma db push --accept-data-loss`;
 
   return indent(
     `${svc.name}_db_migrate:\n` +
       `  profiles: [e2e]\n` +
       `  build:\n` +
       `    context: ./${svc.name}/backend\n` +
-      `    target: rest-api-prod\n` +
+      `    target: base\n` +
       `  command: sh -c "${migrateCmd}"\n` +
       `  environment:\n` +
       `    DATABASE_URL: postgresql://\${${upper}_DB_USER:-postgres}:\${${upper}_DB_PASSWORD}@${svc.name}_db_test:5432/\${${upper}_DB_NAME}\n` +

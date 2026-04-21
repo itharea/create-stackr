@@ -74,17 +74,18 @@ export async function runCreateFlow(
       `  • ${chalk.cyan(svc.name)} — ${label} @ ${chalk.bold(String(svc.backend.port))}${svc.web?.enabled ? ` / web @ ${svc.web.port}` : ''}${svc.mobile?.enabled ? ' / mobile' : ''}`
     );
   }
+  const pm = config.packageManager;
   nextSteps.push(
     '',
     chalk.bold('Next steps:'),
     '',
     `  ${chalk.cyan('1.')} cd ${config.projectName}`,
-    `  ${chalk.cyan('2.')} ./scripts/setup.sh`,
-    `  ${chalk.cyan('3.')} docker compose up -d`,
+    `  ${chalk.cyan('2.')} ${pm} run setup`,
+    `  ${chalk.cyan('3.')} ${pm} run docker:dev`,
     '',
-    chalk.gray('The setup script installs dependencies, wires the `stackr` CLI locally,'),
-    chalk.gray('and creates per-service .env files. After it finishes you can grow the'),
-    chalk.gray('monorepo with `npx stackr add service <name>`.')
+    chalk.gray('`setup` installs monorepo-root + per-service dependencies, creates'),
+    chalk.gray('per-service .env files, and wires the `stackr` CLI. After it finishes'),
+    chalk.gray('you can grow the monorepo with `npx stackr add service <name>`.')
   );
 
   displaySuccess('Monorepo created successfully!', nextSteps);

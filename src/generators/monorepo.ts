@@ -113,10 +113,7 @@ export class MonorepoGenerator {
       // 5. AI tool guideline files (claude/cursor/codex/windsurf)
       await this.generateAIToolFiles();
 
-      // 6. Make scripts executable (setup.sh, docker-dev.sh, docker-prod.sh)
-      await this.makeScriptsExecutable();
-
-      // 7. Initialize git
+      // 6. Initialize git
       await this.initializeGit();
     } catch (err) {
       await this.handleError(err);
@@ -141,6 +138,7 @@ export class MonorepoGenerator {
       aiTools: this.initConfig.aiTools,
       services: this.initConfig.services,
       preset: this.initConfig.preset,
+      ciWorkflow: Boolean(this.initConfig.ciWorkflow),
       // Pinned to the current CLI version so `templates/project/package.json.ejs`
       // can emit a `devDependency` on `create-stackr@^<version>` and the
       // generated project can run `npx stackr add service …` post-install.
@@ -162,7 +160,12 @@ export class MonorepoGenerator {
       });
 
       for (const file of files) {
-        if (!shouldIncludeProjectFile(file, { services: this.initConfig.services })) {
+        if (
+          !shouldIncludeProjectFile(file, {
+            services: this.initConfig.services,
+            ciWorkflow: Boolean(this.initConfig.ciWorkflow),
+          })
+        ) {
           continue;
         }
 
@@ -221,22 +224,6 @@ export class MonorepoGenerator {
         guidelineFileName: fileName,
       });
       await fs.writeFile(path.join(this.targetDir, fileName), rendered);
-    }
-  }
-
-  private async makeScriptsExecutable(): Promise<void> {
-    const scriptNames = ['setup.sh', 'docker-dev.sh', 'docker-prod.sh', 'test-e2e.sh'];
-    for (const name of scriptNames) {
-      const scriptPath = path.join(this.targetDir, 'scripts', name);
-      try {
-        if (await fs.pathExists(scriptPath)) {
-          await fs.chmod(scriptPath, 0o755);
-        }
-      } catch {
-        console.log(
-          chalk.yellow(`\n⚠️  Could not chmod ${scriptPath}; run it manually.`)
-        );
-      }
     }
   }
 

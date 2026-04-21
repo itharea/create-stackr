@@ -1,8 +1,0 @@
-#!/usr/bin/env bash
-# Start the production stack using the prod overlay compose file.
-set -euo pipefail
-
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$ROOT_DIR"
-
-exec docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d "$@"

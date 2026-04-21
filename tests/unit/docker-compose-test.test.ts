@@ -130,20 +130,25 @@ describe('renderDockerComposeTest', () => {
       expect(migrate.depends_on.core_db_test.condition).toBe('service_healthy');
     });
 
-    it('builds from <svc>/backend with rest-api-prod target', () => {
+    it('builds from <svc>/backend with the `base` target (full deps, pre-prune)', () => {
+      // The `rest-api-prod` stage runs `npm prune --production` which strips
+      // the prisma / drizzle-kit CLIs (both devDeps). Migrations need those
+      // CLIs, so the migration container targets the `base` stage instead.
       const parsed = YAML.parse(renderDockerComposeTest(buildStackrConfig(minimalConfig)));
       const migrate = parsed.services.core_db_migrate;
       expect(migrate.build.context).toBe('./core/backend');
-      expect(migrate.build.target).toBe('rest-api-prod');
+      expect(migrate.build.target).toBe('base');
     });
 
     it('uses prisma db push command when orm === "prisma"', () => {
-      // minimalConfig is prisma
+      // minimalConfig is prisma. `--skip-generate` was dropped in Prisma v7
+      // — `prisma generate` already ran during the image build's
+      // postinstall, so there's nothing to skip at migration time.
       const parsed = YAML.parse(renderDockerComposeTest(buildStackrConfig(minimalConfig)));
       const migrate = parsed.services.core_db_migrate;
       expect(migrate.command).toContain('prisma db push');
       expect(migrate.command).toContain('--accept-data-loss');
-      expect(migrate.command).toContain('--skip-generate');
+      expect(migrate.command).not.toContain('--skip-generate');
     });
 
     it('uses drizzle-kit push command when orm === "drizzle"', () => {

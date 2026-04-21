@@ -189,5 +189,8 @@ export function applyCliOptionsToPreset(
     projectName,
     packageManager,
     appScheme: deriveAppScheme(projectName),
+    // Runtime-only flag; propagates to `MonorepoGenerator.renderMonorepoRoot`
+    // which gates `.github/workflows/test.yml` on it.
+    ciWorkflow: Boolean(options.ciWorkflow),
   };
 }

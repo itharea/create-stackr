@@ -84,6 +84,23 @@ model Verification {
   @@map("verification")
 }
 
+// Anonymous device sessions. Created before a user signs in so the client
+// can transact (analytics, pre-purchase flows, etc.) with a stable identity,
+// then optionally migrated onto a User when the user authenticates.
+model DeviceSession {
+  id                String    @id @default(cuid())
+  deviceId          String
+  sessionToken      String    @unique
+  createdAt         DateTime  @default(now())
+  lastActiveAt      DateTime  @default(now())
+  migrated          Boolean   @default(false)
+  migratedToUserId  String?
+  preferredCurrency String    @default("USD")
+
+  @@index([deviceId])
+  @@map("device_session")
+}
+
 <% if (authConf.twoFactor) { -%>
 model TwoFactor {
   id          String  @id @default(cuid())

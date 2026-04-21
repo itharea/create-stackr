@@ -102,35 +102,35 @@ describe('MonorepoGenerator — root package.json', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // setup.sh wiring
+  // setup.mjs wiring
   // ---------------------------------------------------------------------------
 
-  it('setup.sh runs a root install inside an `if package.json exists` guard', async () => {
+  it('setup.mjs runs a root install inside an `if (existsSync("package.json"))` guard', async () => {
     const setup = await fs.readFile(
-      path.join(projectDir, 'scripts/setup.sh'),
+      path.join(projectDir, 'scripts/setup.mjs'),
       'utf-8'
     );
-    expect(setup).toMatch(/if \[ -f package\.json \]; then/);
+    expect(setup).toMatch(/existsSync\('package\.json'\)/);
     expect(setup).toMatch(/Installing monorepo-root devDependencies/);
-    expect(setup).toMatch(/npm install/); // default packageManager in the fixture
+    expect(setup).toMatch(/const PM = 'npm'/); // default packageManager in the fixture
   });
 
-  it('setup.sh root install failure path is non-fatal and prints a fallback hint', async () => {
+  it('setup.mjs root install failure path is non-fatal and prints a fallback hint', async () => {
     const setup = await fs.readFile(
-      path.join(projectDir, 'scripts/setup.sh'),
+      path.join(projectDir, 'scripts/setup.mjs'),
       'utf-8'
     );
-    // The install is wrapped in `if <pm> install; then ... else ... fi` so
-    // a non-zero exit doesn't abort the rest of setup.sh under set -e.
-    expect(setup).toMatch(/if npm install; then/);
+    // The install branches on spawnSync status so a non-zero exit doesn't
+    // abort the rest of setup.mjs — it logs the fallback and continues.
+    expect(setup).toMatch(/r\.status === 0/);
     expect(setup).toMatch(/Root install failed/);
     // Global-install fallback is explicitly documented in the else branch.
     expect(setup).toMatch(/npm i -g create-stackr/);
   });
 
-  it('setup.sh next-steps points users at `npx stackr add service`', async () => {
+  it('setup.mjs next-steps points users at `npx stackr add service`', async () => {
     const setup = await fs.readFile(
-      path.join(projectDir, 'scripts/setup.sh'),
+      path.join(projectDir, 'scripts/setup.mjs'),
       'utf-8'
     );
     expect(setup).toMatch(/npx stackr add service/);
@@ -170,12 +170,12 @@ describe('MonorepoGenerator — root package.json honors package manager choice'
       await new MonorepoGenerator(cfg).generate(dir);
 
       const setup = await fs.readFile(
-        path.join(dir, 'scripts/setup.sh'),
+        path.join(dir, 'scripts/setup.mjs'),
         'utf-8'
       );
-      expect(setup).toMatch(/if yarn install; then/);
+      expect(setup).toMatch(/const PM = 'yarn'/);
       // package.json shape is identical — the devDependency is still on
-      // create-stackr, package manager only affects how setup.sh installs.
+      // create-stackr; package manager only affects how setup.mjs installs.
       const pkg = JSON.parse(
         await fs.readFile(path.join(dir, 'package.json'), 'utf-8')
       );
@@ -198,10 +198,10 @@ describe('MonorepoGenerator — root package.json honors package manager choice'
       await new MonorepoGenerator(cfg).generate(dir);
 
       const setup = await fs.readFile(
-        path.join(dir, 'scripts/setup.sh'),
+        path.join(dir, 'scripts/setup.mjs'),
         'utf-8'
       );
-      expect(setup).toMatch(/if bun install; then/);
+      expect(setup).toMatch(/const PM = 'bun'/);
     } finally {
       await fs.remove(tempDir);
     }

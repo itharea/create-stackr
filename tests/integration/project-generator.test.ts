@@ -141,7 +141,7 @@ describe('MonorepoGenerator — multi-service fixture', () => {
 
     expect(await fs.pathExists(path.join(projectDir, 'README.md'))).toBe(true);
     expect(await fs.pathExists(path.join(projectDir, 'DESIGN.md'))).toBe(true);
-    expect(await fs.pathExists(path.join(projectDir, 'scripts/setup.sh'))).toBe(true);
+    expect(await fs.pathExists(path.join(projectDir, 'scripts/setup.mjs'))).toBe(true);
 
     // Leaked-subdirectory regression guard
     expect(await fs.pathExists(path.join(projectDir, 'project'))).toBe(false);

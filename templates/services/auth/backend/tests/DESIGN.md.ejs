@@ -1,0 +1,83 @@
+# Testing Architecture — <%= service.name %>/backend
+
+This service follows **Yoni Goldberg's Testing Diamond**: mostly component tests (service booted in-process, real DB, mocked network edge), a thin unit layer for genuinely pure logic, and a small number of cross-service E2E tests that live at the **monorepo root**.
+
+## One test compose, two profiles
+
+Test infrastructure lives in a single generated file — `docker-compose.test.yml` at project root — with two profiles:
+
+| Profile | What's brought up | Used by |
+|---|---|---|
+| `component` | Speed-tuned Postgres + Redis per service (no app containers, tmpfs, fsync off) | `<%= packageManager %> run test` (component + unit, this folder) |
+| `e2e` | The above **plus** app containers + migration init containers | `<%= packageManager %> run test:e2e` (monorepo-level cross-service tests) |
+
+Test scope is fully isolated from dev and prod — every container is on its own compose network, bound to 127.0.0.1, with all host ports offset `+10000` from dev. Dev compose and the `e2e` profile can run simultaneously without collision.
+
+| Scope | Compose invocation | Host ports |
+|---|---|---|
+| Dev | `docker-compose.yml` (existing) | <%= service.backend.port %>, ... |
+| Test — component | `docker compose -f docker-compose.test.yml --profile component up` | DB <%= service.testInfra.dbPort %>, Redis <%= service.testInfra.redisPort %> |
+| Test — e2e | `docker compose -f docker-compose.test.yml --profile e2e up --build` | The above + app <%= service.testInfra.appPort %> |
+
+## Layers
+
+### Component tests — `tests/component/` (this folder)
+- Fastify app booted **in-process** via `buildServer()` + `app.inject()`.
+- Real Postgres + Redis from `docker-compose.test.yml` `component` profile.
+- External HTTP (OAuth providers, SMTP) mocked with `nock` / nodemailer test transport; `disableNetConnect()` blocks anything unexpected.
+- **Majority of the test suite (~90%).** Add new feature coverage here by default.
+- Run with `<%= packageManager %> run test` in this folder, or from project root with `<%= packageManager %> run test`.
+
+### Unit tests — `tests/unit/` (this folder)
+- Pure-function, no-I/O. Only for genuinely algorithmic code (error factories, formatters).
+- Skip this layer for controllers / routes / repositories / services — those belong in `component/`.
+- Intentionally thin. Most code is exercised via component tests.
+
+### E2E tests — `<project>/tests/e2e/` (monorepo root, NOT per-service)
+- **Cross-service contract verification only.** Proves things `nock`-mocked component tests cannot — e.g., "a cookie issued here is actually accepted by a base service." Not feature coverage.
+- Runs against `docker-compose.test.yml --profile e2e`: app containers + shared test DBs on the same network.
+- Invoked from monorepo root: `<%= packageManager %> run test:e2e`.
+- Keep this layer small (Goldberg: 3-10 per service). Every new E2E is a maintenance cost.
+
+## Data tiers (Goldberg §6)
+
+- **Metadata** — lookup tables seeded once globally in `tests/helpers/seed.ts`. Idempotent.
+- **Context** — records a test suite depends on but isn't testing. Add in `beforeAll` when useful.
+- **Test records** — data actually under test. Create **inline in the Arrange block** of each test with `getShortUnique()` suffixes so parallel runs never collide.
+
+## Parallelism
+
+- Component tests: vitest forks workers by default. Unique-suffix data makes this parallel-safe — no per-test cleanup, no transaction rollback.
+- E2E tests: `singleFork: true` — the real stack is shared and serializing avoids cross-test interference.
+- **Do not run `<%= packageManager %> run test` and `<%= packageManager %> run test:e2e` simultaneously.** Both profiles share the same DB containers; concurrent runs will step on each other. Run them sequentially. CI runs them as separate jobs.
+
+## What's mocked vs. real, by layer
+
+| Resource | Component | E2E |
+|---|---|---|
+| Postgres | Real (component profile) | Real (e2e profile — same DB containers) |
+| Redis / BullMQ | Real (component profile) | Real (e2e profile — same Redis containers) |
+| Email (nodemailer) | Mocked (test transport) | Mocked (no real SMTP) |
+| OAuth providers | Mocked | Mocked |
+
+The auth service does not mock itself — it tests its own routes directly via `app.inject()`.
+
+## Speed notes
+
+- `docker-compose.test.yml` ships with `fsync=off`, `synchronous_commit=off`, `full_page_writes=off`, tmpfs. Don't "harden" the test DB — it's deliberately unsafe for speed.
+- Locally, leave `docker compose ... --profile component up -d` running between runs — reconnect is ~3-5ms. CI tears down per job.
+- `e2e` profile cold-builds app images on first run (tens of seconds). Subsequent runs are cached.
+- On macOS, tmpfs goes through Docker Desktop's shim filesystem (not RAM), but it's still fast.
+
+## Port summary (reference)
+
+| Service | Dev backend | Test DB (host) | Test Redis (host) | E2E app (host) |
+|---|---|---|---|---|
+| <%= service.name %> | <%= service.backend.port %> | <%= service.testInfra.dbPort %> | <%= service.testInfra.redisPort %> | <%= service.testInfra.appPort %> |
+
+All test host ports are bound to `127.0.0.1`. App-container-to-DB calls inside the `e2e` profile use compose DNS (e.g., `<svc>_db_test:5432`) — no host exposure needed for that path.
+
+## References
+
+- [Goldberg — nodejs-testing-best-practices](https://github.com/goldbergyoni/nodejs-testing-best-practices)
+- [Goldberg §4 — nodebestpractices](https://github.com/goldbergyoni/nodebestpractices#4-testing-and-overall-quality-practices)

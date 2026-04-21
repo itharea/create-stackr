@@ -1,4 +1,7 @@
-import { PrismaClient } from '@prisma/client';
+// Prisma v7 generates the client into a custom path (`prisma/generated/prisma/`)
+// instead of re-exporting it from `@prisma/client`. Match utils/db.ts so both
+// production code and tests import from the same location.
+import { PrismaClient } from '../../prisma/generated/prisma/client';
 
 let client: PrismaClient | null = null;
 
