@@ -1,0 +1,116 @@
+import { Queue, Worker, type Processor, type QueueOptions, type WorkerOptions } from 'bullmq';
+import IORedis, { type Redis } from 'ioredis';
+
+// Singleton per Vitest worker process. Forks share no state, so one connection
+// per fork is correct. BullMQ treats externally-supplied connections as shared
+// and will not call `.quit()` on them when a Worker/Queue closes, so reusing
+// this across tests in the same file is safe.
+let connection: Redis | null = null;
+
+function getConnection(): Redis {
+  if (!connection || connection.status === 'end') {
+    connection = new IORedis({
+      host: process.env.REDIS_HOST,
+      port: Number(process.env.REDIS_PORT),
+      password: process.env.REDIS_PASSWORD,
+      maxRetriesPerRequest: null,   // BullMQ requirement
+    });
+  }
+  return connection;
+}
+
+export function createTestQueue<T = unknown>(name: string, opts: Partial<QueueOptions> = {}) {
+  return new Queue<T>(name, { connection: getConnection(), ...opts });
+}
+
+export function createTestWorker<T = unknown>(
+  name: string,
+  processor: Processor<T>,
+  opts: Partial<WorkerOptions> = {}
+) {
+  return new Worker<T>(name, processor, { connection: getConnection(), concurrency: 1, ...opts });
+}
+
+export async function closeQueueResources(queue: Queue, worker: Worker): Promise<void> {
+  await worker.close();
+  await queue.close();
+}
+
+export async function closeConnection(): Promise<void> {
+  if (connection) { connection.disconnect(); connection = null; }
+}
+
+/**
+ * Await a specific job's terminal state. Listens for both `completed` and
+ * `failed` so the losing branch never dangles as an unhandled rejection.
+ * If the opposite of the expected event fires, the promise rejects — so a
+ * test that asked for `completed` fails loudly when the job actually failed.
+ */
+export function waitForJob(
+  worker: Worker,
+  jobId: string,
+  event: 'completed' | 'failed' = 'completed',
+  timeoutMs = 5000
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      clearTimeout(timer);
+      worker.off('completed', onCompleted);
+      worker.off('failed', onFailed);
+    };
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error(`Timed out waiting for job ${jobId} (${event})`));
+    }, timeoutMs);
+    const onCompleted = (job: { id?: string }) => {
+      if (job.id !== jobId) return;
+      cleanup();
+      if (event === 'completed') resolve();
+      else reject(new Error(`Expected ${event} but job ${jobId} completed`));
+    };
+    const onFailed = (job: { id?: string }, err?: Error) => {
+      if (job.id !== jobId) return;
+      cleanup();
+      if (event === 'failed') resolve();
+      else reject(err ?? new Error(`Expected ${event} but job ${jobId} failed`));
+    };
+    worker.on('completed', onCompleted);
+    worker.on('failed', onFailed);
+  });
+}
+
+/**
+ * Resolve with whichever terminal state the job reaches. Use this when the
+ * caller wants to assert on the mix of outcomes across a batch — avoids the
+ * `Promise.race([waitForJob(...'completed'), waitForJob(...'failed')])`
+ * antipattern that leaks the losing branch's timer.
+ */
+export function waitForJobSettled(
+  worker: Worker,
+  jobId: string,
+  timeoutMs = 5000
+): Promise<'completed' | 'failed'> {
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      clearTimeout(timer);
+      worker.off('completed', onCompleted);
+      worker.off('failed', onFailed);
+    };
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error(`Timed out waiting for job ${jobId}`));
+    }, timeoutMs);
+    const onCompleted = (job: { id?: string }) => {
+      if (job.id !== jobId) return;
+      cleanup();
+      resolve('completed');
+    };
+    const onFailed = (job: { id?: string }) => {
+      if (job.id !== jobId) return;
+      cleanup();
+      resolve('failed');
+    };
+    worker.on('completed', onCompleted);
+    worker.on('failed', onFailed);
+  });
+}
