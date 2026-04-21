@@ -9,7 +9,7 @@
  * @see https://www.better-auth.com/docs/concepts/database
  */
 
-import { pgTable, text, boolean, timestamp, varchar, uniqueIndex } from 'drizzle-orm/pg-core';
+import { pgTable, text, boolean, timestamp, varchar, uniqueIndex, index } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 <% const authConf = service.authConfig; -%>
 
@@ -84,6 +84,22 @@ export const twoFactor = pgTable('two_factor', {
 });
 
 <% } -%>
+
+// Anonymous device sessions. Created before a user signs in so the client
+// can transact (analytics, pre-purchase flows, etc.) with a stable identity,
+// then optionally migrated onto a User when the user authenticates.
+export const deviceSession = pgTable('device_session', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  deviceId: text('device_id').notNull(),
+  sessionToken: text('session_token').notNull().unique(),
+  createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
+  lastActiveAt: timestamp('last_active_at', { mode: 'date' }).defaultNow().notNull(),
+  migrated: boolean('migrated').default(false).notNull(),
+  migratedToUserId: text('migrated_to_user_id'),
+  preferredCurrency: varchar('preferred_currency', { length: 8 }).default('USD').notNull(),
+}, (table) => ({
+  deviceIdIdx: index('device_session_device_id_idx').on(table.deviceId),
+}));
 
 // ==================== Relations ====================
 

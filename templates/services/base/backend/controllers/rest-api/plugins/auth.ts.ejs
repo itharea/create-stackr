@@ -218,6 +218,7 @@ declare module "fastify" {
 
 export default fp(authPlugin);
 <% } else if (flavor === 'role-gated') { -%>
+import type { AuthFastifyRequest } from "fastify";
 import fp from "fastify-plugin";
 import { FastifyPluginAsync, FastifyRequest, FastifyReply } from "fastify";
 import { ErrorFactory, normalizeError } from "../../../utils/errors";
@@ -298,6 +299,7 @@ declare module "fastify" {
 
 export default fp(authPlugin);
 <% } else if (flavor === 'standard') { -%>
+import type { AuthFastifyRequest } from "fastify";
 import fp from "fastify-plugin";
 import { FastifyPluginAsync, FastifyRequest, FastifyReply } from "fastify";
 import { ErrorFactory, normalizeError } from "../../../utils/errors";

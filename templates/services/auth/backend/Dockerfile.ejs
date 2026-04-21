@@ -52,36 +52,45 @@ RUN apk --no-cache add dumb-init ca-certificates \
     && adduser -S backend -u 1001 -G bunjs<% } else { %>    && addgroup -g 1001 -S nodejs \
     && adduser -S backend -u 1001 -G nodejs<% } %>
 
-# Set production environment
-ENV NODE_ENV=production
 WORKDIR /app
 
-# Copy package files and lock file first (for better layer caching)
-COPY package*.json ./
-<% if (packageManager === 'bun') { %>COPY bun.lock* ./<% } else if (packageManager === 'npm') { %>COPY package-lock.json ./<% } else { %>COPY yarn.lock ./<% } %>
+# All COPYs use `--chown=backend:<group>` so the `backend` user (created in
+# the RUN above) owns every file on the way in. This avoids a closing
+# `RUN chown -R /app` step, which on macOS with a large node_modules tree
+# can take tens of seconds per image.
 
-# Install production dependencies only (clean install)
-<% if (packageManager === 'bun') { %>RUN bun install --production<% } else if (packageManager === 'npm') { %>RUN npm ci --production<% } else { %>RUN yarn install --production --frozen-lockfile<% } %>
-
-# Copy ORM schema, config, and generate client
+# Copy package files, lock file, and ORM schema first. Schema must be in
+# place before `<%= packageManager %> install` so prisma's `postinstall →
+# prisma generate` can find `prisma/schema.prisma`; drizzle users are
+# unaffected but keep the same ordering for parity with the base stage.
+<% const chownUser = packageManager === 'bun' ? 'backend:bunjs' : 'backend:nodejs'; -%>
+COPY --chown=<%= chownUser %> package*.json ./
+<% if (packageManager === 'bun') { %>COPY --chown=<%= chownUser %> bun.lock* ./<% } else if (packageManager === 'npm') { %>COPY --chown=<%= chownUser %> package-lock.json ./<% } else { %>COPY --chown=<%= chownUser %> yarn.lock ./<% } %>
 <% if (backend.orm === 'prisma') { %>
-COPY prisma/schema.prisma ./prisma/
-COPY prisma.config.ts ./
+COPY --chown=<%= chownUser %> prisma/schema.prisma ./prisma/
+COPY --chown=<%= chownUser %> prisma.config.ts ./
 <% } else if (backend.orm === 'drizzle') { %>
-COPY drizzle/schema.ts ./drizzle/
-COPY drizzle.config.ts ./
+COPY --chown=<%= chownUser %> drizzle/schema.ts ./drizzle/
+COPY --chown=<%= chownUser %> drizzle.config.ts ./
 <% } %>
-COPY .env ./
-<% if (packageManager === 'bun') { %>RUN bun run db:generate<% } else if (packageManager === 'npm') { %>RUN npm run db:generate<% } else { %>RUN yarn db:generate<% } %>
+COPY --chown=<%= chownUser %> .env ./
+
+# Full install (devDeps are needed for `tsc` in the build below) +
+# (re)generate ORM client. `db:generate` is redundant for prisma (postinstall
+# already ran) but required for drizzle; keeping both in one RUN avoids an
+# extra layer. NODE_ENV is set to `production` only after the prune below
+# so this install never auto-omits devDeps.
+<% if (packageManager === 'bun') { %>RUN bun install && bun run db:generate<% } else if (packageManager === 'npm') { %>RUN npm ci && npm run db:generate<% } else { %>RUN yarn install --frozen-lockfile && yarn db:generate<% } %>
 
 # Copy source code
-COPY . .
+COPY --chown=<%= chownUser %> . .
 
 # Build the TypeScript application
 <% if (packageManager === 'bun') { %>RUN bun run build<% } else if (packageManager === 'npm') { %>RUN npm run build<% } else { %>RUN yarn build<% } %>
 
-# Change ownership to non-root user
-<% if (packageManager === 'bun') { %>RUN chown -R backend:bunjs /app<% } else { %>RUN chown -R backend:nodejs /app<% } %>
+# Prune devDeps now that build is complete, then lock in production env.
+<% if (packageManager === 'bun') { %>RUN bun install --production<% } else if (packageManager === 'npm') { %>RUN npm prune --production<% } else { %>RUN yarn install --production --frozen-lockfile<% } %>
+ENV NODE_ENV=production
 
 # Switch to non-root user
 USER backend
@@ -104,36 +113,34 @@ RUN apk --no-cache add dumb-init ca-certificates \
     && adduser -S backend -u 1001 -G bunjs<% } else { %>    && addgroup -g 1001 -S nodejs \
     && adduser -S backend -u 1001 -G nodejs<% } %>
 
-# Set production environment
-ENV NODE_ENV=production
 WORKDIR /app
 
-# Copy package files and lock file first (for better layer caching)
-COPY package*.json ./
-<% if (packageManager === 'bun') { %>COPY bun.lock* ./<% } else if (packageManager === 'npm') { %>COPY package-lock.json ./<% } else { %>COPY yarn.lock ./<% } %>
-
-# Install production dependencies only (clean install)
-<% if (packageManager === 'bun') { %>RUN bun install --production<% } else if (packageManager === 'npm') { %>RUN npm ci --production<% } else { %>RUN yarn install --production --frozen-lockfile<% } %>
-
-# Copy ORM schema, config, and generate client
+# Copy package files, lock file, and ORM schema first. See rest-api-prod
+# above for the postinstall ordering + `--chown` rationale.
+<% const chownUserEQ = packageManager === 'bun' ? 'backend:bunjs' : 'backend:nodejs'; -%>
+COPY --chown=<%= chownUserEQ %> package*.json ./
+<% if (packageManager === 'bun') { %>COPY --chown=<%= chownUserEQ %> bun.lock* ./<% } else if (packageManager === 'npm') { %>COPY --chown=<%= chownUserEQ %> package-lock.json ./<% } else { %>COPY --chown=<%= chownUserEQ %> yarn.lock ./<% } %>
 <% if (backend.orm === 'prisma') { %>
-COPY prisma/schema.prisma ./prisma/
-COPY prisma.config.ts ./
+COPY --chown=<%= chownUserEQ %> prisma/schema.prisma ./prisma/
+COPY --chown=<%= chownUserEQ %> prisma.config.ts ./
 <% } else if (backend.orm === 'drizzle') { %>
-COPY drizzle/schema.ts ./drizzle/
-COPY drizzle.config.ts ./
+COPY --chown=<%= chownUserEQ %> drizzle/schema.ts ./drizzle/
+COPY --chown=<%= chownUserEQ %> drizzle.config.ts ./
 <% } %>
-COPY .env ./
-<% if (packageManager === 'bun') { %>RUN bun run db:generate<% } else if (packageManager === 'npm') { %>RUN npm run db:generate<% } else { %>RUN yarn db:generate<% } %>
+COPY --chown=<%= chownUserEQ %> .env ./
+
+# Full install (devDeps needed for `tsc`) + (re)generate ORM client
+<% if (packageManager === 'bun') { %>RUN bun install && bun run db:generate<% } else if (packageManager === 'npm') { %>RUN npm ci && npm run db:generate<% } else { %>RUN yarn install --frozen-lockfile && yarn db:generate<% } %>
 
 # Copy source code
-COPY . .
+COPY --chown=<%= chownUserEQ %> . .
 
 # Build the TypeScript application
 <% if (packageManager === 'bun') { %>RUN bun run build<% } else if (packageManager === 'npm') { %>RUN npm run build<% } else { %>RUN yarn build<% } %>
 
-# Change ownership to non-root user
-<% if (packageManager === 'bun') { %>RUN chown -R backend:bunjs /app<% } else { %>RUN chown -R backend:nodejs /app<% } %>
+# Prune devDeps + lock in production env
+<% if (packageManager === 'bun') { %>RUN bun install --production<% } else if (packageManager === 'npm') { %>RUN npm prune --production<% } else { %>RUN yarn install --production --frozen-lockfile<% } %>
+ENV NODE_ENV=production
 
 # Switch to non-root user
 USER backend

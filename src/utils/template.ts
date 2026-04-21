@@ -155,13 +155,17 @@ export function shouldIncludeFile(
     return false;
   }
 
-  // Email service — only include when email verification or password reset is enabled
-  if (
-    filePath.includes('utils/email') &&
-    !ctx.features.authentication.emailVerification &&
-    !ctx.features.authentication.passwordReset
-  ) {
-    return false;
+  // Email service — only included in the auth service, and only when
+  // email verification or password reset is enabled. Base services never
+  // render nodemailer transports (no base template exists for it).
+  if (filePath.includes('utils/email')) {
+    if (ctx.service.kind !== 'auth') return false;
+    if (
+      !ctx.features.authentication.emailVerification &&
+      !ctx.features.authentication.passwordReset
+    ) {
+      return false;
+    }
   }
 
   // Device session is an auth-specific feature: only include in the auth

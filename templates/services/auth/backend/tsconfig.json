@@ -30,10 +30,21 @@
     }
   },
   "include": [
-    "**/*.ts"
+    "controllers/**/*.ts",
+    "domain/**/*.ts",
+    "lib/**/*.ts",
+    "utils/**/*.ts",
+    "scripts/**/*.ts",
+    "prisma/generated/**/*.ts",
+    "drizzle/**/*.ts"
   ],
   "exclude": [
     "node_modules",
-    "dist"
+    "dist",
+    "tests",
+    "vitest.config.ts",
+    "drizzle.config.ts",
+    "prisma.config.ts",
+    "**/*.test.ts"
   ]
 }
