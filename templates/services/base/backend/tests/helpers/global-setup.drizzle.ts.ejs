@@ -1,5 +1,15 @@
 import { execa } from 'execa';
 import nock from 'nock';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// globalSetup runs in the main Vitest process before any test worker
+// spins up, so the `setupFiles` env loader hasn't fired yet. Load the
+// same env files here so DATABASE_URL / REDIS_* are available below.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, '../../../../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../../.env.test'), override: true });
 
 async function waitForPostgres(url: string, timeoutMs = 30000) {
   const { Client } = await import('pg');

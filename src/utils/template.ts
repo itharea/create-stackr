@@ -140,6 +140,16 @@ export function shouldIncludeFile(
     return false;
   }
 
+  // Queue component tests — only when this service runs a worker.
+  if (filePath.includes('/tests/component/queue/') && !ctx.backend.eventQueue) {
+    return false;
+  }
+
+  // Queue test helper — same gate. Without this it ships even when no queue tests do.
+  if (filePath.endsWith('tests/helpers/bullmq.ts.ejs') && !ctx.backend.eventQueue) {
+    return false;
+  }
+
   // Admin routes — only include when auth admin dashboard is enabled
   if (filePath.includes('controllers/rest-api/routes/admin') && !ctx.service.authConfig?.adminDashboard) {
     return false;

@@ -1,0 +1,93 @@
+import { describe, it, expect, afterAll } from 'vitest';
+import { createTestQueue, createTestWorker, waitForJob, waitForJobSettled, closeQueueResources, closeConnection } from '../../helpers/bullmq.js';
+import { getShortUnique } from '../../helpers/unique.js';
+
+describe('queue semantics — BullMQ + Redis', () => {
+  afterAll(closeConnection);
+
+  describe('ack on success', () => {
+    it('marks job completed when handler returns', async () => {
+      const qName = `users-ack-${getShortUnique()}`;
+      const queue = createTestQueue(qName);
+      const worker = createTestWorker(qName, async () => ({ ok: true }));
+
+      try {
+        const job = await queue.add('welcome', { userId: getShortUnique() });
+        await waitForJob(worker, job.id!, 'completed');
+        const state = await job.getState();
+        expect(state).toBe('completed');
+      } finally {
+        await closeQueueResources(queue, worker);
+      }
+    });
+  });
+
+  describe('nack on failure', () => {
+    it('marks job failed after attempts exhausted and increments attemptsMade', async () => {
+      const qName = `users-nack-${getShortUnique()}`;
+      const queue = createTestQueue(qName);
+      const worker = createTestWorker(qName, async () => { throw new Error('boom'); });
+
+      try {
+        const job = await queue.add('welcome', { userId: 'x' }, { attempts: 1 });
+        await waitForJob(worker, job.id!, 'failed');
+        const state = await job.getState();
+        const reloaded = await queue.getJob(job.id!);
+        expect(state).toBe('failed');
+        expect(reloaded!.attemptsMade).toBe(1);
+      } finally {
+        await closeQueueResources(queue, worker);
+      }
+    });
+  });
+
+  describe('idempotency', () => {
+    it('dedupes identical jobId across enqueues', async () => {
+      const qName = `users-idem-${getShortUnique()}`;
+      const queue = createTestQueue(qName);
+      let processedCount = 0;
+      const worker = createTestWorker(qName, async () => { processedCount++; return { ok: true }; });
+
+      try {
+        const jobId = `welcome-${getShortUnique()}`;
+        const job1 = await queue.add('welcome', { userId: 'u1' }, { jobId });
+        const job2 = await queue.add('welcome', { userId: 'u1' }, { jobId });
+        expect(job2.id).toBe(job1.id);  // BullMQ returns the existing job for duplicate jobId
+        await waitForJob(worker, job1.id!, 'completed');
+        const counts = await queue.getJobCounts('completed', 'active', 'waiting');
+        expect(counts.completed).toBe(1);
+        expect(counts.active).toBe(0);
+        expect(counts.waiting).toBe(0);
+        expect(processedCount).toBe(1);
+      } finally {
+        await closeQueueResources(queue, worker);
+      }
+    });
+  });
+
+  describe('batch partial failure', () => {
+    it('completes 4 of 5 when one handler throws', async () => {
+      const qName = `users-batch-${getShortUnique()}`;
+      const queue = createTestQueue(qName);
+      const worker = createTestWorker<{ userId: string }>(qName, async ({ data }) => {
+        if (data.userId === 'bad') throw new Error('failed');
+        return { ok: true };
+      }, { concurrency: 5 });
+
+      try {
+        const ids = ['a', 'b', 'bad', 'c', 'd'];
+        const jobs = await Promise.all(ids.map(id => queue.add('welcome', { userId: id }, { attempts: 1 })));
+
+        const outcomes = await Promise.all(jobs.map(j => waitForJobSettled(worker, j.id!, 5000)));
+        expect(outcomes.filter(o => o === 'completed')).toHaveLength(4);
+        expect(outcomes.filter(o => o === 'failed')).toHaveLength(1);
+
+        const counts = await queue.getJobCounts('completed', 'failed');
+        expect(counts.completed).toBe(4);
+        expect(counts.failed).toBe(1);
+      } finally {
+        await closeQueueResources(queue, worker);
+      }
+    });
+  });
+});
