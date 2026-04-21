@@ -1,0 +1,9 @@
+import axios from 'axios';
+<% services.filter(s => s.backend.tests).forEach(s => { %>
+export const <%= s.name %>Client = axios.create({
+  baseURL: 'http://127.0.0.1:<%= s.backend.port + 10000 %>',
+  timeout: 15_000,
+  validateStatus: () => true,
+  withCredentials: true,
+});
+<% }) %>

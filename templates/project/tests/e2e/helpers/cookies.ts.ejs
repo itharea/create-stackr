@@ -1,0 +1,8 @@
+// Collapses a Set-Cookie header (string or string[]) into a single
+// `name=value; name=value` string suitable for use as a `Cookie:` request header.
+// BetterAuth may emit multiple cookies (session + csrf) per response — we keep all of them.
+export function extractSessionCookie(setCookie: string | string[] | undefined): string {
+  if (!setCookie) return '';
+  const arr = Array.isArray(setCookie) ? setCookie : [setCookie];
+  return arr.map((c) => c.split(';')[0]).join('; ');
+}

@@ -63,7 +63,21 @@ export async function buildServer(overrides: FastifyServerOptions = {}): Promise
       version: "1.0.0"
     });
   });
-
+<% if (service.backend.authMiddleware !== 'none') { %>
+  // Gated echo endpoint. The auth plugin's requireAuth preHandler forwards
+  // the incoming cookie to the auth service's /api/auth/get-session and
+  // either short-circuits with a 401 or populates request.user. Used by
+  // the monorepo-level cross-service-auth E2E to verify that cookie
+  // forwarding reaches the auth service end-to-end.
+  server.get(
+    "/api/me",
+    { preHandler: [server.requireAuth] },
+    async (request) => {
+      const { user } = request as import("fastify").AuthFastifyRequest;
+      return { id: user.id, email: user.email };
+    }
+  );
+<% } %>
   await server.ready();
   return server;
 }
