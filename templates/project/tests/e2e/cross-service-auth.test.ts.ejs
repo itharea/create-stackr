@@ -1,0 +1,40 @@
+<%
+  const authSvc = services.find(s => s.kind === 'auth');
+  const firstBase = services.find(s => s.kind === 'base' && s.backend.tests && s.backend.authMiddleware !== 'none');
+%>
+import { describe, it, expect, beforeAll } from 'vitest';
+import { waitForStack } from './helpers/wait-for-stack.js';
+import { extractSessionCookie } from './helpers/cookies.js';
+import { uniqueEmail, getShortUnique } from './helpers/unique.js';
+import { <%= authSvc.name %>Client, <%= firstBase.name %>Client } from './helpers/clients.js';
+
+describe('Cross-service auth contract', () => {
+  beforeAll(async () => { await waitForStack(); });
+
+  it('cookie issued by <%= authSvc.name %> is accepted by <%= firstBase.name %>', async () => {
+    // Arrange: real sign-up on the auth service.
+    const email = uniqueEmail('e2e');
+    const password = `pw-${getShortUnique(12)}`;
+    const signUp = await <%= authSvc.name %>Client.post('/api/auth/sign-up/email', {
+      email, password, name: 'E2E Test',
+    });
+    expect(signUp.status).toBeLessThan(400);
+    const cookie = extractSessionCookie(signUp.headers['set-cookie']);
+    expect(cookie).not.toBe('');
+
+    // Act: hit the gated /api/me route on the base service with the cookie.
+    // The base service's auth plugin forwards the cookie to the auth
+    // service's /api/auth/get-session and populates request.user on success.
+    const gated = await <%= firstBase.name %>Client.get('/api/me', {
+      headers: { cookie },
+    });
+
+    // Assert: forwarding succeeded and the session round-tripped with the right user.
+    expect(gated.status).toBe(200);
+    expect(gated.data.email).toBe(email);
+
+    // Negative control: same route without the cookie must 401.
+    const anon = await <%= firstBase.name %>Client.get('/api/me');
+    expect(anon.status).toBe(401);
+  });
+});

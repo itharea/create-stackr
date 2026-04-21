@@ -1,0 +1,21 @@
+<% services.filter(s => s.backend.tests).forEach(s => { %>
+import { <%= s.name %>Client } from './clients.js';
+<% }) %>
+
+export async function waitForStack(timeoutMs = 60_000): Promise<void> {
+  const clients = [
+<% services.filter(s => s.backend.tests).forEach(s => { %>    { name: '<%= s.name %>', client: <%= s.name %>Client },
+<% }) %>  ];
+  const deadline = Date.now() + timeoutMs;
+  for (const { name, client } of clients) {
+    let ready = false;
+    while (Date.now() < deadline) {
+      try {
+        const res = await client.get('/');
+        if (res.status === 200) { ready = true; break; }
+      } catch { /* retry */ }
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+    if (!ready) throw new Error(`Service ${name} did not become ready within ${timeoutMs}ms`);
+  }
+}

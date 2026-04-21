@@ -3,7 +3,7 @@ import path from 'path';
 import chalk from 'chalk';
 import ejs from 'ejs';
 import { globby } from 'globby';
-import { TEMPLATE_DIR } from '../utils/template.js';
+import { TEMPLATE_DIR, shouldIncludeProjectFile } from '../utils/template.js';
 import { saveStackrConfig } from '../utils/config-file.js';
 import { initializeGit } from '../utils/git.js';
 import { cleanup } from '../utils/cleanup.js';
@@ -162,6 +162,10 @@ export class MonorepoGenerator {
       });
 
       for (const file of files) {
+        if (!shouldIncludeProjectFile(file, { services: this.initConfig.services })) {
+          continue;
+        }
+
         // Strip the `project/` prefix so the file lands at the
         // project root. Remove `.ejs` if present.
         let rel = file.slice(`${subtree}/`.length);
@@ -221,7 +225,7 @@ export class MonorepoGenerator {
   }
 
   private async makeScriptsExecutable(): Promise<void> {
-    const scriptNames = ['setup.sh', 'docker-dev.sh', 'docker-prod.sh'];
+    const scriptNames = ['setup.sh', 'docker-dev.sh', 'docker-prod.sh', 'test-e2e.sh'];
     for (const name of scriptNames) {
       const scriptPath = path.join(this.targetDir, 'scripts', name);
       try {

@@ -1,0 +1,41 @@
+import { describe, it, expect } from 'vitest';
+import { AppError, ErrorCode, ErrorFactory, normalizeError } from '../../../utils/errors.js';
+
+describe('ErrorFactory', () => {
+  it('resourceNotFound produces a 404 AppError with the resource in the message', () => {
+    const err = ErrorFactory.resourceNotFound('user');
+    expect(err).toBeInstanceOf(AppError);
+    expect(err.statusCode).toBe(404);
+    expect(err.code).toBe(ErrorCode.RESOURCE_NOT_FOUND);
+    expect(err.message).toContain('user');
+  });
+
+  it('userAlreadyExists produces a 409 AppError', () => {
+    const err = ErrorFactory.userAlreadyExists();
+    expect(err.statusCode).toBe(409);
+    expect(err.code).toBe(ErrorCode.USER_ALREADY_EXISTS);
+  });
+
+  it('unauthorized produces a 401 AppError and serializes to a typed API response', () => {
+    const err = ErrorFactory.unauthorized();
+    expect(err.statusCode).toBe(401);
+    const api = err.toApiResponse('req_1', '/x');
+    expect(api.error.code).toBe(ErrorCode.AUTH_UNAUTHORIZED);
+    expect(api.error.requestId).toBe('req_1');
+    expect(api.error.path).toBe('/x');
+  });
+});
+
+describe('normalizeError', () => {
+  it('passes AppError through untouched', () => {
+    const original = ErrorFactory.unauthorized();
+    expect(normalizeError(original)).toBe(original);
+  });
+
+  it('wraps a plain Error as an internal-server AppError', () => {
+    const wrapped = normalizeError(new Error('boom'));
+    expect(wrapped).toBeInstanceOf(AppError);
+    expect(wrapped.statusCode).toBe(500);
+    expect(wrapped.code).toBe(ErrorCode.INTERNAL_SERVER_ERROR);
+  });
+});

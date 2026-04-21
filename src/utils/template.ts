@@ -218,6 +218,49 @@ export function shouldIncludeFile(
 }
 
 /**
+ * Gate project-level (monorepo-root) templates rendered by
+ * `MonorepoGenerator.renderMonorepoRoot`. Unlike `shouldIncludeFile`, the
+ * context here is the monorepo-wide `services` list — per-service gating
+ * (ORM, platform, etc.) does not apply to files under `templates/project/`.
+ *
+ * `filePath` is relative to `TEMPLATE_DIR` and uses the OS path separator;
+ * this helper normalizes to forward slashes before matching so Windows
+ * generators hit the same gates.
+ */
+export function shouldIncludeProjectFile(
+  filePath: string,
+  ctx: { services: { kind: 'auth' | 'base'; backend: { tests: boolean; authMiddleware: string } }[] }
+): boolean {
+  const normalized = filePath.split(path.sep).join('/');
+
+  if (normalized.endsWith('.gitkeep')) return false;
+
+  const anyTests = ctx.services.some((s) => s.backend.tests);
+
+  // Monorepo-level e2e package — drop the whole subtree when no service
+  // opts into tests. Keeps --no-tests projects free of vitest config,
+  // axios clients, and the test-e2e wrapper.
+  if (normalized.includes('project/tests/e2e/') && !anyTests) return false;
+  if (normalized.endsWith('scripts/test-e2e.sh.ejs') && !anyTests) return false;
+
+  // cross-service-auth.test.ts requires an auth peer AND a base peer with
+  // tests enabled AND auth middleware active on that base. Without all
+  // three, the generated test cannot compile.
+  if (normalized.endsWith('cross-service-auth.test.ts.ejs')) {
+    const hasAuth = ctx.services.some((s) => s.kind === 'auth');
+    const hasGatedBase = ctx.services.some(
+      (s) =>
+        s.kind === 'base' &&
+        s.backend.tests &&
+        s.backend.authMiddleware !== 'none'
+    );
+    if (!(hasAuth && hasGatedBase)) return false;
+  }
+
+  return true;
+}
+
+/**
  * Check if a file is an EJS template
  */
 export function isTemplate(filePath: string): boolean {

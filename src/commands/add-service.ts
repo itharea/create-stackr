@@ -46,7 +46,9 @@ import {
   PortCollisionError,
 } from '../utils/port-allocator.js';
 import { validateServiceName, validateConfiguration } from '../utils/validation.js';
-import { renderTemplate } from '../utils/template.js';
+import { renderTemplate, shouldIncludeProjectFile, TEMPLATE_DIR } from '../utils/template.js';
+import { globby } from 'globby';
+import ejs from 'ejs';
 import { readStackrVersion } from '../utils/version.js';
 import semver from 'semver';
 
@@ -333,6 +335,14 @@ export async function runAddService(
       newConfig.pendingMigrations = [...(newConfig.pendingMigrations ?? []), pendingEntry];
     }
 
+    // Monorepo-level E2E regen. The tests/e2e subtree + root package.json
+    // + scripts/test-e2e.sh all iterate over `services`, so they go stale
+    // the moment a new service lands. Re-render every project-level file
+    // that's gated by `shouldIncludeProjectFile` and stage the results
+    // for Phase D. Untouched project-level files (setup.sh, README.md,
+    // etc.) are left alone — that's a pre-existing gap.
+    const plannedProjectE2E = await planProjectE2ERegen(root, newConfig);
+
     // =======================================================================
     // Phase C — dry-run validation
     // =======================================================================
@@ -406,6 +416,28 @@ export async function runAddService(
     if (plannedAuthFile) {
       await fs.ensureDir(path.dirname(plannedAuthFile.destPath));
       await fs.writeFile(plannedAuthFile.destPath, plannedAuthFile.contents, 'utf-8');
+    }
+
+    // 4b. Project-level e2e regen. Writes + deletes are both driven from
+    //     the Phase-B plan; no fresh decisions here.
+    for (const entry of plannedProjectE2E) {
+      if (entry.action === 'delete') {
+        await fs.remove(entry.destPath);
+        continue;
+      }
+      await fs.ensureDir(path.dirname(entry.destPath));
+      if (entry.isCopy) {
+        await fs.copy(entry.srcPath!, entry.destPath, { overwrite: true });
+      } else {
+        await fs.writeFile(entry.destPath, entry.contents!, 'utf-8');
+      }
+      if (entry.executable) {
+        try {
+          await fs.chmod(entry.destPath, 0o755);
+        } catch {
+          /* non-fatal */
+        }
+      }
     }
 
     // 5. Save stackr.config.json LAST so an interrupted run leaves the
@@ -1076,6 +1108,110 @@ function printNextSteps(args: {
     }
     console.log();
   }
+}
+
+// ---------------------------------------------------------------------------
+// Project-level E2E regen
+// ---------------------------------------------------------------------------
+
+interface ProjectE2EPlanEntry {
+  destPath: string;
+  action: 'write' | 'delete';
+  contents?: string;
+  srcPath?: string;
+  isCopy?: boolean;
+  executable?: boolean;
+}
+
+/**
+ * Plan the rewrite of monorepo-level files under `templates/project/` whose
+ * contents depend on the current `services` list: the e2e test subtree,
+ * the e2e shell script, and the root `package.json`'s `test:e2e` script.
+ *
+ * Untouched project-level files (README, DESIGN, setup.sh, etc.) are a
+ * known gap — add-service does not refresh them. Scope is deliberately
+ * narrow: only files whose correctness depends on services[] AND whose
+ * staleness would make Phase 5 tests pointless are regenerated here.
+ */
+async function planProjectE2ERegen(
+  root: string,
+  newConfig: StackrConfigFile
+): Promise<ProjectE2EPlanEntry[]> {
+  const plan: ProjectE2EPlanEntry[] = [];
+  const rootCtx = buildProjectRootCtx(newConfig);
+
+  const e2eFiles = await globby('project/tests/e2e/**/*', {
+    cwd: TEMPLATE_DIR,
+    dot: true,
+    onlyFiles: true,
+    ignore: ['**/node_modules/**'],
+  });
+  const scriptFile = 'project/scripts/test-e2e.sh.ejs';
+  const pkgFile = 'project/package.json.ejs';
+  const managed = [...e2eFiles, scriptFile, pkgFile];
+
+  for (const file of managed) {
+    const absTemplatePath = path.join(TEMPLATE_DIR, file);
+    const rel = file.slice('project/'.length);
+    const destRel = rel.endsWith('.ejs') ? rel.slice(0, -4) : rel;
+    const destPath = path.join(root, destRel);
+
+    const included = shouldIncludeProjectFile(file, { services: newConfig.services });
+
+    if (!included) {
+      if (await fs.pathExists(destPath)) {
+        plan.push({ destPath, action: 'delete' });
+      }
+      continue;
+    }
+
+    if (!(await fs.pathExists(absTemplatePath))) {
+      continue;
+    }
+
+    if (file.endsWith('.ejs')) {
+      const content = await fs.readFile(absTemplatePath, 'utf-8');
+      const rendered = ejs.render(content, rootCtx);
+      plan.push({
+        destPath,
+        action: 'write',
+        contents: rendered,
+        executable: destRel === 'scripts/test-e2e.sh',
+      });
+    } else {
+      plan.push({
+        destPath,
+        action: 'write',
+        srcPath: absTemplatePath,
+        isCopy: true,
+      });
+    }
+  }
+
+  // If post-regen no service has tests, the e2e subtree should be absent.
+  // globby won't return a file that was already gated out by
+  // shouldIncludeProjectFile at a previous generation, so also sweep
+  // the on-disk e2e directory for stale contents.
+  const anyTests = newConfig.services.some((s) => s.backend.tests);
+  if (!anyTests) {
+    const e2eDir = path.join(root, 'tests/e2e');
+    if (await fs.pathExists(e2eDir)) {
+      plan.push({ destPath: e2eDir, action: 'delete' });
+    }
+  }
+
+  return plan;
+}
+
+function buildProjectRootCtx(cfg: StackrConfigFile): Record<string, unknown> {
+  return {
+    projectName: cfg.projectName,
+    packageManager: cfg.packageManager,
+    orm: cfg.orm,
+    aiTools: cfg.aiTools,
+    services: cfg.services,
+    stackrVersion: readStackrVersion(),
+  };
 }
 
 // ---------------------------------------------------------------------------
