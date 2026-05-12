@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-05-12
+
+### Added
+
+- **Testing infrastructure for generated projects** — landed across six phases (PRs #64, #66, #68, #70, #72, #76):
+  - `--tests` flag on `create-stackr` and `--no-tests` on `stackr add service` (default: tests are scaffolded).
+  - Unified `docker-compose.test.yml` generator with two profiles: `component` (per-service Vitest against an ephemeral DB + Redis) and `e2e` (cross-service stack-smoke + auth handoff).
+  - Per-service component tests (Vitest): auth, base, and queue.
+  - Monorepo-level E2E suite at `tests/e2e/` with cross-service stack-smoke and auth handshake.
+  - Stackr CLI's own unit-test layer (`src/utils/port-allocator`, `src/generators/docker-compose-test`, config-file).
+  - Per-service `tests/DESIGN.md` and `tests/BEST_PRACTICES.md` documenting the Testing Diamond and the Arrange/Act/Assert template.
+- `--ci-workflow` flag on `create-stackr` generates `.github/workflows/test.yml` with a component-matrix job (one per service) and an e2e job that runs the cross-service stack once.
+- `stackr add service <name>` now detects an existing workflow on disk and re-emits it with the new service added to the component matrix.
+- Root `package.json` `test` and `test:e2e` scripts (gated on at least one service having tests enabled). `setup.sh` "Next steps" footer surfaces them as a new item.
+- New `infos[]` channel in `printNextSteps` for non-error advisory output (used by the workflow regen notice and similar).
+- Port allocator now reserves a non-overlapping set of test ports alongside the dev ports.
+
+### Changed
+
+- **Generated project scripts migrated from `.sh` to `.mjs`**: `scripts/setup.sh`, `scripts/test-all.sh`, and `scripts/test-e2e.sh` are now `setup.mjs`, `test-all.mjs`, and `test-e2e.mjs`. Runnable under npm, yarn, or bun via `node scripts/*.mjs`. `chmod +x` step removed.
+- `docker:dev` and `docker:prod` are now inline `package.json` scripts (the wrapper `.sh` files are gone).
+- Generated root `package.json` adds `inquirer@^10` as a devDep (used by `setup.mjs`'s volume-reset prompt). `setup.mjs` dynamic-imports it after the root install so the dependency is actually available when the prompt fires.
+- Backend `tsconfig.json` `include` narrowed to source dirs; `tests/`, `vitest.config.ts`, and `*.config.ts` are excluded from the prod build.
+- Backend `package.json` scripts (`build`, `dev:*`, `start:*`, `create-admin`) branch on `packageManager` instead of hardcoding `bun` — npm/yarn projects no longer fail at runtime.
+- `start:*` runs TypeScript source via `tsx` (now a runtime dependency) — sidesteps Node ESM's `.js`-extension requirement without rewriting 47 imports.
+
+### Fixed
+
+- Generated Dockerfile prod stage: schema files COPY'd **before** `<pm> install` so Prisma's `postinstall` can find them. Full install → build → `prune --production`, with `NODE_ENV=production` set **after** prune so the install never auto-omits the devDeps `tsc` needs.
+- Replaced `RUN chown -R backend:<group> /app` (60 s per image on macOS Docker) with `COPY --chown=backend:<group>` on every COPY.
+- Prisma v7 compatibility: test helpers import from `../../prisma/generated/prisma/client` to match `utils/db.ts`. `docker-compose.test.yml` migration runner targets the `base` Dockerfile stage so Prisma/Drizzle CLIs are present, and drops `--skip-generate` (removed from `prisma db push` in v7).
+- Missing `import type { AuthFastifyRequest }` added to the `standard` and `role-gated` auth plugin flavors. The type was declared via `declare module "fastify"` but never imported back; only the `flexible` flavor had it.
+- `DeviceSession` model added to both the Prisma and Drizzle schemas for the auth service. `domain/device-session/repository.ts` queried `db.deviceSession` but the model did not exist.
+
+### Removed
+
+- `templates/services/base/backend/utils/email.ts.ejs` deleted — base services don't send email; the file was leaking in whenever auth had email verification or password reset enabled. The `shouldIncludeFile` email gate now also requires `service.kind === 'auth'`.
+- The `MonorepoGenerator.makeScriptsExecutable` step is gone — `.mjs` files are invoked via `node`, so the `chmod +x` pass is no longer needed.
+
+### Deferred (tracked in backlog)
+
+- `stackr add auth` — retroactively add an auth service to a `--no-auth` project
+- `stackr migrate`, `stackr doctor`, `stackr add entity`, `stackr add route`
+- `ProjectConfig` removal (still aliased to `InitConfig` — was tracked for v0.6 in the v0.5.0 changelog; deferred again)
+
 ## [0.5.1] - 2026-04-14
 
 ### Fixed
@@ -211,6 +256,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Docker required for backend development
 - PostgreSQL and Redis required for full features
 
+[0.6.0]: https://github.com/itharea/create-stackr/releases/tag/v0.6.0
 [0.5.1]: https://github.com/itharea/create-stackr/releases/tag/v0.5.1
 [0.5.0]: https://github.com/itharea/create-stackr/releases/tag/v0.5.0
 [0.4.0]: https://github.com/itharea/create-stackr/releases/tag/v0.4.0
