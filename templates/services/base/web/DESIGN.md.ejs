@@ -58,7 +58,7 @@ Pages requiring authentication:
 <% } %>
 - `/settings/sessions` - Active session management
 
-Protected by `(protected)/layout.tsx` which calls `getSession()` and redirects unauthenticated users.
+Protected by `(protected)/layout.tsx` which calls `getSession()` and redirects unauthenticated users. `getSession()` is wrapped in `React.cache()`, so when nested pages also call it the layout + page share a single backend round-trip per request.
 
 ### `auth/` - API-style Routes (Route Handlers)
 
@@ -77,9 +77,9 @@ Non-UI routes that handle redirects and callbacks:
 
 ### Session Management
 
-1. **Server Components**: Read session from cookies via `getSession()` server action
+1. **Server Components**: Read session via the request-scoped `getSession()` helper from `@/lib/auth/session` (wrapped in `React.cache()`). NOT a Server Action — every export of a `'use server'` file becomes a callable action over RPC, which would defeat the per-request memoization.
 2. **Protected Layouts**: Redirect unauthenticated users server-side
-3. **Server Actions**: Handle sign-in/sign-out with cookie management
+3. **Server Actions** (`@/lib/auth/actions`): Handle sign-in/sign-out and form submissions with cookie management — every export here is `'use server'`-marked and callable from client components.
 4. **Form Components**: Use `useActionState` and `useFormStatus` for pending/error states
 
 ### Cookie-Based Auth
@@ -134,7 +134,10 @@ Browser                    Next.js                    Fastify Backend
 **Server actions + revalidation** for server data (auth, CRUD):
 - `useActionState` for form submissions with pending/error state
 - `useFormStatus` for submit button loading states
-- `revalidatePath`/`revalidateTag` to refresh server data after mutations
+- `updateTag(tag)` for read-your-own-writes mutations — the idiomatic Next 16 call: refreshes tagged caches *in the same request* so the redirect or re-render that follows sees fresh data
+- `revalidateTag(tag)` for background invalidation when the caller does not need the new data immediately (stale-while-revalidate)
+- `revalidatePath(path)` when the route is not tagged
+- **Avoid `revalidateTag(tag, 'max')`**: with `cacheLife('max')` the path is *not* marked revalidated — the runtime treats the call as a stale-while-revalidate hint, so the current request keeps serving stale data. Use `updateTag(tag)` instead.
 - No client-side cache duplication of server state
 
 **Zustand stores** only for client-side global state:

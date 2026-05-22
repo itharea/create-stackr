@@ -9,14 +9,15 @@ Guidelines for utility functions and configuration in the `lib/` directory.
 lib/
 <% if (features.authentication.enabled) { %>
 ├── auth/           # Authentication utilities
-│   ├── actions.ts     # Server actions for auth operations
+│   ├── actions.ts     # Server actions: sign-in, sign-out, form actions ('use server')
+│   ├── session.ts     # Request-scoped getSession() helper (React.cache()) — NOT 'use server'
 │   ├── config.ts      # Auth configuration and constants
 │   ├── cookies.ts     # Cookie read/write utilities
 <% if (hasOAuth) { %>
 │   ├── oauth.ts       # OAuth flow helpers
 │   ├── pkce.ts        # PKCE code generation
 <% } %>
-│   ├── sessions.ts    # Session validation
+│   ├── sessions.ts    # List / revoke active sessions
 │   └── user-agent.ts  # Device detection
 <% } %>
 <% if (features.sessionManagement) { %>
@@ -32,21 +33,27 @@ lib/
 
 ### Server-Only Code
 
-Functions that should only run on the server:
+Functions that should only run on the server. Wrap reads that may be called from multiple Server Components in the same request (layout + page) with `React.cache()` so they share one fetch:
 
-```tsx
 <% if (features.authentication.enabled) { %>
-// lib/auth/sessions.ts
-import "server-only";  // Build error if imported client-side
-import { cookies } from "next/headers";
+```tsx
+// lib/auth/session.ts
+import "server-only";          // Build error if imported client-side
+import { cache } from "react"; // Per-request memoization for Server Components
 
-export async function getSession() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(COOKIE_NAMES.SESSION);
-  // Validate with backend...
-}
-<% } %>
+export const getSession = cache(async () => {
+  const response = await fetch(`${AUTH_CONFIG.backendUrl}/api/auth/get-session`, {
+    headers: await buildAuthHeaders(),
+    cache: "no-store",          // opt out of the data cache
+  });
+  // ...validate response, return AuthSession | null
+});
 ```
+
+`cache: "no-store"` only opts out of the data cache — it does **not** dedupe within a request. `React.cache()` is what guarantees layout + page share one call.
+
+Keep this file out of `'use server'`: every export of a Server Action file becomes a callable action over RPC, which would defeat per-request memoization. Put sign-in / sign-out / form actions in a separate `actions.ts` file.
+<% } %>
 
 ### Client-Safe Code
 
@@ -169,6 +176,20 @@ export async function generateCodeChallenge(verifier: string): Promise<string> {
 }
 ```
 <% } %>
+
+### Why split `actions.ts` and `session.ts`?
+
+`actions.ts` is `'use server'`. Every export becomes a callable Server Action — Next.js generates an RPC ID for it and exposes it to client components. That is the right model for sign-in, sign-out, form submissions, and any mutation triggered from the UI.
+
+It is the wrong model for `getSession()`. We want one shared backend round-trip per request when a layout and its nested pages all read the session. React's `cache()` provides that — it memoizes by arguments within a single render pass. But `cache()` only works on plain Server Component code; wrapping it in `'use server'` turns every call into a fresh RPC and defeats the memoization.
+
+So:
+
+- `actions.ts` (`'use server'`) — `signIn`, `signOut`, `loginAction`, form actions, mutations
+- `session.ts` (`import "server-only"`, `cache()`-wrapped) — `getSession` and any other request-scoped read
+- `sessions.ts` — list / revoke sessions (also `'use server'` since these are mutations called from buttons)
+
+When a Server Action inside `actions.ts` needs the current session (e.g. an admin check inside `loginAction`), it imports `getSession` from `./session` — no cycle because `cache()` is invoked at request time, not module load.
 <% } %>
 
 ## Best Practices

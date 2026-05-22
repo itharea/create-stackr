@@ -1,0 +1,41 @@
+import 'server-only';
+import { cache } from 'react';
+import { getSessionToken } from './cookies';
+import { buildAuthHeaders } from './actions';
+import type { AuthSession } from './actions';
+import { AUTH_CONFIG } from './config';
+
+// Wrapped in React.cache() so a layout + its nested pages share one backend
+// call per request. `cache: 'no-store'` alone only opts out of the data cache;
+// it does NOT dedupe within a request. Keep this file out of 'use server' —
+// every export in a Server Action file becomes a callable action, which would
+// defeat the per-request memoization.
+export const getSession = cache(async (): Promise<AuthSession | null> => {
+  const sessionToken = await getSessionToken();
+
+  if (!sessionToken) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${AUTH_CONFIG.backendUrl}/api/auth/get-session`, {
+      method: 'GET',
+      headers: await buildAuthHeaders(),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      // Don't try to clear cookie here - it doesn't work in Server Components.
+      // Server Components can't send Set-Cookie headers when using redirect().
+      // The protected layout redirects to /auth/session-expired which is a
+      // Route Handler that properly clears the cookie.
+      return null;
+    }
+
+    const data = await response.json();
+    return data as AuthSession;
+  } catch (error) {
+    console.error('Get session error:', error);
+    return null;
+  }
+});

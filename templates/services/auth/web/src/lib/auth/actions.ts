@@ -6,8 +6,9 @@ import {
   clearSessionCookie,
   buildAuthHeaders,
 } from "./cookies";
+import { getSession } from "./session";
 import { AUTH_CONFIG, BETTER_AUTH_COOKIE_NAME } from "./config";
-import type { AuthSession, FormActionState } from "./types";
+import type { FormActionState } from "./types";
 
 function extractSessionToken(response: Response): string | null {
   const setCookieHeaders = response.headers.getSetCookie();
@@ -68,28 +69,6 @@ export async function signOut(): Promise<void> {
   }
   await clearSessionCookie();
   redirect("/login");
-}
-
-export async function getSession(): Promise<AuthSession | null> {
-  try {
-    const response = await fetch(
-      `${AUTH_CONFIG.backendUrl}/api/auth/get-session`,
-      {
-        method: "GET",
-        headers: await buildAuthHeaders(),
-        cache: "no-store",
-      }
-    );
-
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    if (!data?.user) return null;
-
-    return data as AuthSession;
-  } catch {
-    return null;
-  }
 }
 
 export async function loginAction(

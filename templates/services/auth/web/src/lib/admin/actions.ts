@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidateTag } from "next/cache";
+import { updateTag } from "next/cache";
 import { buildAuthHeaders } from "@/lib/auth/cookies";
 import { AUTH_CONFIG } from "@/lib/auth/config";
 import type { User, UserRole } from "@/lib/auth/types";
@@ -75,7 +75,7 @@ export async function updateUserRole(
     };
   }
 
-  revalidateTag("admin-users");
+  updateTag("admin-users");
   return { success: true };
 }
 
@@ -95,6 +95,6 @@ export async function deleteUser(
     };
   }
 
-  revalidateTag("admin-users");
+  updateTag("admin-users");
   return { success: true };
 }
