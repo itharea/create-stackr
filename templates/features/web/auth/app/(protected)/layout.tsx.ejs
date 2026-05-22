@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getSession } from "@/lib/auth/actions";
+import { getSession } from "@/lib/auth/session";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export default async function ProtectedLayout({ children }: { children: React.ReactNode }) {

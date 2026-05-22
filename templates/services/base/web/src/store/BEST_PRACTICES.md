@@ -9,7 +9,7 @@ Zustand stores are for **client-side global state** that needs to persist across
 - UI state (modals, toasts, sidebar)
 - Client-side caches that don't map to a server resource
 
-For server data and mutations, prefer **server actions with `revalidatePath`/`revalidateTag`**, `useActionState`, and `useFormStatus` instead.
+For server data and mutations, prefer **server actions with `updateTag(tag)`** (read-your-own-writes, immediate refresh in the same request — the idiomatic Next 16 call), or `revalidateTag(tag)` / `revalidatePath(path)` for background invalidation, plus `useActionState` and `useFormStatus` for form state. Avoid `revalidateTag(tag, 'max')` — with `cacheLife('max')` the path is not marked revalidated, so the current request keeps serving stale data; use `updateTag(tag)` instead.
 
 ## Store Structure Pattern
 
