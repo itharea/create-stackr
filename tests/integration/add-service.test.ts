@@ -75,6 +75,17 @@ describe('stackr add service — primary flow', () => {
     expect(authLib).toContain('hasCoreAccount'); // existing one preserved
   });
 
+  it('regenerates the auth prisma schema with the new hasScoutAccount column', async () => {
+    await runAddService('scout', { install: false });
+
+    const schema = await fs.readFile(
+      path.join(fx.projectDir, 'auth/backend/prisma/schema.prisma'),
+      'utf-8'
+    );
+    expect(schema).toContain('hasScoutAccount');
+    expect(schema).toContain('hasCoreAccount'); // existing one preserved
+  });
+
   it('appends the prefixed env keys inside the managed .env block', async () => {
     await runAddService('scout', { install: false });
 

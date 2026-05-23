@@ -305,7 +305,11 @@ export async function runAddService(
     const plannedRootEnvExample = await planRootEnvRegen(envExamplePath, newConfig, Boolean(options.force));
 
     // Auth file regeneration (only when the project has an auth service).
+    // Both the BetterAuth config (`lib/auth.ts`) and the ORM schema file
+    // iterate `provisioningTargets` to emit per-peer `has<Service>Account`
+    // entries, so both must be rewritten when a new peer is added.
     let plannedAuthFile: { destPath: string; contents: string } | null = null;
+    let plannedAuthSchemaFile: { destPath: string; contents: string } | null = null;
     if (hasAuthService) {
       const authRegen = await planAuthFileRegen(
         root,
@@ -321,7 +325,23 @@ export async function runAddService(
           `auth/backend/lib/auth.ts has been modified locally — the regenerated version has been written to ${path.relative(root, authRegen.destPath)} for manual merging.`
         );
       }
-      // Regardless of whether the regenerated file matched pristine or not,
+
+      const schemaRegen = await planAuthSchemaFileRegen(
+        root,
+        config,
+        newConfig
+      );
+      plannedAuthSchemaFile = {
+        destPath: schemaRegen.destPath,
+        contents: schemaRegen.plannedContents,
+      };
+      if (schemaRegen.collision) {
+        warnings.push(
+          `${path.relative(root, schemaRegen.destPath.replace(/\.stackr-new$/, ''))} has been modified locally — the regenerated version has been written to ${path.relative(root, schemaRegen.destPath)} for manual merging.`
+        );
+      }
+
+      // Regardless of whether the regenerated files matched pristine or not,
       // the DB schema still needs migrating. Append a pending migration
       // entry against the auth service.
       const authSvcEntry = newConfig.services.find((s) => s.kind === 'auth')!;
@@ -429,6 +449,17 @@ export async function runAddService(
     if (plannedAuthFile) {
       await fs.ensureDir(path.dirname(plannedAuthFile.destPath));
       await fs.writeFile(plannedAuthFile.destPath, plannedAuthFile.contents, 'utf-8');
+    }
+
+    // 4a. Write auth schema file (drizzle/schema.ts or prisma/schema.prisma).
+    //     Same .stackr-new fallback semantics as the auth lib file.
+    if (plannedAuthSchemaFile) {
+      await fs.ensureDir(path.dirname(plannedAuthSchemaFile.destPath));
+      await fs.writeFile(
+        plannedAuthSchemaFile.destPath,
+        plannedAuthSchemaFile.contents,
+        'utf-8'
+      );
     }
 
     // 4b. Project-level e2e regen. Writes + deletes are both driven from
@@ -946,53 +977,96 @@ function parseEnvKeys(blockInner: string): Set<string> {
 // ---------------------------------------------------------------------------
 
 /**
- * Plan the rewrite of `auth/backend/lib/auth.ts` (if the current on-disk
- * file is bit-identical to what the current `config` would re-render; if
- * the user has hand-edited it, we stage the new contents at
- * `auth.ts.stackr-new` instead and leave the live file untouched).
+ * Plan the rewrite of an auth-service file whose contents depend on
+ * `provisioningTargets` (currently `lib/auth.ts` and the ORM schema file).
+ *
+ * If the on-disk file is bit-identical to what `currentConfig` would
+ * re-render, we overwrite it with the `newConfig` render. If the user has
+ * hand-edited it, we stage the new contents at `<file>.stackr-new` so the
+ * live file stays untouched and the user can merge manually.
+ */
+async function planAuthFileRegenFromTemplate(
+  root: string,
+  currentConfig: StackrConfigFile,
+  newConfig: StackrConfigFile,
+  templatePath: string,
+  destRelPath: string
+): Promise<{ destPath: string; plannedContents: string; collision: boolean }> {
+  const authSvc = newConfig.services.find((s) => s.kind === 'auth')!;
+  const destPath = path.join(root, authSvc.name, destRelPath);
+
+  const plannedContents = await renderAuthTemplateFromConfig(newConfig, templatePath);
+  const pristineContents = await renderAuthTemplateFromConfig(currentConfig, templatePath);
+
+  if (!(await fs.pathExists(destPath))) {
+    return { destPath, plannedContents, collision: false };
+  }
+
+  const currentContents = await fs.readFile(destPath, 'utf-8');
+  if (sha256(currentContents) === sha256(pristineContents)) {
+    return { destPath, plannedContents, collision: false };
+  }
+
+  return {
+    destPath: destPath + '.stackr-new',
+    plannedContents,
+    collision: true,
+  };
+}
+
+/**
+ * Plan the rewrite of `auth/backend/lib/auth.ts` (BetterAuth config).
  */
 async function planAuthFileRegen(
   root: string,
   currentConfig: StackrConfigFile,
   newConfig: StackrConfigFile
 ): Promise<{ destPath: string; plannedContents: string; collision: boolean }> {
-  const authSvc = newConfig.services.find((s) => s.kind === 'auth')!;
-  const authFilePath = path.join(root, authSvc.name, 'backend/lib/auth.ts');
-
-  const plannedContents = await renderAuthLibFromConfig(newConfig);
-  const pristineContents = await renderAuthLibFromConfig(currentConfig);
-
-  // If the current file doesn't exist (edge: user deleted it), fall back
-  // to just writing the planned contents.
-  if (!(await fs.pathExists(authFilePath))) {
-    return { destPath: authFilePath, plannedContents, collision: false };
-  }
-
-  const currentContents = await fs.readFile(authFilePath, 'utf-8');
-  const currentHash = sha256(currentContents);
-  const pristineHash = sha256(pristineContents);
-
-  if (currentHash === pristineHash) {
-    // Untouched since last stackr render — safe to overwrite.
-    return { destPath: authFilePath, plannedContents, collision: false };
-  }
-
-  // User has modified the file — write the regen to .stackr-new.
-  return {
-    destPath: authFilePath + '.stackr-new',
-    plannedContents,
-    collision: true,
-  };
+  return planAuthFileRegenFromTemplate(
+    root,
+    currentConfig,
+    newConfig,
+    `services/auth/backend/lib/auth.${newConfig.orm}.ts.ejs`,
+    'backend/lib/auth.ts'
+  );
 }
 
-async function renderAuthLibFromConfig(config: StackrConfigFile): Promise<string> {
+/**
+ * Plan the rewrite of the auth ORM schema file
+ * (`drizzle/schema.ts` or `prisma/schema.prisma`) so the per-peer
+ * `has<Service>Account` columns stay in sync with `provisioningTargets`.
+ */
+async function planAuthSchemaFileRegen(
+  root: string,
+  currentConfig: StackrConfigFile,
+  newConfig: StackrConfigFile
+): Promise<{ destPath: string; plannedContents: string; collision: boolean }> {
+  const templatePath =
+    newConfig.orm === 'drizzle'
+      ? 'services/auth/backend/drizzle/schema.drizzle.ts.ejs'
+      : 'services/auth/backend/prisma/schema.prisma.ejs';
+  const destRelPath =
+    newConfig.orm === 'drizzle' ? 'backend/drizzle/schema.ts' : 'backend/prisma/schema.prisma';
+
+  return planAuthFileRegenFromTemplate(
+    root,
+    currentConfig,
+    newConfig,
+    templatePath,
+    destRelPath
+  );
+}
+
+async function renderAuthTemplateFromConfig(
+  config: StackrConfigFile,
+  templatePath: string
+): Promise<string> {
   const initConfig = stackrConfigToInitConfig(config);
   const authSvc = initConfig.services.find((s) => s.kind === 'auth');
   if (!authSvc) {
-    throw new Error('renderAuthLibFromConfig called on a config with no auth service');
+    throw new Error('renderAuthTemplateFromConfig called on a config with no auth service');
   }
   const ctx = buildServiceContext(initConfig, authSvc);
-  const templatePath = `services/auth/backend/lib/auth.${config.orm}.ts.ejs`;
   return renderTemplate(templatePath, ctx as unknown as Record<string, unknown>);
 }
 

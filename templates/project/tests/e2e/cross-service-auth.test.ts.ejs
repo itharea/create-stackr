@@ -1,12 +1,16 @@
 <%
   const authSvc = services.find(s => s.kind === 'auth');
   const firstBase = services.find(s => s.kind === 'base' && s.backend.tests && s.backend.authMiddleware !== 'none');
+  const verifyEmail = Boolean(authSvc.authConfig && authSvc.authConfig.emailVerification);
 %>
 import { describe, it, expect, beforeAll } from 'vitest';
 import { waitForStack } from './helpers/wait-for-stack.js';
 import { extractSessionCookie } from './helpers/cookies.js';
 import { uniqueEmail, getShortUnique } from './helpers/unique.js';
 import { <%= authSvc.name %>Client, <%= firstBase.name %>Client } from './helpers/clients.js';
+<% if (verifyEmail) { -%>
+import { markEmailVerified } from './helpers/verify-user.js';
+<% } -%>
 
 describe('Cross-service auth contract', () => {
   beforeAll(async () => { await waitForStack(); });
@@ -19,7 +23,20 @@ describe('Cross-service auth contract', () => {
       email, password, name: 'E2E Test',
     });
     expect(signUp.status).toBeLessThan(400);
+
+<% if (verifyEmail) { -%>
+    // With email verification enabled, sign-up does NOT issue a session
+    // cookie until the user verifies. Flip emailVerified directly in the
+    // auth test DB and sign in to obtain the cookie.
+    await markEmailVerified(email);
+    const signIn = await <%= authSvc.name %>Client.post('/api/auth/sign-in/email', {
+      email, password,
+    });
+    expect(signIn.status).toBeLessThan(400);
+    const cookie = extractSessionCookie(signIn.headers['set-cookie']);
+<% } else { -%>
     const cookie = extractSessionCookie(signUp.headers['set-cookie']);
+<% } -%>
     expect(cookie).not.toBe('');
 
     // Act: hit the gated /api/me route on the base service with the cookie.

@@ -234,7 +234,11 @@ export function shouldIncludeFile(
 export function shouldIncludeProjectFile(
   filePath: string,
   ctx: {
-    services: { kind: 'auth' | 'base'; backend: { tests: boolean; authMiddleware: string } }[];
+    services: {
+      kind: 'auth' | 'base';
+      backend: { tests: boolean; authMiddleware: string };
+      authConfig?: { emailVerification: boolean };
+    }[];
     ciWorkflow?: boolean;
   }
 ): boolean {
@@ -274,6 +278,16 @@ export function shouldIncludeProjectFile(
         s.backend.authMiddleware !== 'none'
     );
     if (!(hasAuth && hasGatedBase)) return false;
+  }
+
+  // verify-user e2e helper exists only to flip emailVerified=true via the
+  // auth test DB when the cross-service auth flow runs. Without an auth
+  // service that enables email verification, the helper has no caller and
+  // its template reads `authSvc.testInfra`, which would throw at render
+  // time when authSvc is undefined.
+  if (normalized.endsWith('tests/e2e/helpers/verify-user.ts.ejs')) {
+    const authSvc = ctx.services.find((s) => s.kind === 'auth');
+    if (!authSvc?.authConfig?.emailVerification) return false;
   }
 
   return true;

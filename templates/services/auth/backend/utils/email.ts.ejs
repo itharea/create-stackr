@@ -19,6 +19,11 @@ interface SendEmailOptions {
 }
 
 export async function sendEmail({ to, subject, html, text }: SendEmailOptions): Promise<void> {
+  // Skip real SMTP in tests — component/e2e tests flip user.emailVerified
+  // directly in the DB and never assert on email delivery. Without this
+  // guard, every test would race against a real transporter.sendMail() call
+  // and pollute stderr with auth errors.
+  if (process.env.NODE_ENV === "test") return;
   await transporter.sendMail({
     from: process.env.EMAIL_FROM || "noreply@example.com",
     to,
