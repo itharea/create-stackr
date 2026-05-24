@@ -4,6 +4,7 @@
 // docker-build.
 
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -13,8 +14,39 @@ process.chdir(ROOT_DIR);
 
 const PM = '<%= packageManager %>';
 
+// Load the root .env so credentials (e.g. AUTH_DB_PASSWORD) reach the
+// spawned vitest process. Docker Compose reads root .env automatically;
+// the host-side e2e tests do not, so we thread it through ourselves.
+// Helpers like tests/e2e/helpers/verify-user.ts depend on these vars.
+function loadRootEnv() {
+  try {
+    const content = readFileSync(path.join(ROOT_DIR, '.env'), 'utf8');
+    const out = {};
+    for (const raw of content.split('\n')) {
+      const line = raw.trim();
+      if (!line || line.startsWith('#')) continue;
+      const eq = line.indexOf('=');
+      if (eq < 0) continue;
+      const key = line.slice(0, eq).trim();
+      let val = line.slice(eq + 1).trim();
+      if (
+        (val.startsWith('"') && val.endsWith('"')) ||
+        (val.startsWith("'") && val.endsWith("'"))
+      ) {
+        val = val.slice(1, -1);
+      }
+      out[key] = val;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+const rootEnv = loadRootEnv();
+const spawnEnv = { ...process.env, ...rootEnv };
+
 function run(cmd, args, opts = {}) {
-  const r = spawnSync(cmd, args, { stdio: 'inherit', ...opts });
+  const r = spawnSync(cmd, args, { stdio: 'inherit', env: spawnEnv, ...opts });
   if (r.status !== 0) {
     process.exitCode = r.status ?? 1;
     throw new Error(`${cmd} ${args.join(' ')} failed (exit ${r.status})`);

@@ -1,0 +1,57 @@
+<%
+  const authSvc = services.find(s => s.kind === 'auth');
+  // computeTestPorts() walks services in declaration order, assigning
+  // dbPort = 5432 + index + TEST_PORT_OFFSET. Mirror the walk here so we
+  // can bake the auth service's published Postgres host port at gen time
+  // without enriching rootCtx.
+  let dbBase = 5432;
+  let authDbPort = 5432;
+  for (const svc of services) {
+    if (svc.name === authSvc.name) {
+      authDbPort = dbBase + 10000;
+      break;
+    }
+    dbBase++;
+  }
+  const dbName = `${projectName.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${authSvc.name.replace(/-/g, '_')}`;
+  const upper = authSvc.name.toUpperCase().replace(/-/g, '_');
+  // Drizzle pushes snake_case columns; Prisma keeps verbatim field names
+  // because the schema does not declare `@map` for the user model.
+  const column = orm === 'prisma' ? '"emailVerified"' : 'email_verified';
+-%>
+import { Client } from 'pg';
+
+const HOST = '127.0.0.1';
+const PORT = <%= authDbPort %>;
+const DB = '<%= dbName %>';
+const USER = 'postgres';
+const PASSWORD_ENV = '<%= upper %>_DB_PASSWORD';
+
+/**
+ * Test-only helper for the e2e suite. Connects to the auth service's
+ * test-infra Postgres (published on 127.0.0.1) and flips `emailVerified=true`
+ * so the cross-service flow can skip the OTP round-trip when verification
+ * is enabled. The DB password is read from `process.env` at runtime —
+ * `scripts/test-e2e.mjs` threads the root `.env` into the spawned vitest
+ * process so the same value the dev/test compose uses is available here.
+ */
+export async function markEmailVerified(email: string): Promise<void> {
+  const password = process.env[PASSWORD_ENV];
+  if (!password) {
+    throw new Error(
+      `${PASSWORD_ENV} is not set. Run \`bun run test:e2e\` from the project ` +
+        `root so test-e2e.mjs can load the root .env before spawning vitest.`
+    );
+  }
+  const url = `postgresql://${USER}:${encodeURIComponent(password)}@${HOST}:${PORT}/${DB}`;
+  const client = new Client({ connectionString: url });
+  await client.connect();
+  try {
+    await client.query(
+      `UPDATE "user" SET <%= column %> = true WHERE email = $1`,
+      [email]
+    );
+  } finally {
+    await client.end();
+  }
+}

@@ -1,3 +1,4 @@
+<% const authConf = service.authConfig; -%>
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { createTestApp, closeTestApp } from '../../helpers/app.js';
@@ -12,6 +13,31 @@ describe('POST /api/auth/sign-up/email', () => {
     await closeTestApp(app);
   });
 
+<% if (authConf.emailVerification) { -%>
+  it('creates a user but does not issue a session cookie until verification', async () => {
+    const email = uniqueEmail('signup');
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/auth/sign-up/email',
+      payload: {
+        email,
+        password: 'correcthorsebatterystaple',
+        name: 'Test User',
+      },
+      headers: { 'content-type': 'application/json' },
+    });
+    expect(res.statusCode, res.body).toBe(200);
+    // With requireEmailVerification=true, BetterAuth defers the session
+    // cookie until the user verifies. Component tests assert that contract
+    // here; the sign-in test flips emailVerified directly and proves the
+    // post-verification cookie flow.
+    const setCookie = res.headers['set-cookie'];
+    const cookieStr = setCookie
+      ? (Array.isArray(setCookie) ? setCookie.join('\n') : String(setCookie))
+      : '';
+    expect(cookieStr).not.toMatch(/session_token|better-auth\.session/i);
+  });
+<% } else { -%>
   it('creates a user and sets a session cookie', async () => {
     const email = uniqueEmail('signup');
     const res = await app.inject({
@@ -30,4 +56,5 @@ describe('POST /api/auth/sign-up/email', () => {
     const cookieStr = Array.isArray(setCookie) ? setCookie.join('\n') : String(setCookie);
     expect(cookieStr).toMatch(/session|auth/i);
   });
+<% } -%>
 });

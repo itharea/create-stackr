@@ -37,6 +37,12 @@ export default defineConfig({
     exclude: [
       '**/node_modules/**',
       '**/dist/**',
+      // Local sandbox projects scaffolded by contributors during manual
+      // smoke-testing — these ship their own test suites that need
+      // Postgres + Redis up and aren't part of the CLI's own coverage.
+      'smoke-test/**',
+      'smoke-tests/**',
+      'tmp/**',
       // Exclude build tests in watch mode
       ...(process.env.VITEST_WATCH ? ['**/tests/e2e/build-verification.test.ts'] : []),
     ],

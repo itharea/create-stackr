@@ -1,0 +1,15 @@
+import { eq } from 'drizzle-orm';
+
+import { getTestDb } from './db.js';
+import { user } from '../../drizzle/schema.js';
+
+/**
+ * Test-only helper. Flips `user.emailVerified=true` directly in the DB so
+ * tests can skip the OTP round-trip when email verification is enabled.
+ * Production code keeps `requireEmailVerification: true`; this helper only
+ * runs against the test-infra Postgres (see `.env.test`).
+ */
+export async function markEmailVerified(email: string): Promise<void> {
+  const db = getTestDb();
+  await db.update(user).set({ emailVerified: true }).where(eq(user.email, email));
+}

@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import fs from 'fs-extra';
+import path from 'path';
 import { runAddService } from '../../src/commands/add-service.js';
 import { loadStackrConfig } from '../../src/utils/config-file.js';
 import { createAddServiceFixture, type AddServiceFixture } from './add-service-helpers.js';
@@ -47,5 +49,17 @@ describe('stackr add service — drizzle project', () => {
     // The pendingMigration command should also be the drizzle command.
     expect(cfg.pendingMigrations).toBeDefined();
     expect(cfg.pendingMigrations![0].command).toContain('drizzle-kit');
+  });
+
+  it('regenerates the auth drizzle schema with the new hasScoutAccount column', async () => {
+    await runAddService('scout', { install: false });
+
+    const schema = await fs.readFile(
+      path.join(fx.projectDir, 'auth/backend/drizzle/schema.ts'),
+      'utf-8'
+    );
+    expect(schema).toContain('hasScoutAccount');
+    expect(schema).toContain('has_scout_account');
+    expect(schema).toContain('hasCoreAccount'); // existing one preserved
   });
 });

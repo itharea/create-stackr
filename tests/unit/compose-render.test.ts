@@ -42,16 +42,14 @@ describe('renderDockerCompose', () => {
     expect(envStr).not.toContain('AUTH_SERVICE_URL');
   });
 
-  it('includes managed marker blocks that survive yaml.parse', () => {
+  it('does NOT emit stackr-managed marker comments (AST regen, not marker-based)', () => {
     const stackrConfig = buildStackrConfig(minimalConfig);
     const dev = renderDockerCompose(stackrConfig, 'dev');
 
-    expect(dev).toContain('# >>> stackr managed services >>>');
-    expect(dev).toContain('# <<< stackr managed services <<<');
-    expect(dev).toContain('# >>> stackr managed volumes >>>');
-    expect(dev).toContain('# <<< stackr managed volumes <<<');
+    expect(dev).not.toContain('# >>> stackr managed');
+    expect(dev).not.toContain('# <<< stackr managed');
 
-    // Comments must not break YAML parsing
+    // Output must still be parseable YAML.
     expect(() => YAML.parse(dev)).not.toThrow();
   });
 

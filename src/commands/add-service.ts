@@ -4,7 +4,6 @@ import path from 'path';
 import chalk from 'chalk';
 import boxen from 'boxen';
 import YAML from 'yaml';
-import { createHash } from 'crypto';
 import { execa } from 'execa';
 import { requireProjectRoot } from '../utils/project-root.js';
 import {
@@ -20,12 +19,10 @@ import type {
 } from '../types/config-file.js';
 import type { InitConfig, ServiceConfig } from '../types/index.js';
 import { coreEntry, noIntegrations } from '../config/presets.js';
-import {
-  buildServiceContext,
-  stackrConfigToInitConfig,
-} from '../generators/service-context.js';
+import { stackrConfigToInitConfig } from '../generators/service-context.js';
 import { ServiceGenerator } from '../generators/service.js';
-import { renderComposeInnerBlocks } from '../generators/docker-compose.js';
+import { buildServiceContext } from '../generators/service-context.js';
+import { renderDockerCompose } from '../generators/docker-compose.js';
 import { renderDockerComposeTest } from '../generators/docker-compose-test.js';
 import { writeEnvFilesWithCredentials } from '../generators/env-files.js';
 import {
@@ -35,10 +32,11 @@ import {
 import {
   readMarkedBlock,
   writeMarkedBlock,
-  initComposeWithMarkedBlocks,
   MarkerCorruptionError,
-  MarkerNotFoundError,
 } from '../utils/compose-merge.js';
+import { mergeDockerCompose } from '../utils/ast-merge/yaml-merge.js';
+import { mergeAuthLibTs, mergeAuthSchemaDrizzle } from '../utils/ast-merge/ts-merge.js';
+import { mergeAuthSchemaPrisma } from '../utils/ast-merge/prisma-merge.js';
 import {
   allocateBackendPort,
   allocateWebPort,
@@ -258,23 +256,14 @@ export async function runAddService(
       credentialsByService: newServiceCredentials,
     });
 
-    // Compose regeneration. writeMarkedBlock refuses cleanly on missing or
-    // corrupt markers; we translate that into a friendly error.
+    // Compose regeneration — AST-based additive merge. Existing entries
+    // (including user customizations to managed services) are preserved;
+    // only missing service/volume entries get added.
     const composePath = path.join(root, 'docker-compose.yml');
     const composeProdPath = path.join(root, 'docker-compose.prod.yml');
 
-    const plannedComposeYml = await planComposeRegen(
-      composePath,
-      newConfig,
-      'dev',
-      Boolean(options.force)
-    );
-    const plannedComposeProdYml = await planComposeRegen(
-      composeProdPath,
-      newConfig,
-      'prod',
-      Boolean(options.force)
-    );
+    const plannedComposeYml = await planComposeRegen(composePath, newConfig, 'dev');
+    const plannedComposeProdYml = await planComposeRegen(composeProdPath, newConfig, 'prod');
 
     // docker-compose.test.yml is regenerated WHOLESALE — no marker blocks.
     // `plannedTestCompose` is one of:
@@ -304,25 +293,26 @@ export async function runAddService(
     const envExamplePath = path.join(root, '.env.example');
     const plannedRootEnvExample = await planRootEnvRegen(envExamplePath, newConfig, Boolean(options.force));
 
-    // Auth file regeneration (only when the project has an auth service).
+    // Auth file regeneration — AST additive merge for both the BetterAuth
+    // config (`lib/auth.ts`) and the ORM schema file. Each merge adds the
+    // new peer's `has<Cap>Account` entry without disturbing existing
+    // properties, imports, comments, or user-added fields.
     let plannedAuthFile: { destPath: string; contents: string } | null = null;
+    let plannedAuthSchemaFile: { destPath: string; contents: string } | null = null;
     if (hasAuthService) {
-      const authRegen = await planAuthFileRegen(
-        root,
-        config,
-        newConfig
-      );
+      const authRegen = await planAuthLibRegen(root, newConfig);
       plannedAuthFile = {
         destPath: authRegen.destPath,
         contents: authRegen.plannedContents,
       };
-      if (authRegen.collision) {
-        warnings.push(
-          `auth/backend/lib/auth.ts has been modified locally — the regenerated version has been written to ${path.relative(root, authRegen.destPath)} for manual merging.`
-        );
-      }
-      // Regardless of whether the regenerated file matched pristine or not,
-      // the DB schema still needs migrating. Append a pending migration
+
+      const schemaRegen = await planAuthSchemaRegen(root, newConfig);
+      plannedAuthSchemaFile = {
+        destPath: schemaRegen.destPath,
+        contents: schemaRegen.plannedContents,
+      };
+
+      // The DB schema still needs migrating. Append a pending migration
       // entry against the auth service.
       const authSvcEntry = newConfig.services.find((s) => s.kind === 'auth')!;
       const capName = capitalizeServiceName(name);
@@ -425,10 +415,20 @@ export async function runAddService(
       await fs.writeFile(envExamplePath, plannedRootEnvExample, 'utf-8');
     }
 
-    // 4. Write auth file (or .stackr-new fallback).
+    // 4. Write auth file (AST merge output — no .stackr-new fallback).
     if (plannedAuthFile) {
       await fs.ensureDir(path.dirname(plannedAuthFile.destPath));
       await fs.writeFile(plannedAuthFile.destPath, plannedAuthFile.contents, 'utf-8');
+    }
+
+    // 4a. Write auth schema file (drizzle/schema.ts or prisma/schema.prisma).
+    if (plannedAuthSchemaFile) {
+      await fs.ensureDir(path.dirname(plannedAuthSchemaFile.destPath));
+      await fs.writeFile(
+        plannedAuthSchemaFile.destPath,
+        plannedAuthSchemaFile.contents,
+        'utf-8'
+      );
     }
 
     // 4b. Project-level e2e regen. Writes + deletes are both driven from
@@ -653,84 +653,34 @@ function rebuildConfigFromRuntime(
 }
 
 // ---------------------------------------------------------------------------
-// Compose regen
+// Compose regen — AST-based additive merge
 // ---------------------------------------------------------------------------
 
+/**
+ * Plan the rewrite of `docker-compose.yml` / `docker-compose.prod.yml`.
+ *
+ * - If the file is missing, render a fresh one from `newConfig`.
+ * - Otherwise, parse the YAML, strip any legacy `# >>> stackr managed`
+ *   marker comments, and additively merge in any service/volume entries
+ *   that `newConfig` requires and the on-disk file doesn't already have.
+ *   Existing entries — including user customizations to managed services
+ *   like `auth_db`'s image tag, env vars, or healthchecks — survive
+ *   untouched.
+ */
 async function planComposeRegen(
   composePath: string,
   newConfig: StackrConfigFile,
-  mode: 'dev' | 'prod',
-  force: boolean
+  mode: 'dev' | 'prod'
 ): Promise<string> {
   const exists = await fs.pathExists(composePath);
-  const fresh = renderComposeInnerBlocks(newConfig, mode);
 
   if (!exists) {
-    // Compose file missing — rebuild from scratch. Slightly unusual but we
-    // can recover cleanly so we do.
-    const header =
-      mode === 'dev'
-        ? `# All infrastructure for local development\n# Usage: docker compose up -d\n`
-        : `# Production overlay for docker-compose.yml\n# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d\n`;
-    return initComposeWithMarkedBlocks(fresh.services, fresh.volumes, { header });
+    // Compose file missing — rebuild from scratch.
+    return renderDockerCompose(newConfig, mode);
   }
 
   const content = await fs.readFile(composePath, 'utf-8');
-
-  // Try to update the services block, then the volumes block (dev only).
-  let next: string;
-  try {
-    next = writeMarkedBlock(content, 'services', fresh.services);
-  } catch (err) {
-    if (err instanceof MarkerNotFoundError) {
-      if (!force) {
-        throw new Error(
-          `${path.basename(composePath)}: stackr managed "services" marker block is missing. ` +
-            `Re-run with --force to regenerate the managed blocks in-place.`
-        );
-      }
-      // Force path: regenerate the whole file from scratch so the user's
-      // outside-markers content is discarded (they asked for this).
-      const header =
-        mode === 'dev'
-          ? `# All infrastructure for local development\n# Usage: docker compose up -d\n`
-          : `# Production overlay for docker-compose.yml\n# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d\n`;
-      return initComposeWithMarkedBlocks(fresh.services, fresh.volumes, { header });
-    }
-    if (err instanceof MarkerCorruptionError) {
-      throw new Error(
-        `${path.basename(composePath)}: stackr managed "services" block is corrupt (${err.reason}). ` +
-          `Inspect the file and restore its markers before re-running.`
-      );
-    }
-    throw err;
-  }
-
-  if (mode === 'dev') {
-    // The volumes block is only present in the dev compose.
-    const volumesBlock = readMarkedBlock(next, 'volumes');
-    if (volumesBlock) {
-      next = writeMarkedBlock(next, 'volumes', fresh.volumes);
-    } else if (!force) {
-      throw new Error(
-        `${path.basename(composePath)}: stackr managed "volumes" marker block is missing. ` +
-          `Re-run with --force to regenerate the managed blocks in-place.`
-      );
-    } else {
-      // Force but no volumes block → append one at the end.
-      const sep = detectFileSeparator(next);
-      next =
-        next.replace(/(\r?\n)+$/, '') +
-        sep + sep +
-        `volumes:${sep}` +
-        `  # >>> stackr managed volumes >>>${sep}` +
-        (fresh.volumes.length > 0 ? fresh.volumes : '') +
-        (fresh.volumes.endsWith('\n') || fresh.volumes.length === 0 ? '' : sep) +
-        `  # <<< stackr managed volumes <<<${sep}`;
-    }
-  }
-
-  return next;
+  return mergeDockerCompose(content, newConfig, mode);
 }
 
 function detectFileSeparator(content: string): '\n' | '\r\n' {
@@ -942,62 +892,85 @@ function parseEnvKeys(blockInner: string): Set<string> {
 }
 
 // ---------------------------------------------------------------------------
-// Auth file regen
+// Auth file regen — AST-based additive merge
 // ---------------------------------------------------------------------------
 
 /**
- * Plan the rewrite of `auth/backend/lib/auth.ts` (if the current on-disk
- * file is bit-identical to what the current `config` would re-render; if
- * the user has hand-edited it, we stage the new contents at
- * `auth.ts.stackr-new` instead and leave the live file untouched).
+ * Plan an additive merge of `<authService>/backend/lib/auth.ts` so the
+ * new service's `has<Cap>Account` additionalField lands without
+ * disturbing any other user customization. Falls back to rendering the
+ * file from scratch if the on-disk file is missing (the user deleted it).
  */
-async function planAuthFileRegen(
+async function planAuthLibRegen(
   root: string,
-  currentConfig: StackrConfigFile,
   newConfig: StackrConfigFile
-): Promise<{ destPath: string; plannedContents: string; collision: boolean }> {
+): Promise<{ destPath: string; plannedContents: string }> {
   const authSvc = newConfig.services.find((s) => s.kind === 'auth')!;
-  const authFilePath = path.join(root, authSvc.name, 'backend/lib/auth.ts');
+  const destPath = path.join(root, authSvc.name, 'backend/lib/auth.ts');
+  const targets = authSvc.authConfig?.provisioningTargets ?? [];
 
-  const plannedContents = await renderAuthLibFromConfig(newConfig);
-  const pristineContents = await renderAuthLibFromConfig(currentConfig);
-
-  // If the current file doesn't exist (edge: user deleted it), fall back
-  // to just writing the planned contents.
-  if (!(await fs.pathExists(authFilePath))) {
-    return { destPath: authFilePath, plannedContents, collision: false };
+  if (!(await fs.pathExists(destPath))) {
+    const plannedContents = await renderAuthTemplateFromConfig(
+      newConfig,
+      `services/auth/backend/lib/auth.${newConfig.orm}.ts.ejs`
+    );
+    return { destPath, plannedContents };
   }
 
-  const currentContents = await fs.readFile(authFilePath, 'utf-8');
-  const currentHash = sha256(currentContents);
-  const pristineHash = sha256(pristineContents);
-
-  if (currentHash === pristineHash) {
-    // Untouched since last stackr render — safe to overwrite.
-    return { destPath: authFilePath, plannedContents, collision: false };
-  }
-
-  // User has modified the file — write the regen to .stackr-new.
-  return {
-    destPath: authFilePath + '.stackr-new',
-    plannedContents,
-    collision: true,
-  };
+  const source = await fs.readFile(destPath, 'utf-8');
+  const next = mergeAuthLibTs(source, targets);
+  return { destPath, plannedContents: next };
 }
 
-async function renderAuthLibFromConfig(config: StackrConfigFile): Promise<string> {
+/**
+ * Plan an additive merge of the auth ORM schema file
+ * (`drizzle/schema.ts` or `prisma/schema.prisma`) so the new service's
+ * `has<Cap>Account` column lands without touching user-added columns.
+ * Falls back to rendering the file from scratch if missing.
+ */
+async function planAuthSchemaRegen(
+  root: string,
+  newConfig: StackrConfigFile
+): Promise<{ destPath: string; plannedContents: string }> {
+  const authSvc = newConfig.services.find((s) => s.kind === 'auth')!;
+  const targets = authSvc.authConfig?.provisioningTargets ?? [];
+  const destRelPath =
+    newConfig.orm === 'drizzle' ? 'backend/drizzle/schema.ts' : 'backend/prisma/schema.prisma';
+  const destPath = path.join(root, authSvc.name, destRelPath);
+
+  if (!(await fs.pathExists(destPath))) {
+    const templatePath =
+      newConfig.orm === 'drizzle'
+        ? 'services/auth/backend/drizzle/schema.drizzle.ts.ejs'
+        : 'services/auth/backend/prisma/schema.prisma.ejs';
+    const plannedContents = await renderAuthTemplateFromConfig(newConfig, templatePath);
+    return { destPath, plannedContents };
+  }
+
+  const source = await fs.readFile(destPath, 'utf-8');
+  const next =
+    newConfig.orm === 'drizzle'
+      ? mergeAuthSchemaDrizzle(source, targets)
+      : mergeAuthSchemaPrisma(source, targets);
+  return { destPath, plannedContents: next };
+}
+
+/**
+ * Render an auth-service template against the current config — used only
+ * by the missing-file fallback in `planAuthLibRegen` /
+ * `planAuthSchemaRegen`. Normal regens go through the AST mergers.
+ */
+async function renderAuthTemplateFromConfig(
+  config: StackrConfigFile,
+  templatePath: string
+): Promise<string> {
   const initConfig = stackrConfigToInitConfig(config);
   const authSvc = initConfig.services.find((s) => s.kind === 'auth');
   if (!authSvc) {
-    throw new Error('renderAuthLibFromConfig called on a config with no auth service');
+    throw new Error('renderAuthTemplateFromConfig called on a config with no auth service');
   }
   const ctx = buildServiceContext(initConfig, authSvc);
-  const templatePath = `services/auth/backend/lib/auth.${config.orm}.ts.ejs`;
   return renderTemplate(templatePath, ctx as unknown as Record<string, unknown>);
-}
-
-function sha256(input: string): string {
-  return createHash('sha256').update(input).digest('hex');
 }
 
 // ---------------------------------------------------------------------------

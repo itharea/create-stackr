@@ -1,7 +1,11 @@
+<% const authConf = service.authConfig; -%>
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { createTestApp, closeTestApp } from '../../helpers/app.js';
 import { uniqueEmail } from '../../helpers/unique.js';
+<% if (authConf.emailVerification) { -%>
+import { markEmailVerified } from '../../helpers/verify-user.js';
+<% } -%>
 
 function extractCookie(setCookie: string | string[] | undefined): string {
   if (!setCookie) return '';
@@ -30,7 +34,21 @@ describe('GET /api/auth/get-session', () => {
     });
     expect(signUp.statusCode, signUp.body).toBe(200);
 
+<% if (authConf.emailVerification) { -%>
+    // Skip the OTP round-trip in tests, then sign in to obtain the session
+    // cookie (sign-up itself does not issue one when verification is on).
+    await markEmailVerified(email);
+    const signIn = await app.inject({
+      method: 'POST',
+      url: '/api/auth/sign-in/email',
+      payload: { email, password },
+      headers: { 'content-type': 'application/json' },
+    });
+    expect(signIn.statusCode, signIn.body).toBe(200);
+    const cookie = extractCookie(signIn.headers['set-cookie']);
+<% } else { -%>
     const cookie = extractCookie(signUp.headers['set-cookie']);
+<% } -%>
     expect(cookie.length).toBeGreaterThan(0);
 
     const res = await app.inject({

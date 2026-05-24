@@ -57,6 +57,8 @@ export function renderDockerComposeTest(config: StackrConfigFile): string {
   return (
     FILE_HEADER +
     '\n' +
+    `name: ${config.projectName}-test\n` +
+    '\n' +
     'services:\n' +
     serviceBlocks.join('\n') +
     '\n' +
@@ -224,6 +226,11 @@ const FILE_HEADER = `# docker-compose.test.yml
 # from the project root so Docker Compose picks it up for \${VAR} substitution (or pass
 # --env-file explicitly). Different container names + different host ports mean this
 # stack and the dev compose can run concurrently.
+#
+# The top-level \`name:\` field below sets the Docker Compose project namespace to
+# \`<projectName>-test\` so this stack runs in its own project — separate from the
+# dev compose's folder-derived namespace. This is what prevents
+# "Found orphan containers" warnings when tests run while the dev stack is up.
 #
 # Regenerated WHOLESALE by \`stackr add service\` — unlike docker-compose.yml /
 # docker-compose.prod.yml, this file uses no marker blocks and hand-edits are

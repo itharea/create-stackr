@@ -47,7 +47,7 @@ describe('stackr add service — primary flow', () => {
     expect(scout?.backend.authMiddleware).toBe('standard');
   });
 
-  it('injects the new service into the docker-compose managed block', async () => {
+  it('injects the new service into docker-compose.yml via AST merge', async () => {
     await runAddService('scout', { install: false });
 
     const compose = await fs.readFile(
@@ -59,9 +59,9 @@ describe('stackr add service — primary flow', () => {
     expect(services).toContain('scout_db');
     expect(services).toContain('scout_redis');
     expect(services).toContain('scout_rest_api');
-    // The managed block still contains the marker comments.
-    expect(compose).toContain('# >>> stackr managed services >>>');
-    expect(compose).toContain('# <<< stackr managed services <<<');
+    // AST regen leaves no marker comments behind.
+    expect(compose).not.toContain('# >>> stackr managed');
+    expect(compose).not.toContain('# <<< stackr managed');
   });
 
   it('regenerates auth/backend/lib/auth.ts with new hasScoutAccount field', async () => {
@@ -73,6 +73,17 @@ describe('stackr add service — primary flow', () => {
     );
     expect(authLib).toContain('hasScoutAccount');
     expect(authLib).toContain('hasCoreAccount'); // existing one preserved
+  });
+
+  it('regenerates the auth prisma schema with the new hasScoutAccount column', async () => {
+    await runAddService('scout', { install: false });
+
+    const schema = await fs.readFile(
+      path.join(fx.projectDir, 'auth/backend/prisma/schema.prisma'),
+      'utf-8'
+    );
+    expect(schema).toContain('hasScoutAccount');
+    expect(schema).toContain('hasCoreAccount'); // existing one preserved
   });
 
   it('appends the prefixed env keys inside the managed .env block', async () => {

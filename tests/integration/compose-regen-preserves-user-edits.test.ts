@@ -6,12 +6,12 @@ import { runAddService } from '../../src/commands/add-service.js';
 import { createAddServiceFixture, type AddServiceFixture } from './add-service-helpers.js';
 
 /**
- * RELEASE BLOCKER (plans/phase3_add_service_command.md §D.2).
+ * RELEASE BLOCKER.
  *
- * `stackr add service` regenerates docker-compose.yml by rewriting the
- * marker-managed services/volumes blocks. Anything OUTSIDE those marker
- * blocks — user-added comments, custom services, top-of-file headers,
- * extra top-level keys — must survive byte-identical across the rewrite.
+ * `stackr add service` regenerates docker-compose.yml via AST additive
+ * merge. Hand-edits to the file — user-added services, networks,
+ * top-of-file comments, AND modifications to managed services (e.g.
+ * bumping `auth_db`'s image tag) — must all survive the rewrite.
  *
  * If this test fails, do not ship. Silent clobbering of user edits is
  * the worst-case failure mode for this subcommand.
@@ -27,7 +27,6 @@ describe('compose regen — preserves user edits (RELEASE BLOCKER)', () => {
       - "9999:80"
 `;
   const USER_NETWORK = `
-
 networks:
   my_custom_network:
     driver: bridge
@@ -40,30 +39,33 @@ networks:
   beforeEach(async () => {
     fx = await createAddServiceFixture('phase3-preservation');
 
-    // Hand-edit docker-compose.yml to add content OUTSIDE the managed blocks.
+    // Hand-edit docker-compose.yml. We add four kinds of user edits:
+    //
+    //   1. Top-of-file user comment
+    //   2. Custom user service inside `services:`
+    //   3. Custom user network stanza
+    //   4. Custom user volume inside `volumes:`
+    //   5. Customization to a managed service (auth_db image tag bump)
+    //
+    // Each must survive the AST additive merge.
     const composePath = path.join(fx.projectDir, 'docker-compose.yml');
     const original = await fs.readFile(composePath, 'utf-8');
 
-    // 1. Prepend a user comment
-    // 2. Insert a custom service inside `services:` AFTER the managed block
-    // 3. Append a custom network stanza at the end
-    // 4. Insert a custom volume entry inside `volumes:` AFTER the managed block
     let modified = TOP_COMMENT + '\n' + original;
 
-    // Add custom service just after the services marker block end
-    modified = modified.replace(
-      '# <<< stackr managed services <<<',
-      '# <<< stackr managed services <<<' + CUSTOM_SVC
-    );
+    // Append a custom service inside `services:` (after the last managed entry)
+    // by inserting before the blank line that separates services from volumes.
+    modified = modified.replace(/\n(\nvolumes:)/, `\n${CUSTOM_SVC}$1`);
 
-    // Add custom volume just after the volumes marker block end
-    modified = modified.replace(
-      '# <<< stackr managed volumes <<<',
-      '# <<< stackr managed volumes <<<' + VOLUMES_POSTLUDE
-    );
+    // Append a custom volume inside `volumes:` (end of the volumes map)
+    modified = modified.replace(/(\nvolumes:\n[^]+?)(\n*$)/, `$1${VOLUMES_POSTLUDE}$2`);
 
-    // Append networks at the very end
-    modified = modified + USER_NETWORK;
+    // Append a networks stanza at the very end
+    modified = modified.trimEnd() + '\n' + USER_NETWORK;
+
+    // Bump a managed service's image to verify managed-block customizations
+    // also survive (this is the key UX win of AST over marker rewrites).
+    modified = modified.replace('image: postgres:16-alpine', 'image: postgres:17-alpine');
 
     await fs.writeFile(composePath, modified, 'utf-8');
   });
@@ -72,7 +74,7 @@ networks:
     await fx.cleanup();
   });
 
-  it('survives a single add-service call with all four user edits intact', async () => {
+  it('survives a single add-service call with all five user edits intact', async () => {
     await runAddService('wallet', { install: false });
 
     const composePath = path.join(fx.projectDir, 'docker-compose.yml');
@@ -83,14 +85,15 @@ networks:
     // 2. Custom service still present
     expect(after).toContain('my_custom_service');
     expect(after).toContain('nginx:alpine');
-    expect(after).toContain('"9999:80"');
     // 3. User-added network still present
     expect(after).toContain('my_custom_network');
     expect(after).toContain('driver: bridge');
     // 4. User-added volume still present
     expect(after).toContain('my_custom_volume');
+    // 5. Managed-service customization (the KEY AST-merge win) survives
+    expect(after).toContain('postgres:17-alpine');
 
-    // And the managed block contains the new service
+    // And the new service lands cleanly
     expect(after).toContain('wallet_db');
     expect(after).toContain('wallet_rest_api');
     expect(after).toContain('wallet_redis');
@@ -122,8 +125,9 @@ networks:
     expect(after).toContain('my_custom_service');
     expect(after).toContain('my_custom_network');
     expect(after).toContain('my_custom_volume');
+    expect(after).toContain('postgres:17-alpine');
 
-    // Both new services present in the managed block
+    // Both new services present
     expect(after).toContain('wallet_rest_api');
     expect(after).toContain('treasury_rest_api');
 

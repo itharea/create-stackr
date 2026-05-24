@@ -1,7 +1,11 @@
+<% const authConf = service.authConfig; -%>
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { createTestApp, closeTestApp } from '../../helpers/app.js';
 import { uniqueEmail } from '../../helpers/unique.js';
+<% if (authConf.emailVerification) { -%>
+import { markEmailVerified } from '../../helpers/verify-user.js';
+<% } -%>
 
 describe('POST /api/auth/sign-in/email', () => {
   let app: FastifyInstance;
@@ -24,6 +28,13 @@ describe('POST /api/auth/sign-in/email', () => {
     });
     expect(signUp.statusCode, signUp.body).toBe(200);
 
+<% if (authConf.emailVerification) { -%>
+    // Skip the OTP round-trip: flip emailVerified directly so sign-in can
+    // succeed without a real email/SMTP. The OTP send was a no-op in tests
+    // (see utils/email.ts), so there is nothing to "consume" here.
+    await markEmailVerified(email);
+
+<% } -%>
     const signIn = await app.inject({
       method: 'POST',
       url: '/api/auth/sign-in/email',
