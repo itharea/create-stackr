@@ -11,6 +11,12 @@
 // Set test environment variables
 process.env.NODE_ENV = 'test';
 
+// Skip `git init` + `git add` + `git commit` inside `MonorepoGenerator`.
+// Background git activity (gc / pack writes / fsmonitor) races with
+// per-test `fs.remove(tempDir)` cleanup on Linux CI and produces flaky
+// ENOTEMPTY failures on `.git/objects/`. See src/utils/git.ts.
+process.env.STACKR_SKIP_GIT_INIT = '1';
+
 // Increase timeout for slow operations
 import { beforeAll } from 'vitest';
 beforeAll(() => {

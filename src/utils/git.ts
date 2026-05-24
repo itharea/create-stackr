@@ -1,9 +1,18 @@
 import { execa } from 'execa';
 
 /**
- * Initialize a git repository with an initial commit
+ * Initialize a git repository with an initial commit.
+ *
+ * No-op when `STACKR_SKIP_GIT_INIT` is set. The test harness flips this in
+ * `tests/utils/setup.ts` so integration tests don't pay the cost of
+ * `git init` + `git add .` + `git commit` (≈100 ms each) and don't race
+ * with git's async background writes (gc / fsmonitor / pack writes) during
+ * `fs.remove(tempDir)` cleanup — the source of the ENOTEMPTY flake on
+ * `.git/objects/` we hit on Linux CI.
  */
 export async function initializeGit(targetDir: string): Promise<void> {
+  if (process.env.STACKR_SKIP_GIT_INIT) return;
+
   // Check if git is available
   try {
     await execa('git', ['--version']);
