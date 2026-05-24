@@ -6,25 +6,22 @@ import { runAddService } from '../../src/commands/add-service.js';
 import { createAddServiceFixture, type AddServiceFixture } from './add-service-helpers.js';
 
 /**
- * Exercises the `--force` regen path of `planComposeRegen` when the
- * stackr marker blocks have been stripped from `docker-compose.yml`:
- *   - Without --force, we refuse with a "marker block is missing" error.
- *   - With --force, we rebuild the whole file from scratch and the new
- *     service ends up inside regenerated marker blocks.
- *
- * This covers both the services-marker-missing force path and the
- * volumes-block-missing-on-force append path in src/commands/add-service.ts.
+ * AST-based compose regen handles minimal / non-stackr-managed compose
+ * files additively. Replaces the previous test for --force-regen of
+ * missing marker blocks, which no longer apply (the marker mechanism is
+ * gone — every regen is an additive AST merge).
  */
-describe('stackr add service — force regen of compose file', () => {
+describe('stackr add service — compose AST merge against atypical files', () => {
   let fx: AddServiceFixture;
   let logSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
-    fx = await createAddServiceFixture('force-compose');
+    fx = await createAddServiceFixture('compose-atypical');
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-    // Replace docker-compose.yml with a minimal scaffold that contains
-    // NEITHER the managed "services" markers NOR any `volumes:` section.
+    // Replace docker-compose.yml with a minimal user-authored scaffold
+    // that has NO stackr-managed structure: just one custom service and
+    // no volumes section at all.
     await fs.writeFile(
       path.join(fx.projectDir, 'docker-compose.yml'),
       'services:\n  placeholder:\n    image: busybox\n',
@@ -37,31 +34,29 @@ describe('stackr add service — force regen of compose file', () => {
     await fx.cleanup();
   });
 
-  it('refuses without --force when the services marker block is missing', async () => {
-    await expect(
-      runAddService('scout', { install: false })
-    ).rejects.toThrow(/managed "services" marker block is missing/);
-  });
-
-  it('regenerates the whole file under --force and injects the new service', async () => {
-    await runAddService('scout', { install: false, force: true });
+  it('adds the new service additively, preserving the user placeholder', async () => {
+    await runAddService('scout', { install: false });
 
     const compose = await fs.readFile(
       path.join(fx.projectDir, 'docker-compose.yml'),
       'utf-8'
     );
 
-    // Marker blocks are back.
-    expect(compose).toContain('# >>> stackr managed services >>>');
-    expect(compose).toContain('# <<< stackr managed services <<<');
-    expect(compose).toContain('# >>> stackr managed volumes >>>');
-    expect(compose).toContain('# <<< stackr managed volumes <<<');
+    // AST regen leaves no marker comments behind.
+    expect(compose).not.toContain('# >>> stackr managed');
+    expect(compose).not.toContain('# <<< stackr managed');
 
-    // The regenerated file is valid YAML and includes the new service.
     const parsed = YAML.parse(compose);
     const serviceKeys = Object.keys(parsed.services);
+    // User's placeholder survives untouched.
+    expect(serviceKeys).toContain('placeholder');
+    expect(parsed.services.placeholder.image).toBe('busybox');
+    // New service entries land cleanly.
     expect(serviceKeys).toContain('scout_rest_api');
     expect(serviceKeys).toContain('scout_db');
     expect(serviceKeys).toContain('scout_redis');
+    // Volumes section appears because newConfig requires it.
+    expect(parsed.volumes).toBeTruthy();
+    expect(Object.keys(parsed.volumes)).toContain('scout_postgres_data');
   });
 });

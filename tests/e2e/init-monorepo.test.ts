@@ -37,10 +37,10 @@ describe('E2E: monorepo generation', () => {
     expect(cfg.services.length).toBe(2);
     expect(cfg.services.map((s: { name: string }) => s.name)).toEqual(['auth', 'core']);
 
-    // docker-compose.yml parses and has managed marker blocks
+    // docker-compose.yml parses cleanly without marker comments.
     const dev = await fs.readFile(path.join(projectDir, 'docker-compose.yml'), 'utf-8');
-    expect(dev).toContain('# >>> stackr managed services >>>');
-    expect(dev).toContain('# <<< stackr managed services <<<');
+    expect(dev).not.toContain('# >>> stackr managed');
+    expect(dev).not.toContain('# <<< stackr managed');
     const parsed = YAML.parse(dev);
     expect(Object.keys(parsed.services)).toContain('auth_rest_api');
     expect(Object.keys(parsed.services)).toContain('core_rest_api');

@@ -6,12 +6,13 @@ import { createAddServiceFixture, type AddServiceFixture } from './add-service-h
 
 /**
  * The A–E phase ordering in runAddService is load-bearing: phases A-C
- * must not mutate any on-disk state. If dry-run validation fails (Phase C),
- * the project root should be byte-identical to its pre-run snapshot.
+ * must not mutate any on-disk state. If planning fails (Phase B) or
+ * dry-run validation fails (Phase C), the project root should be
+ * byte-identical to its pre-run snapshot.
  *
- * We induce a Phase C failure by corrupting a marker block in
- * docker-compose.yml so writeMarkedBlock surfaces a MarkerCorruptionError
- * before we reach Phase D. Everything on disk stays as it was.
+ * We induce a planning failure by corrupting docker-compose.yml into
+ * unparseable YAML, so mergeDockerCompose throws in Phase B. Everything
+ * on disk stays as it was.
  */
 describe('stackr add service — atomicity (A–E ordering)', () => {
   let fx: AddServiceFixture;
@@ -43,21 +44,18 @@ describe('stackr add service — atomicity (A–E ordering)', () => {
     return out;
   }
 
-  it('Phase C failure leaves the project byte-identical', async () => {
-    // Corrupt the services marker block by duplicating the start marker,
-    // so planComposeRegen → writeMarkedBlock → readMarkedBlock surfaces
-    // MarkerCorruptionError inside Phase B before Phase C even runs.
+  it('Planning failure (Phase B) leaves the project byte-identical', async () => {
+    // Corrupt docker-compose.yml into unparseable YAML so mergeDockerCompose
+    // throws during Phase B planning, before any disk writes happen.
     const composePath = path.join(fx.projectDir, 'docker-compose.yml');
-    const original = await fs.readFile(composePath, 'utf-8');
-    const corrupted = original.replace(
-      '# >>> stackr managed services >>>',
-      '# >>> stackr managed services >>>\n  # >>> stackr managed services >>>'
-    );
+    const corrupted = 'services:\n  auth_db:\n    image: postgres\n    invalid: [unclosed\n';
     await fs.writeFile(composePath, corrupted, 'utf-8');
 
     const before = await snapshot(fx.projectDir);
 
-    await expect(runAddService('wallet', { install: false })).rejects.toThrow(/corrupt/i);
+    await expect(runAddService('wallet', { install: false })).rejects.toThrow(
+      /failed to parse as YAML/i
+    );
 
     // No new service directory
     expect(await fs.pathExists(path.join(fx.projectDir, 'wallet'))).toBe(false);
