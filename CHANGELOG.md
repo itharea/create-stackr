@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-05-25
+
+### Changed
+
+- **`stackr add service` now uses AST-based additive merge for every managed file** it rewrites — `auth/backend/lib/auth.ts`, the auth ORM schema (`prisma/schema.prisma` or `drizzle/schema.ts`), and `docker-compose.yml`. Replaces the previous mix of marker blocks (compose) and whole-file SHA-256 checks with `.stackr-new` sidecars (TS files). The new contract is purely additive: if a desired entry already exists, leave it alone; if it's missing, add it. User customizations on managed entries (image tags, env vars, healthchecks, hand-added fields/imports) survive across regens, and user-added services / networks / volumes / models / properties are untouched. (#81)
+  - TS files use `ts-morph@28` (new runtime dep, ~3 MB). Prisma schema uses `@mrleebo/prisma-ast` (new runtime dep, ~30 KB — chosen over the 20 MB `@prisma/internals`). Compose uses the existing `yaml@2.6.1` with `parseDocument(..., { keepSourceTokens: true })`.
+  - Marker comments (`# >>> stackr managed …`) are no longer emitted. `stripStackrMarkers` removes them on the first regen against a pre-0.6.1 compose file; one-time visible churn, no markers thereafter.
+  - `.stackr-new` sidecar files are gone. Collisions are resolved by the AST merge itself.
+
+### Fixed
+
+- **Next.js 16 cache footguns in auth web templates.** `revalidateTag(tag)` was the wrong primitive for read-your-own-writes mutations: with a `CacheLife` profile like `'max'`, the runtime treats it as stale-while-revalidate and the current request keeps serving stale data. Swapped to `updateTag(tag)` in `templates/services/auth/web/src/lib/admin/actions.ts` for `updateUserRole` and `deleteUser`. (#79)
+- **`getSession()` was fetched twice per protected-route render** — once in the layout, once in nested pages — because it lived in a `'use server'` `actions.ts` and relied on `fetch(..., cache: 'no-store')` without `React.cache()`. `no-store` opts out of the data cache, not request memoization. Extracted into a new `lib/auth/session.ts` wrapped in `React.cache()` with `import "server-only"`, and updated every importer in `templates/services/auth/web/` and `templates/features/web/auth/`. Docs in `templates/services/base/web/DESIGN.md.ejs` and `BEST_PRACTICES.md.ejs` updated to teach the right primitives. (#79)
+- **Generated auth tests no-op when `emailVerification: true`.** BetterAuth's `sign-up/email` returns 200 without a session cookie when verification is on, and `sign-in/email` returns 403 `EMAIL_NOT_VERIFIED`, but the component / e2e tests all assumed sign-up issues a cookie. The `emailOTP` plugin also called `sendEmail()` straight into real Gmail SMTP, producing `EAUTH 535-5.7.8 BadCredentials` on every test run. Fix is a DB-flip in tests via a new `markEmailVerified(email)` helper (`tests/helpers/verify-user.{drizzle,prisma}.ts.ejs` per service; `tests/e2e/helpers/verify-user.ts.ejs` at the monorepo level using raw `pg.Client`). `sendEmail()` short-circuits when `NODE_ENV === "test"`. Component + e2e tests branch on `service.authConfig.emailVerification`. (#81)
+- **Test compose collided with dev compose project namespace.** Both `docker-compose.yml` and `docker-compose.test.yml` were emitted without a top-level `name:` field, so Compose derived the project name from the cwd folder for both — `bun run test` after `bun run docker:dev` printed `WARN ... Found orphan containers ...`. `docker-compose.test.yml` now emits `name: <projectName>-test`. Dev compose's project name stays implicit so existing dev volumes/containers in upgraded projects don't get orphaned. (#81)
+- **`stackr add service` left the auth ORM schema stale.** The command set the `has<Service>Account` pending-migration sentinel and regenerated `auth/backend/lib/auth.ts`, but the schema file (`drizzle/schema.ts` / `prisma/schema.prisma`) was never rewritten, so `drizzle-kit generate` / `prisma migrate dev` had no diff to migrate. Phase B now plans both files; Phase D commits both. (#81)
+- **`ENOTEMPTY` flake on integration tests.** `MonorepoGenerator.generate()` ran `git init` + `git add .` + `git commit` against the freshly-generated project; on Linux CI, git left background work in flight and `afterEach`'s `fs.remove(tempDir)` raced with late-arriving `.git/objects/` writes. Gated `initializeGit` on a `STACKR_SKIP_GIT_INIT` env var set in `tests/utils/setup.ts`. Production CLI behavior unchanged. Side benefit: integration suite wall time dropped from ~28 s to ~10 s. (#84)
+
 ## [0.6.0] - 2026-05-12
 
 ### Added
