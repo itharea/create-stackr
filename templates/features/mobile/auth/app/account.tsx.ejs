@@ -33,7 +33,7 @@ export default function AccountScreen() {
 
     const gradientColors = theme.mode === 'dark'
         ? [theme.colors.card, 'transparent'] as const
-        : ['#ffffff', '#f8fafc'] as const;
+        : [theme.colors.background, theme.colors.backgroundSecondary] as const;
 
     const handleDeleteAccount = async () => {
         if (deleteConfirmText !== 'DELETE') {

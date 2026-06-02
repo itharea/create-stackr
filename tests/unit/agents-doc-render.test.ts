@@ -4,6 +4,8 @@ import fs from 'fs-extra';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { multiServiceConfig } from '../fixtures/configs/multi-service.js';
+import { cloneInitConfig } from '../fixtures/configs/index.js';
+import { buildAIContextPlan } from '../../src/generators/ai-context.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,73 +17,51 @@ async function renderTemplate(relPath: string, ctx: Record<string, unknown>): Pr
 }
 
 /**
- * Regression lock for the phase-2-fixes docs rewrite (fix #2).
- *
- * If anyone reintroduces `monorepo-root/` into the generated docs, or
- * drops the up-the-tree traversal language, these assertions fail.
+ * The PULL router (`templates/shared/AGENTS.md.ejs`, "walk upward and read
+ * every DESIGN.md") was retired in favour of a PUSH backbone emitted by the
+ * `ai-context` generator. These assertions lock the new shape: a lean root
+ * AGENTS.md driven by the context-map, a CLAUDE.md `@AGENTS.md` bridge, and
+ * NO surviving up-the-tree / PULL phrasing.
  */
-describe('generated AGENTS.md', () => {
-  const ctx = {
-    projectName: multiServiceConfig.projectName,
-    packageManager: multiServiceConfig.packageManager,
-    orm: multiServiceConfig.orm,
-    aiTools: multiServiceConfig.aiTools,
-    services: multiServiceConfig.services,
-    guidelineFileName: 'AGENTS.md',
-  };
+describe('generated AGENTS.md backbone (ai-context)', () => {
+  const plan = buildAIContextPlan('/proj', cloneInitConfig(multiServiceConfig));
+  const find = (rel: string): string =>
+    plan.find((e) => e.destPath === path.posix.join('/proj', rel) && e.action === 'write')
+      ?.contents ?? '';
 
-  it('does not mention the create-stackr-internal `monorepo-root/` path', async () => {
-    const rendered = await renderTemplate('templates/shared/AGENTS.md.ejs', ctx);
-    expect(rendered).not.toMatch(/monorepo-root/);
-  });
-
-  it('does not mention the `project/` create-stackr-internal path', async () => {
-    const rendered = await renderTemplate('templates/shared/AGENTS.md.ejs', ctx);
-    // Match the folder name as a path (e.g. `project/`), not as a common word
-    // (e.g. "project root"). Look for `project/` path-tokens only.
-    expect(rendered).not.toMatch(/(?:^|[\s"`'])project\//m);
-  });
-
-  it('contains up-the-tree traversal language ("upward")', async () => {
-    const rendered = await renderTemplate('templates/shared/AGENTS.md.ejs', ctx);
-    expect(rendered).toMatch(/upward/i);
-  });
-
-  it('mentions reading parent DESIGN.md files', async () => {
-    const rendered = await renderTemplate('templates/shared/AGENTS.md.ejs', ctx);
-    expect(rendered).toMatch(/parent DESIGN\.md/);
-  });
-
-  it('instructs agents to read "as deeply as" the task requires', async () => {
-    const rendered = await renderTemplate('templates/shared/AGENTS.md.ejs', ctx);
-    expect(rendered).toMatch(/as deeply as/);
-  });
-
-  it('mentions up-the-tree reading at least twice', async () => {
-    // "upward" must appear in the hierarchy/usage section AND the closing
-    // principle — the phase-2 rewrite only said it once.
-    const rendered = await renderTemplate('templates/shared/AGENTS.md.ejs', ctx);
-    const matches = rendered.match(/upward/gi) ?? [];
-    expect(matches.length).toBeGreaterThanOrEqual(2);
-  });
-
-  it('lists every service in services[] by name', async () => {
-    const rendered = await renderTemplate('templates/shared/AGENTS.md.ejs', ctx);
+  it('emits a lean root AGENTS.md with the service map and the trust-anchor rule', () => {
+    const root = find('AGENTS.md');
+    expect(root).toContain(`# ${multiServiceConfig.projectName}`);
     for (const svc of multiServiceConfig.services) {
-      expect(rendered).toContain(svc.name);
+      expect(root, `root AGENTS.md missing service ${svc.name}`).toContain(svc.name);
     }
+    expect(root).toMatch(/NEVER add `user`/);
+    expect(root).toContain('/api/auth/get-session');
   });
 
-  it('renders without leaving any raw EJS markers', async () => {
-    const rendered = await renderTemplate('templates/shared/AGENTS.md.ejs', ctx);
-    expect(rendered).not.toMatch(/<%[=_-]?/);
-    expect(rendered).not.toMatch(/%>/);
+  it('retires the PULL phrasing (no "walk upward" / "parent DESIGN.md" / internal paths)', () => {
+    const root = find('AGENTS.md');
+    expect(root).not.toMatch(/walk upward/i);
+    expect(root).not.toMatch(/parent DESIGN\.md/);
+    expect(root).not.toMatch(/monorepo-root/);
   });
 
-  it('contains DESIGN.md / BEST_PRACTICES.md closing principle', async () => {
-    const rendered = await renderTemplate('templates/shared/AGENTS.md.ejs', ctx);
-    expect(rendered).toMatch(/DESIGN\.md\s*=/);
-    expect(rendered).toMatch(/BEST_PRACTICES\.md\s*=/);
+  it('bridges Claude to AGENTS.md via an @import on the first line', () => {
+    expect(find('CLAUDE.md')).toMatch(/^@AGENTS\.md/);
+  });
+
+  it('emits a backend subsystem AGENTS.md carrying the repository try/catch rule', () => {
+    const backend = find('auth/backend/AGENTS.md');
+    expect(backend).toMatch(/ErrorFactory\.databaseError/);
+  });
+
+  it('leaves no raw EJS markers in any emitted artifact', () => {
+    for (const entry of plan) {
+      if (entry.action === 'write' && entry.contents) {
+        expect(entry.contents, `EJS marker in ${entry.destPath}`).not.toMatch(/<%[=_-]?/);
+        expect(entry.contents, `EJS marker in ${entry.destPath}`).not.toMatch(/%>/);
+      }
+    }
   });
 });
 

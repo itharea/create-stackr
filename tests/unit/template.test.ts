@@ -58,8 +58,8 @@ describe('getDestinationPath', () => {
   });
 
   it('maps shared/** to the project root (no service prefix)', () => {
-    const dst = getDestinationPath('shared/AGENTS.md.ejs', targetDir, { serviceName: 'core' });
-    expect(dst).toBe(path.join(targetDir, 'AGENTS.md'));
+    const dst = getDestinationPath('shared/.gitignore.ejs', targetDir, { serviceName: 'core' });
+    expect(dst).toBe(path.join(targetDir, '.gitignore'));
   });
 
   it('parameterizes by different service names', () => {
@@ -113,12 +113,6 @@ describe('shouldIncludeFile', () => {
     const auth = minimalConfig.services.find((s) => s.kind === 'auth')!;
     const ctx = buildServiceContext(minimalConfig, auth);
     expect(shouldIncludeFile('services/base/backend/controllers/rest-api/plugins/auth.ts.ejs', ctx)).toBe(false);
-  });
-
-  it('skips shared/AGENTS.md (rendered separately by the monorepo root pass)', () => {
-    const core = minimalConfig.services.find((s) => s.name === 'core')!;
-    const ctx = buildServiceContext(minimalConfig, core);
-    expect(shouldIncludeFile('shared/AGENTS.md.ejs', ctx)).toBe(false);
   });
 
   it('excludes domain/device-session and routes/device-sessions for non-auth services', () => {

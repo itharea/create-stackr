@@ -65,8 +65,10 @@ cd <%= svc.name %>/mobile && <%= packageManager %> start
 
 Each service has its own isolated Postgres database and Redis cache.
 Non-auth services verify requests by forwarding cookies to
-`${AUTH_SERVICE_URL}/api/auth/get-session`. See `DESIGN.md` and each
-service's own `backend/DESIGN.md` for the full picture.
+`${AUTH_SERVICE_URL}/api/auth/get-session`. See `DESIGN.md` for the
+system design, and each service's `AGENTS.md` (plus the nested
+`backend/`, `web/`, and `mobile/` `AGENTS.md` files) for the
+layer-specific conventions that agents and contributors should follow.
 
 ## Adding a service later
 

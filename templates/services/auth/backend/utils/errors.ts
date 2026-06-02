@@ -1,5 +1,3 @@
-import { FastifyError } from 'fastify';
-
 // Error codes enum for consistent error identification
 export enum ErrorCode {
   // Authentication & Authorization
