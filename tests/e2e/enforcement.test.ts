@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { MonorepoGenerator } from '../../src/generators/monorepo.js';
 import { minimalConfig } from '../fixtures/configs/minimal.js';
 import { cloneInitConfig } from '../fixtures/configs/index.js';
+import { renderEntityRepository, entityNames } from '../../src/generators/entity-codegen.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const REPO_ROOT = path.resolve(path.dirname(__filename), '../..');
@@ -47,6 +48,18 @@ describe('enforcement layer (real ast-grep + node script)', () => {
   it('ast-grep passes (no errors) on a pristine drizzle project', async () => {
     expect(await fs.pathExists(AST_GREP), '@ast-grep/cli devDep must be installed').toBe(true);
     const dir = await generate('drizzle', 'pristine-drizzle');
+    const { code, out } = astGrep(dir);
+    expect(out).not.toMatch(/error\[/);
+    expect(code).toBe(0);
+  }, 60000);
+
+  it('the `stackr add entity` generated repository PASSES the repo-catch rule (correct-by-construction)', async () => {
+    const dir = await generate('drizzle', 'entity-clean');
+    // Plant a generated entity repository (what `stackr add entity` writes) and
+    // confirm the real ast-grep gate accepts it — every catch rethrows
+    // ErrorFactory.databaseError, so the gate-able subset is satisfied at birth.
+    const repo = path.join(dir, 'core/backend/domain/widget/repository.ts');
+    await fs.outputFile(repo, renderEntityRepository('drizzle', entityNames('widget')));
     const { code, out } = astGrep(dir);
     expect(out).not.toMatch(/error\[/);
     expect(code).toBe(0);

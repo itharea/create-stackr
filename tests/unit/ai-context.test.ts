@@ -288,3 +288,58 @@ describe('writeAIContextPlan', () => {
     expect(mode).not.toBe(0); // at least one execute bit set
   });
 });
+
+// ===========================================================================
+// Claude skills (.claude/skills/**) — M4
+// ===========================================================================
+describe('Claude skills', () => {
+  it('emits backend + add-domain-entity always, web/mobile gated, when claude is selected', () => {
+    const plan = planFor({ aiTools: ['claude'] }); // fixture: web (manage) + mobile (scout)
+    expect(hasWrite(plan, '.claude/skills/stackr-backend/SKILL.md')).toBe(true);
+    expect(hasWrite(plan, '.claude/skills/add-domain-entity/SKILL.md')).toBe(true);
+    expect(hasWrite(plan, '.claude/skills/stackr-web/SKILL.md')).toBe(true);
+    expect(hasWrite(plan, '.claude/skills/stackr-mobile/SKILL.md')).toBe(true);
+  });
+
+  it('deletes the skills + hooks dirs (not just files) when claude is not selected', () => {
+    const plan = planFor({ aiTools: ['codex'] });
+    expect(hasWrite(plan, '.claude/skills/stackr-backend/SKILL.md')).toBe(false);
+    expect(hasDelete(plan, '.claude/skills')).toBe(true);
+    // dir-level delete (mirrors .cursor/rules) — no orphan empty `.claude/hooks`
+    expect(hasDelete(plan, '.claude/hooks')).toBe(true);
+    expect(hasDelete(plan, '.claude/hooks/check-edited.mjs')).toBe(false);
+    expect(hasDelete(plan, '.claude/settings.json')).toBe(true);
+  });
+
+  it('gates web/mobile skills and emits a delete when that platform is absent', () => {
+    const cfg = cloneInitConfig(multiServiceConfig);
+    cfg.aiTools = ['claude'];
+    cfg.services = cfg.services.map((s) => ({ ...s, web: null, mobile: null }));
+    const plan = buildAIContextPlan(ROOT, cfg);
+    expect(hasWrite(plan, '.claude/skills/stackr-backend/SKILL.md')).toBe(true);
+    expect(hasWrite(plan, '.claude/skills/stackr-web/SKILL.md')).toBe(false);
+    expect(hasDelete(plan, '.claude/skills/stackr-web')).toBe(true);
+    expect(hasDelete(plan, '.claude/skills/stackr-mobile')).toBe(true);
+  });
+
+  it('backend skill is paths:-globbed and carries the canonical bullets', () => {
+    const skill = write(planFor({ aiTools: ['claude'] }), '.claude/skills/stackr-backend/SKILL.md')!;
+    expect(skill.startsWith('---\n')).toBe(true);
+    expect(skill).toContain('name: stackr-backend');
+    expect(skill).toMatch(/paths:\n\s+- "\*\*\/backend\/\*\*\/\*\.ts"/);
+    expect(skill).toMatch(/ErrorFactory\.databaseError/);
+    // No inline `!`shell`` exec — a paths: skill loads on every matching edit.
+    expect(skill).not.toMatch(/^!`/m);
+  });
+
+  it('add-domain-entity skill has named arguments, no paths:, and wraps the codegen without auto-exec', () => {
+    const skill = write(
+      planFor({ aiTools: ['claude'] }),
+      '.claude/skills/add-domain-entity/SKILL.md'
+    )!;
+    expect(skill).toContain('arguments: [service, entity]');
+    expect(skill).not.toMatch(/^paths:/m); // must NOT auto-fire on file edits
+    expect(skill).toContain('stackr add entity');
+    expect(skill).not.toMatch(/!`/); // documented as a ```bash block, never inline-exec
+  });
+});

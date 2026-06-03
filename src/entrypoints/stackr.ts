@@ -3,6 +3,7 @@
 import { program } from 'commander';
 import chalk from 'chalk';
 import { runAddService } from '../commands/add-service.js';
+import { runAddEntity } from '../commands/add-entity.js';
 import { runMigrationsAck } from '../commands/migrations-ack.js';
 import { displayError } from '../utils/errors.js';
 import { validateNodeVersion } from '../utils/system-validation.js';
@@ -75,6 +76,19 @@ addCommand
     }
   });
 
+addCommand
+  .command('entity <service> <entity>')
+  .description('Scaffold a domain entity (schema + repository + service) and merge its ORM table')
+  .option('--verbose', 'Show detailed progress logging')
+  .action(async (service: string, entity: string, options: Record<string, unknown>) => {
+    try {
+      await runAddEntity(service, entity, { verbose: options.verbose as boolean | undefined });
+    } catch (error) {
+      displayError(error as Error);
+      process.exit(1);
+    }
+  });
+
 // ---------------------------------------------------------------------------
 // `stackr migrations ack <service>`
 // ---------------------------------------------------------------------------
@@ -107,6 +121,7 @@ Examples:
   $ stackr add service wallet
   $ stackr add service wallet --no-install
   $ stackr add service wallet --web --port 8083
+  $ stackr add entity blog comment
   $ stackr migrations ack auth
 
 Run ${chalk.bold('stackr <cmd> --help')} for per-command details.

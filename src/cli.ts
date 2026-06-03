@@ -88,6 +88,14 @@ export async function runCreateFlow(
     chalk.gray('you can grow the monorepo with `npx stackr add service <name>`.')
   );
 
+  if (config.aiTools.includes('claude')) {
+    nextSteps.push(
+      '',
+      chalk.gray('Claude Code: restart it inside this project to load the generated'),
+      chalk.gray('skills (.claude/skills/) and the PostToolUse lint hook.')
+    );
+  }
+
   displaySuccess('Monorepo created successfully!', nextSteps);
 }
 

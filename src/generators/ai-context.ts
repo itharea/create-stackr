@@ -528,6 +528,133 @@ process.exit(2);
 }
 
 // ===========================================================================
+// Claude skill adapters — `.claude/skills/**`. Knowledge skills auto-load via
+// the verified `paths:` SKILL.md frontmatter (the Claude analog of Cursor's
+// `.mdc globs`), sourced from the same context-map; the `add-domain-entity`
+// skill wraps the `stackr add entity` codegen.
+// ===========================================================================
+
+// Broad subsystem-level globs for each knowledge skill's deterministic
+// auto-load. Wider than the per-rule glob rules on purpose — the skill is the
+// subsystem's whole knowledge surface, not one folder's rule.
+const SKILL_PATHS: Record<Subsystem, string[]> = {
+  backend: ['**/backend/**/*.ts'],
+  web: ['**/web/**/*.tsx', '**/web/**/*.ts'],
+  mobile: ['**/mobile/**/*.tsx', '**/mobile/**/*.ts'],
+};
+
+// The 1,536-char skill-listing budget applies to the description (loaded for
+// every request); keep these tight. Bodies load only on invoke / path-match.
+const SKILL_DESCRIPTION: Record<Subsystem, (orm: string) => string> = {
+  backend: (orm) =>
+    `Fastify + TypeBox + ${orm} backend conventions — layered routes → service → repository → schema, ErrorFactory error handling, and the auth trust-anchor boundary. Use when editing any backend/ file or adding an endpoint, repository, plugin, domain entity, or test.`,
+  web: () =>
+    'Next.js (App Router) web conventions — Server Components by default, the BFF / Server-Action session model, and Zustand store rules. Use when editing any web/ file or building a page, component, server action, or store.',
+  mobile: () =>
+    'Expo / React Native mobile conventions — theme tokens (never hardcoded colors), memoized styles, native-driver animations, the shared api instance, and SecureStore token storage. Use when editing any mobile/ file or building a screen, component, or service.',
+};
+
+/** All folder rules for one subsystem (ungated by axes — the skill is only
+ *  emitted when the subsystem exists, so every rule for it is relevant). */
+function subsystemRulesForSkill(subsystem: Subsystem): ContextRule[] {
+  return CONTEXT_RULES.filter((r) => r.scope === 'folder' && r.subsystem === subsystem);
+}
+
+/**
+ * A per-area knowledge skill. `paths:`-globbed so Claude auto-loads it when
+ * editing a matching file; the body carries the MUST/NEVER bullets plus the
+ * fuller architecture prose folded out of the deleted DESIGN.md. NEVER contains
+ * a `!`shell`` inline-exec — a `paths:` skill loads on every matching edit, so
+ * an embedded command would fire constantly.
+ */
+function renderAreaSkill(subsystem: Subsystem, initConfig: InitConfig): string {
+  const rules = subsystemRulesForSkill(subsystem);
+  const pathsYaml = SKILL_PATHS[subsystem].map((p) => `  - "${p}"`).join('\n');
+  const sections = rules
+    .map((r) => `### ${RULE_TITLES[r.id] ?? r.id}\n\n${bullets(r.ruleSummary)}`)
+    .join('\n\n');
+  const arch = rules
+    .map((r) => r.architectureProse)
+    .filter(Boolean)
+    .join('\n\n');
+
+  const extras: string[] = [];
+  if (subsystem === 'backend') {
+    const project = selectProjectRules();
+    const projectArch = project
+      .map((r) => r.architectureProse)
+      .filter(Boolean)
+      .join('\n\n');
+    extras.push(
+      `## Cross-service trust anchor\n\n${projectArch}\n\n${bullets(project.flatMap((r) => r.ruleSummary))}`
+    );
+    extras.push(
+      '## Adding a domain entity\n\n' +
+        'To add a new domain slice (schema + repository + service) that compiles, run ' +
+        '`stackr add entity <service> <entity>` (or invoke the `add-domain-entity` skill). ' +
+        'It scaffolds the slice AND merges the ORM table so the repository type-checks. ' +
+        'NEVER hand-write a new schema/repository/service trio for a new entity.'
+    );
+  }
+
+  return `---
+name: stackr-${subsystem}
+description: ${SKILL_DESCRIPTION[subsystem](initConfig.orm)}
+paths:
+${pathsYaml}
+---
+# ${subsystem} conventions (MUST / NEVER)
+
+${sections}
+
+## Architecture
+
+${arch}${extras.length ? '\n\n' + extras.join('\n\n') : ''}
+`;
+}
+
+/**
+ * The codegen wrapper skill. Has NO `paths:` (must not auto-fire on edits) — it
+ * is description- / explicit-invoke triggered. The body uses a plain ```bash
+ * block (NOT a `!`shell`` inline-exec) so it never runs on load; it documents
+ * the one correct-by-construction path for new entities.
+ */
+function renderAddEntitySkill(initConfig: InitConfig): string {
+  const migrateHint =
+    initConfig.orm === 'drizzle'
+      ? 'drizzle-kit generate && drizzle-kit migrate'
+      : 'prisma migrate dev';
+  return `---
+name: add-domain-entity
+description: Scaffold a new backend domain entity (schema + repository + service) and merge its ORM table so the new code compiles. Use when adding a domain entity / model / table to a service, or when a feature request needs a new persisted resource.
+arguments: [service, entity]
+---
+# Add a domain entity (correct-by-construction)
+
+Run stackr's codegen instead of hand-writing the slice — it writes
+\`<service>/backend/domain/<entity>/{schema,repository,service}.ts\` AND merges the
+table into the service's ORM schema so the repository type-checks:
+
+\`\`\`bash
+stackr add entity $service $entity
+\`\`\`
+
+When invoked without arguments, substitute the real service and a singular
+entity name — e.g. \`stackr add entity blog comment\`.
+
+After it runs:
+- The schema change needs a migration. Run the printed command
+  (\`cd <service>/backend && ${migrateHint}\`), then \`stackr migrations ack <service>\`.
+- Wire the new repository/service into a route under
+  \`<service>/backend/controllers/rest-api/routes/\` — keep the handler thin and
+  import the generated TypeBox schema.
+
+NEVER hand-create the schema/repository/service files or hand-edit the ORM
+schema for a new entity; the codegen keeps them consistent and compiling.
+`;
+}
+
+// ===========================================================================
 // Plan builder — the single producer of every artifact.
 // ===========================================================================
 
@@ -561,6 +688,7 @@ export function buildAIContextPlan(
   const write = (rel: string, contents: string) =>
     plan.push({ destPath: path.join(targetDir, rel), action: 'write', contents });
   const del = (rel: string) => plan.push({ destPath: path.join(targetDir, rel), action: 'delete' });
+  const skillPath = (name: string) => path.join('.claude', 'skills', name, 'SKILL.md');
 
   // --- Markdown backbone (always; decoupled from any single tool selection) ---
   write('AGENTS.md', renderRootAgentsMd(initConfig));
@@ -642,9 +770,26 @@ export function buildAIContextPlan(
   if (has('claude')) {
     write(path.join('.claude', 'settings.json'), renderClaudeSettings());
     write(path.join('.claude', 'hooks', 'check-edited.mjs'), renderCheckEditedHook());
+
+    // Knowledge skills (paths:-globbed auto-load) + the codegen wrapper. Backend
+    // + add-domain-entity always ship; web/mobile gate on the live service set
+    // with a DELETE when the last service of that platform is removed.
+    const hasWeb = initConfig.services.some((s) => s.web?.enabled);
+    write(skillPath('stackr-backend'), renderAreaSkill('backend', initConfig));
+    write(skillPath('add-domain-entity'), renderAddEntitySkill(initConfig));
+
+    if (hasWeb) write(skillPath('stackr-web'), renderAreaSkill('web', initConfig));
+    else del(path.join('.claude', 'skills', 'stackr-web'));
+
+    if (hasMobile) write(skillPath('stackr-mobile'), renderAreaSkill('mobile', initConfig));
+    else del(path.join('.claude', 'skills', 'stackr-mobile'));
   } else {
+    // Remove every stackr-created `.claude` artifact at the directory level
+    // (mirrors the .cursor/rules + .windsurf/rules dir-deletes above) so no
+    // orphan empty dirs are left behind.
     del(path.join('.claude', 'settings.json'));
-    del(path.join('.claude', 'hooks', 'check-edited.mjs'));
+    del(path.join('.claude', 'hooks'));
+    del(path.join('.claude', 'skills'));
   }
 
   return plan;
