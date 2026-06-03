@@ -170,8 +170,10 @@ const SALIENCE_DELETE_GLOBS: DeleteTarget[] = [
   // every nested AGENTS.md (root + service-root + subsystem) + the Claude bridge
   { kind: 'name', value: 'AGENTS.md' },
   { kind: 'rel', value: 'CLAUDE.md' },
-  { kind: 'rel', value: '.cursorrules' },
-  { kind: 'rel', value: '.windsurfrules' },
+  // push glob-rule dirs (M3) replaced the legacy flat .cursorrules/.windsurfrules
+  { kind: 'dir', value: '.cursor' },
+  { kind: 'dir', value: '.windsurf' },
+  // .claude covers skills (M4) + the PostToolUse hook
   { kind: 'dir', value: '.claude' },
   // enforcement config is inert during an agent run, but OFF means "no context":
   { kind: 'rel', value: 'sgconfig.yml' },

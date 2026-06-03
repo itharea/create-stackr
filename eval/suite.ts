@@ -54,6 +54,213 @@ export const CONDITIONS = ['off', 'salience', 'enforcement'] as const;
 export type Condition = (typeof CONDITIONS)[number];
 
 export const SUITE: Task[] = [
+  // ===========================================================================
+  // Backend (P1–P6) — repo-catch is the shipped ast-grep gate; the route/plugin
+  // rules we do NOT ship as ast-grep are scored by grep-diff or by hand.
+  // ===========================================================================
+  {
+    id: 'P1',
+    surface: 'backend / domain',
+    gateable: true,
+    prompt:
+      'Add a comments feature to the `blog` service: a user can post a comment on an article, and we can list the comments for an article.',
+    targets: [
+      'new entity via `stackr add entity` (schema/repository/service)',
+      '`schema.ts` exports both `XSchema` and `type X = Static<typeof XSchema>`',
+      'route imports the schema rather than inlining a `Type.Object(...)`',
+      'thin handler with no try/catch',
+    ],
+    adversarialHook: 'a multi-layer feature invites a fat handler and an inline schema.',
+    confound: 'Requires a `blog` service in the pinned app (or substitute an existing service name).',
+    assertions: [
+      { id: 'repo-catch', kind: 'forbid', via: 'ast-grep', rule: 'repo-catch-database-error' },
+      {
+        id: 'schema-static-pairing',
+        kind: 'require',
+        via: 'grep-diff',
+        pattern: 'Static<typeof',
+        note: 'schema.ts exports a Static<> type alongside the TypeBox const',
+      },
+      {
+        id: 'no-inline-typebox-in-route',
+        kind: 'hand',
+        via: 'hand',
+        note: 'route imports the schema; no inline Type.Object(...) literal in the handler',
+      },
+      { id: 'thin-handler', kind: 'hand', via: 'hand', note: 'handler has no try/catch and no DB/business logic' },
+    ],
+  },
+  {
+    id: 'P2',
+    surface: 'backend / route',
+    gateable: true,
+    prompt: 'Add an endpoint to the `orders` service that returns total revenue for a given month.',
+    targets: ['thin handler (no try/catch)', 'schema imported not inlined', 'repository read with a wrapped catch'],
+    adversarialHook: '"return a computed total" tempts try-catch-in-handler and an ad-hoc inline response schema.',
+    confound: 'Requires an `orders` service in the pinned app.',
+    assertions: [
+      { id: 'repo-catch', kind: 'forbid', via: 'ast-grep', rule: 'repo-catch-database-error' },
+      { id: 'no-try-catch-in-handler', kind: 'hand', via: 'hand', note: 'errors propagate to the error-handler plugin' },
+      { id: 'no-inline-typebox-in-route', kind: 'hand', via: 'hand', note: 'response schema imported, not inlined' },
+    ],
+  },
+  {
+    id: 'P3',
+    surface: 'backend / data',
+    gateable: true,
+    prompt:
+      'Add a soft-delete to the `posts` table in the `blog` service, and make the default list query exclude deleted rows.',
+    targets: ['schema edit', 'repository query change with a wrapped catch'],
+    adversarialHook: 'a quick column add invites an unwrapped query change.',
+    confound: 'Requires a `blog` service with a `posts` table.',
+    assertions: [
+      { id: 'repo-catch', kind: 'forbid', via: 'ast-grep', rule: 'repo-catch-database-error' },
+    ],
+  },
+  {
+    id: 'P4',
+    surface: 'backend / queue',
+    gateable: false,
+    prompt:
+      'Add a background job to the `notifications` service that sends a daily digest email each morning.',
+    targets: ['BullMQ worker skeleton (codegen-able shape)', 'a new Fastify plugin wrapped in `fp()`'],
+    adversarialHook: 'scheduling work invites a hand-rolled worker that diverges from the skeleton.',
+    confound: 'Requires a `notifications` service with the event queue enabled.',
+    assertions: [
+      { id: 'worker-shape', kind: 'hand', via: 'hand', note: 'worker matches the expected BullMQ structure' },
+      { id: 'plugin-fp', kind: 'require', via: 'grep-diff', pattern: 'fp\\(', note: 'any new plugin is wrapped in fp()' },
+    ],
+  },
+  {
+    id: 'P5',
+    surface: 'backend / plugin',
+    gateable: true,
+    prompt:
+      'Add a Fastify plugin to the `billing` service that decorates the request with a configured Stripe client.',
+    targets: ['plugin wrapped in `fp()`', 'singleton db client if it touches the DB (no `new Pool()`)'],
+    adversarialHook: '"decorate the request" is exactly where the fp() wrap gets dropped.',
+    confound: 'Requires a `billing` service.',
+    assertions: [
+      { id: 'plugin-fp', kind: 'require', via: 'grep-diff', pattern: 'fp\\(', note: 'plugin wrapped in fastify-plugin' },
+      { id: 'no-new-pool', kind: 'forbid', via: 'grep-diff', pattern: 'new Pool\\(', note: 'use the singleton db client' },
+    ],
+  },
+  {
+    id: 'P6',
+    surface: 'backend / data',
+    gateable: true,
+    prompt:
+      'The `analytics` service talks to Postgres directly in a couple of places. Add a query that aggregates daily active users.',
+    targets: ['no `new Pool()` — use the singleton db client'],
+    adversarialHook: '"talks to Postgres directly" deliberately tempts a fresh `new Pool()`.',
+    confound: 'Requires an `analytics` service.',
+    assertions: [
+      { id: 'no-new-pool', kind: 'forbid', via: 'grep-diff', pattern: 'new Pool\\(', note: 'singleton db client only' },
+      { id: 'repo-catch', kind: 'forbid', via: 'ast-grep', rule: 'repo-catch-database-error' },
+    ],
+  },
+  // ===========================================================================
+  // Auth boundary (P7–P8) — no-auth-tables is the shipped ast-grep gate
+  // (Drizzle; Prisma via the node-script). The trust-anchor usage is semantic.
+  // ===========================================================================
+  {
+    id: 'P7',
+    surface: 'auth boundary',
+    gateable: false,
+    prompt:
+      'The `billing` service needs to show the logged-in user their current subscription. Add an endpoint that returns it, accessible only to that user.',
+    targets: [
+      'verify the session by forwarding the cookie to `${AUTH_SERVICE_URL}/api/auth/get-session`',
+      'do NOT add a local user/session table or import auth’s schema',
+    ],
+    adversarialHook: '"accessible only to the logged-in user" tempts a local session check or a local users table.',
+    confound: 'Requires a `billing` service alongside `auth`.',
+    assertions: [
+      { id: 'no-auth-tables', kind: 'forbid', via: 'ast-grep', rule: 'no-auth-tables-outside-auth' },
+      { id: 'no-auth-schema-import', kind: 'hand', via: 'hand', note: 'no import resolving into auth’s domain schema' },
+      {
+        id: 'trust-anchor-used',
+        kind: 'hand',
+        via: 'hand',
+        note: 'code references the auth URL / decorated request.user rather than rolling its own session check',
+      },
+    ],
+  },
+  {
+    id: 'P8',
+    surface: 'auth boundary',
+    gateable: false,
+    prompt: 'Add teams to the `billing` service: a user can belong to a team, and we store the membership.',
+    targets: ['no user table outside auth', 'reference auth’s user by id via the trust anchor, don’t duplicate the table'],
+    adversarialHook: '"a user belongs to a team" strongly tempts a local users table or a direct FK into auth’s schema.',
+    confound: 'Requires a `billing` service alongside `auth`.',
+    assertions: [
+      { id: 'no-auth-tables', kind: 'forbid', via: 'ast-grep', rule: 'no-auth-tables-outside-auth' },
+      { id: 'membership-by-user-id', kind: 'hand', via: 'hand', note: 'membership references the user by id, no local users table' },
+    ],
+  },
+  // ===========================================================================
+  // Web (P9–P12) — none of these are shipped as ast-grep rules; scored by
+  // grep-diff (directives, useShallow, revalidateTag) + hand (granularity).
+  // ===========================================================================
+  {
+    id: 'P9',
+    surface: 'web',
+    gateable: false,
+    prompt:
+      'Add a favorites feature to the web app: a logged-in user can favorite an article, and we show their favorites on a `/favorites` page.',
+    targets: ['Zustand selectors use `useShallow`', 'one domain per store', 'Server Components by default', 'session read via the BFF pattern'],
+    adversarialHook: 'list + toggle state invites a multi-domain store and unshallow selectors.',
+    confound: 'Requires a web service.',
+    assertions: [
+      { id: 'use-shallow', kind: 'require', via: 'grep-diff', pattern: 'useShallow', note: 'new store selectors use useShallow' },
+      { id: 'store-granularity', kind: 'hand', via: 'hand', note: 'one domain per store; Server/Client split correct' },
+    ],
+  },
+  {
+    id: 'P10',
+    surface: 'web',
+    gateable: true,
+    prompt: 'Build a settings page where a user can update their display name and avatar.',
+    targets: ["`actions.ts` is `'use server'`", "`session.ts` imports `'server-only'`", 'Server Component default'],
+    adversarialHook: 'a form page tempts a client component plus an unguarded server action.',
+    confound: 'Requires a web service.',
+    assertions: [
+      { id: 'use-server', kind: 'require', via: 'grep-diff', pattern: "['\"]use server['\"]", note: "server action declares 'use server'" },
+      { id: 'server-only', kind: 'require', via: 'grep-diff', pattern: "['\"]server-only['\"]", note: "session helper imports 'server-only'" },
+    ],
+  },
+  {
+    id: 'P11',
+    surface: 'web',
+    gateable: true,
+    prompt: 'After a user updates their profile, other pages show stale profile data. Fix the revalidation.',
+    targets: ["avoid `revalidateTag(tag, 'max')`"],
+    adversarialHook: '"fix the stale cache" tempts the ‘max’ profile.',
+    confound: 'Requires a web service.',
+    assertions: [
+      {
+        id: 'avoid-revalidatetag-max',
+        kind: 'forbid',
+        via: 'grep-diff',
+        pattern: 'revalidateTag\\([^)]*max',
+        note: "revalidateTag(tag, 'max') leaves stale data; use updateTag(tag)",
+      },
+    ],
+  },
+  {
+    id: 'P12',
+    surface: 'web',
+    gateable: false,
+    prompt: 'Add a notifications dropdown to the web header that shows the unread count and updates as items are read.',
+    targets: ['`useShallow`', 'one-domain-per-store'],
+    adversarialHook: 'counts + list + read-state invite one bloated store with broad selectors.',
+    confound: 'Requires a web service.',
+    assertions: [
+      { id: 'use-shallow', kind: 'require', via: 'grep-diff', pattern: 'useShallow', note: 'selectors use useShallow' },
+      { id: 'store-boundaries', kind: 'hand', via: 'hand', note: 'unread/list/read-state are not merged into one bloated store' },
+    ],
+  },
   {
     id: 'P13',
     surface: 'mobile / components + theme',
@@ -133,6 +340,59 @@ export const SUITE: Task[] = [
         via: 'grep-diff',
         pattern: '(expo-secure-store|SecureStore)',
         note: 'token stored via SecureStore',
+      },
+    ],
+  },
+  // ===========================================================================
+  // Tests (P17) + config/CLI capability-discovery probe (P18).
+  // ===========================================================================
+  {
+    id: 'P17',
+    surface: 'tests',
+    gateable: true,
+    prompt: 'Add integration tests for the new comments endpoints.',
+    targets: ['no shared fixtures', 'no truncate/cleanup between tests', 'use `uniqueEmail()`'],
+    adversarialHook: '"integration tests" tempts a shared setup + truncate teardown.',
+    confound: 'Requires the comments endpoints from P1 to exist (chain P1 → P17, or seed them).',
+    assertions: [
+      {
+        id: 'no-truncate',
+        kind: 'forbid',
+        via: 'grep-diff',
+        pattern: '(truncate|TRUNCATE)',
+        note: 'no per-test truncate/cleanup',
+      },
+      {
+        id: 'uses-unique-email',
+        kind: 'require',
+        via: 'grep-diff',
+        pattern: 'uniqueEmail\\(',
+        note: 'test data arranged inline with uniqueEmail()',
+      },
+      { id: 'no-shared-fixtures', kind: 'hand', via: 'hand', note: 'no shared fixture/factory file introduced' },
+    ],
+  },
+  {
+    id: 'P18',
+    surface: 'config / CLI',
+    gateable: false,
+    prompt: "We're adding a `search` service to the project. Set it up.",
+    targets: ['never hand-edit `stackr.config.json`', 'the correct path is `stackr add service`'],
+    adversarialHook: '"set it up" tempts hand-editing config/compose files directly.',
+    confound:
+      'Capability-discovery probe: scored from the agent transcript/tool calls, not only the diff — did it invoke `stackr add service`?',
+    assertions: [
+      {
+        id: 'invoked-add-service',
+        kind: 'hand',
+        via: 'hand',
+        note: 'transcript shows `stackr add service search`, not a hand-edit of stackr.config.json / docker-compose',
+      },
+      {
+        id: 'no-config-hand-edit',
+        kind: 'hand',
+        via: 'hand',
+        note: 'stackr.config.json + docker-compose.yml were not edited by hand (CI-style config-vs-compose diff)',
       },
     ],
   },

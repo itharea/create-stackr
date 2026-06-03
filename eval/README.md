@@ -1,16 +1,23 @@
-# Agent-context effectiveness eval (mobile slice)
+# Agent-context effectiveness eval
 
 A stackr-generated project ships several layers meant to make an AI coding agent
-follow the project's conventions: nested `AGENTS.md` files, `CLAUDE.md`, Cursor/
-Windsurf rule files (**salience** — getting the right rule in front of the agent),
+follow the project's conventions: nested `AGENTS.md` files, `CLAUDE.md`, Cursor
+`.cursor/rules/*.mdc` / Windsurf `.windsurf/rules/*.md` glob rules, and Claude
+`.claude/skills/**` (**salience** — getting the right rule in front of the agent),
 plus ast-grep rules and a PostToolUse hook (**enforcement** — catching violations
 and feeding them back for self-repair).
 
 This suite measures **how much those layers actually change an agent's first-pass
-compliance**, on the mobile rule class (theming, animation, data-fetching, secure
-token storage — tickets **P13–P16**). It runs each task under three conditions and
-scores the agent's diff with the project's own ast-grep rules, so the numbers are
-objective rather than vibes.
+compliance**. It runs each task under three conditions and scores the agent's diff
+with the project's own ast-grep rules (plus grep-diff + hand assertions), so the
+numbers are objective rather than vibes.
+
+`suite.ts` holds the **full 18-ticket suite (`P1`–`P18`)** spanning backend,
+auth-boundary, web, mobile, tests, and the config/CLI capability probe (see the
+*Coverage matrix* in `LLM_CONTEXT_PLAN.md`). The **mobile slice (`P13`–`P16`)** is
+the fully-automated reference because Claude Code automates headlessly and the
+mobile rules are the highest-value shipped ast-grep gates; the other tickets are
+runnable but need the harness caveats in *Running the full suite* below.
 
 The **task suite (`suite.ts`) is the durable asset**; the `harness/` driver is a
 throwaway rig you point at a generated app.
@@ -64,7 +71,7 @@ throwaway rig you point at a generated app.
 
 | Condition | Context files | Reinject hook | Isolates |
 |---|---|---|---|
-| `off` | stripped (all `AGENTS.md`, `CLAUDE.md`, `.cursorrules`, `.windsurfrules`, `.claude/`, `sgconfig.yml`, `.stackr/`) | none | baseline |
+| `off` | stripped (all `AGENTS.md`, `CLAUDE.md`, `.cursor/`, `.windsurf/`, `.claude/`, `sgconfig.yml`, `.stackr/`) | none | baseline |
 | `salience` | present | none | push delivery alone |
 | `enforcement` | present | **mobile ast-grep hook** | the check-and-reinject loop on top |
 
@@ -160,6 +167,49 @@ EVAL_MODELS=haiku,sonnet,opus \
   node eval/harness/run.ts --task P13adv --runs 3
 ```
 
+## Running the full suite (P1–P12, P17–P18)
+
+The mobile slice runs out of the box. The rest of the suite is authored and
+type-checked, but two throwaway-harness realities apply (the plan's "framework is
+throwaway; the suite is the durable asset"):
+
+1. **The pinned app must contain the named services.** The tickets reference
+   `blog`, `orders`, `notifications`, `billing`, `analytics`, plus web — generate
+   a richer pinned app (extend `harness/generate-app.ts`, or run `stackr add
+   service` to provision them), or substitute the app's actual service names in
+   the prompt at run time. `P18` is a capability probe: it expects an app where
+   adding `search` is the *task*, scored from the transcript.
+2. **The grep scorer is currently mobile-scoped.** `harness/score.ts` filters
+   added lines to the mobile subsystem; generalize that filter (or scope per
+   ticket's `surface`) before trusting the backend/web `grep-diff` rows. The
+   `ast-grep` rows (`repo-catch-database-error`, `no-auth-tables-outside-auth`)
+   are already subsystem-independent and score correctly today.
+
+Tickets carry a `confound` note where a prerequisite (a service, a prior ticket's
+output) must be set up first.
+
+## Standing per-release protocol
+
+Run this as a release checklist item (directional, never a CI gate):
+
+1. **Pin + generate.** Check out the release commit, `npm run build`,
+   `node eval/harness/generate-app.ts` (records the SHA in `.work/provenance.json`).
+2. **Mobile slice, automated.** `--setup`, then `--runs 10` across the three
+   conditions for `P13`–`P16`. Record `Δ off→salience` and `Δ salience→enforcement`
+   per ticket + spread.
+3. **Fresh-scaffold spot-check.** One non-`--setup` pass (no `npm install`) to
+   confirm the reinject hook no-ops cleanly before deps exist — the state an agent
+   first edits in.
+4. **Broader tickets, as scoped.** Run the backend/auth/web/tests tickets you have
+   provisioned services for; resolve `hand` assertions manually (no LLM judge).
+5. **Cause-label every violation** (absent-from-context / present-but-ignored /
+   present-but-misapplied) — that label, not the raw count, says whether the next
+   dollar buys salience or a new gate.
+6. **Cross-tool smoke.** Cursor/Windsurf/Claude do not automate identically — run
+   `smoke-test/SMOKE_PROTOCOL.md` for the IDE rule-loading half.
+
+Record the result JSON + the cause-label pass alongside the release notes.
+
 ## Interpreting the result
 
 - **`Δ off→salience` large** → push delivery is doing real work. **Small** →
@@ -190,7 +240,7 @@ EVAL_MODELS=haiku,sonnet,opus \
 ```
 eval/
 ├── README.md             # this doc
-├── suite.ts              # P13–P16 tickets + scorer metadata (durable asset)
+├── suite.ts              # P1–P18 tickets + scorer metadata (durable asset)
 ├── tsconfig.json         # type-checks the harness (noEmit); npm run typecheck:eval
 ├── .gitignore            # ignores .work/
 └── harness/              # throwaway driver
