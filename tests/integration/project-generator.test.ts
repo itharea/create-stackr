@@ -188,12 +188,15 @@ describe('MonorepoGenerator — AI tool file generation', () => {
     expect(await fs.pathExists(path.join(projectDir, '.windsurfrules'))).toBe(false);
   });
 
-  it('cursor adds .cursorrules, windsurf adds .windsurfrules, claude adds the .claude hook', async () => {
+  it('cursor adds .cursor/rules/*.mdc, windsurf adds .windsurf/rules/*.md, claude adds the .claude hook — never the legacy flat files', async () => {
     const projectDir = await generateWithAiTools(['codex', 'claude', 'cursor', 'windsurf']);
     expect(await fs.pathExists(path.join(projectDir, 'AGENTS.md'))).toBe(true);
     expect(await fs.pathExists(path.join(projectDir, 'CLAUDE.md'))).toBe(true);
-    expect(await fs.pathExists(path.join(projectDir, '.cursorrules'))).toBe(true);
-    expect(await fs.pathExists(path.join(projectDir, '.windsurfrules'))).toBe(true);
+    // Push glob rules replace the retired flat single-file formats.
+    expect(await fs.pathExists(path.join(projectDir, '.cursor/rules/backend-domain.mdc'))).toBe(true);
+    expect(await fs.pathExists(path.join(projectDir, '.windsurf/rules/backend-domain.md'))).toBe(true);
+    expect(await fs.pathExists(path.join(projectDir, '.cursorrules'))).toBe(false);
+    expect(await fs.pathExists(path.join(projectDir, '.windsurfrules'))).toBe(false);
     expect(await fs.pathExists(path.join(projectDir, '.claude/settings.json'))).toBe(true);
     expect(await fs.pathExists(path.join(projectDir, '.claude/hooks/check-edited.mjs'))).toBe(true);
   });

@@ -42,6 +42,27 @@ describe('add service — agent context regen', () => {
     expect(rule).not.toMatch(/^\s*-\s*"auth\/backend\/drizzle/m);
   });
 
+  it('regenerates the Cursor push glob rules for the new service (and never the legacy flat file)', async () => {
+    fixture = await createAddServiceFixture('regen-cursor', {
+      orm: 'drizzle',
+      aiTools: ['codex', 'cursor'],
+    });
+    const { projectDir } = fixture;
+
+    await runAddService('vault', { install: false });
+
+    // Glob rules are root-level + project-wide, so they exist after the add.
+    expect(await fs.pathExists(path.join(projectDir, '.cursor/rules/backend-domain.mdc'))).toBe(true);
+    const rule = await fs.readFile(
+      path.join(projectDir, '.cursor/rules/backend-domain.mdc'),
+      'utf-8'
+    );
+    expect(rule.startsWith('---\n')).toBe(true);
+    expect(rule).toContain('globs: **/backend/domain/**/*.ts');
+    // The retired flat file is never written.
+    expect(await fs.pathExists(path.join(projectDir, '.cursorrules'))).toBe(false);
+  });
+
   it('regenerates the CLAUDE.md bridge and keeps it pointing at AGENTS.md', async () => {
     fixture = await createAddServiceFixture('regen-claude', { orm: 'drizzle', aiTools: ['codex', 'claude'] });
     const { projectDir } = fixture;

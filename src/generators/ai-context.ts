@@ -9,8 +9,11 @@
  *
  *   - nested `AGENTS.md` (root + service-root + backend/web/mobile subsystems)
  *   - root `CLAUDE.md` = `@AGENTS.md` bridge (Claude ignores AGENTS.md)
- *   - transitional flat `.cursorrules` / `.windsurfrules` (legacy single-file
- *     formats; retired once the M3 glob-rule layer ships)
+ *   - push glob rules: `.cursor/rules/*.mdc` (Cursor) + `.windsurf/rules/*.md`
+ *     (Windsurf), one file per applicable folder rule, auto-attached by glob —
+ *     these replace the retired flat `.cursorrules` / `.windsurfrules`
+ *   - Claude skills: `.claude/skills/**` (knowledge skills `paths:`-globbed from
+ *     the same triggerGlobs, plus the `add-domain-entity` codegen wrapper)
  *   - the ast-grep enforcement config: `sgconfig.yml` + `.stackr/sg-rules/*`
  *   - the Claude-Code PostToolUse hook (`.claude/settings.json` + the hook
  *     script) — only when `claude` is a selected tool
@@ -81,6 +84,26 @@ const RULE_TITLES: Record<string, string> = {
   'mobile-components': 'Components & theme (`mobile/src/components/`)',
   'mobile-services': 'Services & lib (`mobile/src/services/`, `mobile/src/lib/`)',
 };
+
+// Short, human descriptions for each folder rule's glob-rule frontmatter
+// (Cursor `.mdc` / Windsurf `.md`). Presentation-only, so it lives here rather
+// than in the pure-data context-map.
+const RULE_DESCRIPTIONS: Record<string, string> = {
+  'backend-domain': 'Backend domain layer conventions (schema, repository, service)',
+  'backend-routes': 'Fastify route handler conventions for the REST API layer',
+  'backend-plugins': 'Fastify plugin conventions (fastify-plugin wrapping, boot order)',
+  'backend-utils': 'Backend utils conventions (singleton db client, ErrorFactory)',
+  'backend-tests': 'Backend test conventions (no shared fixtures, no per-test cleanup)',
+  'web-app': 'Next.js App Router conventions (Server Components, session reads)',
+  'web-lib-auth': 'Web lib/auth conventions (server-only session, use-server actions)',
+  'web-store': 'Zustand store conventions (useShallow, one domain per store)',
+  'mobile-components': 'Mobile component + theme conventions (theme tokens, native driver)',
+  'mobile-services': 'Mobile service layer conventions (shared api instance, SecureStore)',
+};
+
+function ruleDescription(rule: ContextRule): string {
+  return RULE_DESCRIPTIONS[rule.id] ?? RULE_TITLES[rule.id] ?? rule.id;
+}
 
 const SUBSYSTEM_INTRO: Record<Subsystem, (orm: string) => string> = {
   backend: (orm) => `Fastify + TypeBox + ${orm}, layered routes → service → repository → schema.`,
@@ -236,52 +259,60 @@ ${sections}
 `;
 }
 
-/**
- * Flat single-file rules for the legacy `.cursorrules` / `.windsurfrules`
- * formats. Renders the project rules plus every applicable folder rule once
- * (deduped by id across services) — these formats are read globally, not by
- * glob, so they carry the full set. Retired in M3 when per-glob rules ship.
- */
-function renderFlatRules(initConfig: InitConfig): string {
-  const seen = new Set<string>();
-  const groups: { subsystem: Subsystem; rules: ContextRule[] }[] = [
-    { subsystem: 'backend', rules: [] },
-    { subsystem: 'web', rules: [] },
-    { subsystem: 'mobile', rules: [] },
-  ];
+// ===========================================================================
+// Push glob-rule adapters — Cursor `.mdc` + Windsurf `.md`. One file per
+// applicable folder rule; the agent's tool auto-attaches it by glob when a
+// matching file is edited. These replace the retired flat single-file formats.
+// Both bodies derive from the SAME `ruleSummary`, so they cannot disagree.
+// ===========================================================================
 
+/**
+ * Cursor `.cursor/rules/<id>.mdc`. Footguns the syntax guards against:
+ *  - `globs` MUST be a BARE comma-separated string — never a YAML array, never
+ *    quoted — or Cursor silently never matches.
+ *  - the file MUST start with `---\n` (no leading whitespace) or the
+ *    frontmatter is ignored.
+ *  - do NOT rely on `alwaysApply: true` (demoted to "requestable" in 3.0.16+);
+ *    Auto-Attach = `alwaysApply: false` + `globs`.
+ */
+function renderCursorRule(rule: ContextRule): string {
+  return `---
+description: ${ruleDescription(rule)}
+globs: ${rule.triggerGlobs.join(', ')}
+alwaysApply: false
+---
+${bullets(rule.ruleSummary)}
+`;
+}
+
+/**
+ * Windsurf `.windsurf/rules/<id>.md`. `trigger: glob` + `globs:` loads the body
+ * only on a file match; bodies are capped at 12,000 chars/file (our rule bodies
+ * are a handful of bullets — far under, asserted in the unit test).
+ */
+function renderWindsurfRule(rule: ContextRule): string {
+  return `---
+trigger: glob
+globs: ${rule.triggerGlobs.join(', ')}
+description: ${ruleDescription(rule)}
+---
+${bullets(rule.ruleSummary)}
+`;
+}
+
+/**
+ * The set of folder-rule ids that apply to ANY service in this project (union
+ * across services). For v1 the glob rules are emitted root-level (not per
+ * nested service dir), so a rule is emitted once if any service triggers it.
+ */
+function applicableFolderRuleIds(initConfig: InitConfig): Set<string> {
+  const ids = new Set<string>();
   for (const svc of initConfig.services) {
-    const axes = serviceAxes(initConfig, svc);
-    for (const rule of selectServiceRules(axes)) {
-      if (seen.has(rule.id) || !rule.subsystem) continue;
-      seen.add(rule.id);
-      groups.find((g) => g.subsystem === rule.subsystem)?.rules.push(rule);
+    for (const rule of selectServiceRules(serviceAxes(initConfig, svc))) {
+      if (rule.scope === 'folder') ids.add(rule.id);
     }
   }
-
-  const project = selectProjectRules();
-  const sections = groups
-    .filter((g) => g.rules.length > 0)
-    .map((g) => {
-      const body = g.rules
-        .map((r) => `#### ${RULE_TITLES[r.id] ?? r.id}\n\n${bullets(r.ruleSummary)}`)
-        .join('\n\n');
-      return `### ${g.subsystem}\n\n${body}`;
-    })
-    .join('\n\n');
-
-  return `# ${initConfig.projectName} — agent rules
-
-Generated by stackr from a single source. Do not edit by hand; re-run stackr.
-
-## Cross-service (MUST / NEVER)
-
-${bullets(project.flatMap((r) => r.ruleSummary))}
-
-## By layer
-
-${sections}
-`;
+  return ids;
 }
 
 // ===========================================================================
@@ -578,12 +609,35 @@ export function buildAIContextPlan(
     else del(path.join('.stackr', 'sg-rules', file));
   }
 
-  // --- Tool-gated artifacts (with deletes when a tool is not selected) ---
-  if (has('cursor')) write('.cursorrules', renderFlatRules(initConfig));
-  else del('.cursorrules');
+  // --- Push glob rules (Cursor `.mdc` / Windsurf `.md`) — one file per
+  //     applicable folder rule. Wholesale-regenerated; user edits discarded. ---
+  const folderRules = CONTEXT_RULES.filter((r) => r.scope === 'folder');
+  const applicable = applicableFolderRuleIds(initConfig);
 
-  if (has('windsurf')) write('.windsurfrules', renderFlatRules(initConfig));
-  else del('.windsurfrules');
+  // The legacy single-file formats are retired (M3): never written, always
+  // deleted so a regen / `migrate context` sweep removes any stale copy.
+  del('.cursorrules');
+  del('.windsurfrules');
+
+  if (has('cursor')) {
+    for (const rule of folderRules) {
+      const rel = path.join('.cursor', 'rules', `${rule.id}.mdc`);
+      if (applicable.has(rule.id)) write(rel, renderCursorRule(rule));
+      else del(rel); // a now-inapplicable rule (e.g. last mobile service removed)
+    }
+  } else {
+    del(path.join('.cursor', 'rules')); // tool dropped → remove the whole dir
+  }
+
+  if (has('windsurf')) {
+    for (const rule of folderRules) {
+      const rel = path.join('.windsurf', 'rules', `${rule.id}.md`);
+      if (applicable.has(rule.id)) write(rel, renderWindsurfRule(rule));
+      else del(rel);
+    }
+  } else {
+    del(path.join('.windsurf', 'rules'));
+  }
 
   if (has('claude')) {
     write(path.join('.claude', 'settings.json'), renderClaudeSettings());

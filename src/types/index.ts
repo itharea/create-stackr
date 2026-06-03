@@ -7,12 +7,14 @@ export type Platform = 'mobile' | 'web';
 // AI coding tool choices
 export type AITool = 'claude' | 'codex' | 'cursor' | 'windsurf';
 
-// Maps each AI tool to its convention filename
+// Maps each AI tool to the convention artifact stackr emits for it (used for
+// the CLI summary). Cursor/Windsurf use glob-scoped rule DIRECTORIES as of M3;
+// the legacy single-file `.cursorrules` / `.windsurfrules` formats are retired.
 export const AI_TOOL_FILES: Record<AITool, string> = {
   claude: 'CLAUDE.md',
   codex: 'AGENTS.md',
-  cursor: '.cursorrules',
-  windsurf: '.windsurfrules',
+  cursor: '.cursor/rules/',
+  windsurf: '.windsurf/rules/',
 };
 
 /**

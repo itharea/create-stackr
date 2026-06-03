@@ -98,16 +98,23 @@ describe('buildAIContextPlan — baseline + gating', () => {
     expect(hasWrite(plan, 'core/mobile/AGENTS.md')).toBe(false);
   });
 
-  it('gates tool-specific artifacts and emits deletes when a tool is absent', () => {
+  it('gates push glob rules + retires the legacy flat files, with deletes when a tool is absent', () => {
     const none = planFor({ aiTools: ['codex'] });
+    // legacy flat files are always retired (never written, always deleted)
     expect(hasWrite(none, '.cursorrules')).toBe(false);
     expect(hasDelete(none, '.cursorrules')).toBe(true);
     expect(hasDelete(none, '.windsurfrules')).toBe(true);
+    // no glob-rule dirs when neither tool is selected
+    expect(hasWrite(none, '.cursor/rules/backend-domain.mdc')).toBe(false);
+    expect(hasDelete(none, '.cursor/rules')).toBe(true);
+    expect(hasDelete(none, '.windsurf/rules')).toBe(true);
     expect(hasDelete(none, '.claude/settings.json')).toBe(true);
 
     const all = planFor({ aiTools: ['codex', 'claude', 'cursor', 'windsurf'] });
-    expect(hasWrite(all, '.cursorrules')).toBe(true);
-    expect(hasWrite(all, '.windsurfrules')).toBe(true);
+    expect(hasWrite(all, '.cursorrules')).toBe(false);
+    expect(hasDelete(all, '.cursorrules')).toBe(true);
+    expect(hasWrite(all, '.cursor/rules/backend-domain.mdc')).toBe(true);
+    expect(hasWrite(all, '.windsurf/rules/backend-domain.md')).toBe(true);
     expect(hasWrite(all, '.claude/settings.json')).toBe(true);
     expect(hasWrite(all, '.claude/hooks/check-edited.mjs')).toBe(true);
   });
@@ -117,8 +124,8 @@ describe('buildAIContextPlan — baseline + gating', () => {
     const plan = buildAIContextPlan(ROOT, cfg, {
       aiTools: ['cursor', 'bogus-tool' as never],
     });
-    expect(hasWrite(plan, '.cursorrules')).toBe(true);
-    expect(hasDelete(plan, '.windsurfrules')).toBe(true);
+    expect(hasWrite(plan, '.cursor/rules/backend-domain.mdc')).toBe(true);
+    expect(hasDelete(plan, '.windsurf/rules')).toBe(true);
   });
 
   it('emits the Drizzle no-auth-tables rule only for drizzle projects with an auth + non-auth split', () => {
@@ -180,39 +187,70 @@ describe('buildAIContextPlan — baseline + gating', () => {
 // ===========================================================================
 describe('single source of truth (cross-format rule-body agreement)', () => {
   const plan = planFor({ aiTools: ['codex', 'claude', 'cursor', 'windsurf'] });
-  const cursor = write(plan, '.cursorrules')!;
-  const windsurf = write(plan, '.windsurfrules')!;
 
-  it('renders .cursorrules and .windsurfrules byte-identically from the one source', () => {
-    expect(cursor).toBe(windsurf);
-  });
+  // The bullet lines from a glob-rule file body (after stripping frontmatter).
+  const bodyBullets = (text: string): string[] =>
+    text
+      .replace(/^---[\s\S]*?\n---\n/, '')
+      .split('\n')
+      .filter((l) => l.startsWith('- '));
 
-  it('every project-scope bullet appears verbatim in the root AGENTS.md and the flat rules', () => {
-    const root = write(plan, 'AGENTS.md')!;
-    for (const rule of selectProjectRules()) {
-      for (const bullet of rule.ruleSummary) {
-        expect(root, `root AGENTS.md missing: ${bullet}`).toContain(bullet);
-        expect(cursor, `.cursorrules missing: ${bullet}`).toContain(bullet);
-      }
-    }
-  });
-
-  it('every applicable folder bullet appears verbatim in the flat rules', () => {
+  // Folder-rule ids applicable to the fixture project.
+  const applicableFolderIds = (): Set<string> => {
     const cfg = cloneInitConfig(multiServiceConfig);
-    const applicable = new Set<string>();
+    const ids = new Set<string>();
     for (const svc of cfg.services) {
       const platforms = [
         ...(svc.web?.enabled ? ['web' as const] : []),
         ...(svc.mobile?.enabled ? ['mobile' as const] : []),
       ];
       for (const rule of selectServiceRules({ kind: svc.kind, platforms, orm: cfg.orm })) {
-        rule.ruleSummary.forEach((b) => applicable.add(b));
+        if (rule.scope === 'folder') ids.add(rule.id);
       }
     }
-    expect(applicable.size).toBeGreaterThan(0);
-    for (const bullet of applicable) {
-      expect(cursor, `.cursorrules missing folder bullet: ${bullet}`).toContain(bullet);
+    return ids;
+  };
+
+  it('renders each folder rule body identically across Cursor `.mdc` and Windsurf `.md`', () => {
+    const ids = applicableFolderIds();
+    expect(ids.size).toBeGreaterThan(0);
+    for (const id of ids) {
+      const cur = write(plan, `.cursor/rules/${id}.mdc`);
+      const win = write(plan, `.windsurf/rules/${id}.md`);
+      expect(cur, `cursor rule ${id} missing`).toBeDefined();
+      expect(win, `windsurf rule ${id} missing`).toBeDefined();
+      expect(bodyBullets(cur!), `bodies differ for ${id}`).toEqual(bodyBullets(win!));
     }
+  });
+
+  it('every project-scope bullet appears verbatim in the root AGENTS.md', () => {
+    const root = write(plan, 'AGENTS.md')!;
+    for (const rule of selectProjectRules()) {
+      for (const bullet of rule.ruleSummary) {
+        expect(root, `root AGENTS.md missing: ${bullet}`).toContain(bullet);
+      }
+    }
+  });
+
+  it('every applicable folder bullet appears verbatim in its Cursor glob rule', () => {
+    const cfg = cloneInitConfig(multiServiceConfig);
+    let checked = 0;
+    for (const svc of cfg.services) {
+      const platforms = [
+        ...(svc.web?.enabled ? ['web' as const] : []),
+        ...(svc.mobile?.enabled ? ['mobile' as const] : []),
+      ];
+      for (const rule of selectServiceRules({ kind: svc.kind, platforms, orm: cfg.orm })) {
+        if (rule.scope !== 'folder') continue;
+        const cur = write(plan, `.cursor/rules/${rule.id}.mdc`);
+        expect(cur, `missing cursor rule ${rule.id}`).toBeDefined();
+        for (const bullet of rule.ruleSummary) {
+          expect(cur!, `.cursor/rules/${rule.id}.mdc missing: ${bullet}`).toContain(bullet);
+          checked++;
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(0);
   });
 });
 

@@ -204,7 +204,7 @@ export class MonorepoGenerator {
 
   /**
    * Emit every agent-facing artifact (nested AGENTS.md, CLAUDE.md bridge,
-   * transitional .cursorrules/.windsurfrules, ast-grep enforcement config, and
+   * push glob rules (.cursor/rules, .windsurf/rules), ast-grep enforcement config, and
    * the claude-gated PostToolUse hook) from the single context-map source via
    * the `ai-context` generator — the sole writer of these files. The baseline
    * AGENTS.md + CLAUDE.md ship on every init regardless of `aiTools`; the
