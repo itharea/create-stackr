@@ -14,6 +14,9 @@
     "dev:rest-api": "<% if (packageManager === 'bun') { %>bun --watch<% } else { %>tsx watch<% } %> ./controllers/rest-api/index.ts | pino-pretty --colorize",<% if (backend.eventQueue) { %>
     "dev:event-queue": "<% if (packageManager === 'bun') { %>bun --watch<% } else { %>tsx watch<% } %> ./controllers/event-queue/index.ts | pino-pretty --colorize",<% } %>
     "build": "tsc",
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "check": "<%= packageManager %> run lint && <%= packageManager %> run typecheck",
     "start:rest-api": "<% if (packageManager === 'bun') { %>bun run<% } else { %>tsx<% } %> ./controllers/rest-api/index.ts",<% if (backend.eventQueue) { %>
     "start:event-queue": "<% if (packageManager === 'bun') { %>bun run<% } else { %>tsx<% } %> ./controllers/event-queue/index.ts",<% } %><% if (backend.orm === 'prisma') { %>
     "db:generate": "prisma generate",
@@ -52,7 +55,11 @@
   },
   "devDependencies": {
     "@inquirer/prompts": "~8.4.1",
-    "@types/node": "~24.0.0",<% if (backend.orm === 'prisma') { %>
+    "@types/node": "~24.0.0",
+    "@eslint/js": "^9.0.0",
+    "eslint": "^9.0.0",
+    "typescript-eslint": "^8.0.0",
+    "@eslint-community/eslint-plugin-eslint-comments": "^4.0.0",<% if (backend.orm === 'prisma') { %>
     "prisma": "~7.0.0",<% } %><% if (backend.orm === 'drizzle') { %>
     "drizzle-kit": "~0.30.0",
     "@types/pg": "~8.11.0",<% } %>

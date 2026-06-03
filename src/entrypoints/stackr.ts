@@ -3,7 +3,10 @@
 import { program } from 'commander';
 import chalk from 'chalk';
 import { runAddService } from '../commands/add-service.js';
+import { runAddEntity } from '../commands/add-entity.js';
 import { runMigrationsAck } from '../commands/migrations-ack.js';
+import { runDoctor } from '../commands/doctor.js';
+import { runMigrateContext } from '../commands/migrate-context.js';
 import { displayError } from '../utils/errors.js';
 import { validateNodeVersion } from '../utils/system-validation.js';
 import { readStackrVersion } from '../utils/version.js';
@@ -75,6 +78,19 @@ addCommand
     }
   });
 
+addCommand
+  .command('entity <service> <entity>')
+  .description('Scaffold a domain entity (schema + repository + service) and merge its ORM table')
+  .option('--verbose', 'Show detailed progress logging')
+  .action(async (service: string, entity: string, options: Record<string, unknown>) => {
+    try {
+      await runAddEntity(service, entity, { verbose: options.verbose as boolean | undefined });
+    } catch (error) {
+      displayError(error as Error);
+      process.exit(1);
+    }
+  });
+
 // ---------------------------------------------------------------------------
 // `stackr migrations ack <service>`
 // ---------------------------------------------------------------------------
@@ -96,6 +112,50 @@ migrationsCommand
   });
 
 // ---------------------------------------------------------------------------
+// `stackr doctor [--fix]`
+// ---------------------------------------------------------------------------
+
+program
+  .command('doctor')
+  .description('Check that the agent-context layer is in sync with stackr.config.json')
+  .option('--fix', 'Regenerate any drifted agent-context artifacts from the single source')
+  .action(async (options: Record<string, unknown>) => {
+    try {
+      const result = await runDoctor({ fix: options.fix as boolean | undefined });
+      // CI-gateable: unfixed drift exits non-zero.
+      if (!result.fixed && result.drift.length > 0) {
+        process.exitCode = 1;
+      }
+    } catch (error) {
+      displayError(error as Error);
+      process.exit(1);
+    }
+  });
+
+// ---------------------------------------------------------------------------
+// `stackr migrate context [--dry-run]`
+// ---------------------------------------------------------------------------
+
+const migrateCommand = program
+  .command('migrate')
+  .description('Migrate parts of an existing stackr project to the current layout');
+
+migrateCommand
+  .command('context')
+  .description(
+    'Regenerate the agent-context layer (AGENTS.md, glob rules, skills, enforcement) and retire legacy .cursorrules/.windsurfrules'
+  )
+  .option('--dry-run', 'Print the write/delete plan without touching disk')
+  .action(async (options: Record<string, unknown>) => {
+    try {
+      await runMigrateContext({ dryRun: options.dryRun as boolean | undefined });
+    } catch (error) {
+      displayError(error as Error);
+      process.exit(1);
+    }
+  });
+
+// ---------------------------------------------------------------------------
 // Help text
 // ---------------------------------------------------------------------------
 
@@ -107,7 +167,11 @@ Examples:
   $ stackr add service wallet
   $ stackr add service wallet --no-install
   $ stackr add service wallet --web --port 8083
+  $ stackr add entity blog comment
   $ stackr migrations ack auth
+  $ stackr doctor
+  $ stackr doctor --fix
+  $ stackr migrate context --dry-run
 
 Run ${chalk.bold('stackr <cmd> --help')} for per-command details.
 

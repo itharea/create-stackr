@@ -182,7 +182,7 @@ export default function VerifyEmailScreen() {
                 style={[
                   styles.otpInput,
                   {
-                    borderColor: error ? "#dc2626" : colors.border,
+                    borderColor: error ? colors.error : colors.border,
                     color: colors.text,
                     backgroundColor: colors.background,
                   },
@@ -201,7 +201,7 @@ export default function VerifyEmailScreen() {
             ))}
           </View>
 
-          {error && <Text style={styles.error}>{error}</Text>}
+          {error && <Text style={[styles.error, { color: colors.error }]}>{error}</Text>}
 
           {isVerifying && (
             <Text style={[styles.verifying, { color: colors.textSecondary }]}>
@@ -283,7 +283,6 @@ const styles = StyleSheet.create({
     fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
   },
   error: {
-    color: "#dc2626",
     textAlign: "center",
     marginBottom: 16,
     fontSize: 14,

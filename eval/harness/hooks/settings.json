@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 120,
+            "command": "node .claude/hooks/check-edited-mobile.mts"
+          }
+        ]
+      }
+    ]
+  }
+}

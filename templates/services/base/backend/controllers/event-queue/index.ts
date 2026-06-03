@@ -11,8 +11,8 @@ const redisConnection = new Redis({
   maxRetriesPerRequest: null,
 });
 
-// Create a account worker
-const userWorker = createUserWorker(redisConnection, {
+// Start the user worker (autorun begins processing immediately).
+createUserWorker(redisConnection, {
   concurrency: 20,
   autorun: true,
 });

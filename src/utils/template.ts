@@ -45,11 +45,6 @@ export function shouldIncludeFile(
     return false;
   }
 
-  // Skip AGENTS.md — rendered separately by the monorepo root pass
-  if (filePath.includes('shared/AGENTS.md')) {
-    return false;
-  }
-
   // Per-kind divergence: only the auth service renders auth subtrees, and
   // only non-auth services render base subtrees. This applies to both
   // backend and web — the auth admin dashboard (`services/auth/web/`) is a
@@ -263,6 +258,13 @@ export function shouldIncludeProjectFile(
   // already exists on disk (see add-service.ts::planProjectE2ERegen).
   // Also gated on `anyTests` — an empty matrix is invalid YAML for GHA.
   if (normalized.endsWith('.github/workflows/test.yml.ejs') && (!ctx.ciWorkflow || !anyTests)) {
+    return false;
+  }
+
+  // Phase 7 — enforcement CI (ESLint + typecheck matrix + root ast-grep). Same
+  // `--ci-workflow` opt-in as test.yml, but NOT gated on `anyTests`: lint and
+  // typecheck run on every service regardless of whether tests are scaffolded.
+  if (normalized.endsWith('.github/workflows/lint.yml.ejs') && !ctx.ciWorkflow) {
     return false;
   }
 

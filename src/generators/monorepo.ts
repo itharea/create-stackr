@@ -8,8 +8,8 @@ import { saveStackrConfig } from '../utils/config-file.js';
 import { initializeGit } from '../utils/git.js';
 import { cleanup } from '../utils/cleanup.js';
 import type { InitConfig } from '../types/index.js';
-import { AI_TOOL_FILES } from '../types/index.js';
 import { ServiceGenerator } from './service.js';
+import { buildAIContextPlan, writeAIContextPlan } from './ai-context.js';
 import { buildServiceContext, buildStackrConfig } from './service-context.js';
 import { renderDockerCompose } from './docker-compose.js';
 import { renderDockerComposeTest } from './docker-compose-test.js';
@@ -202,29 +202,17 @@ export class MonorepoGenerator {
     }
   }
 
+  /**
+   * Emit every agent-facing artifact (nested AGENTS.md, CLAUDE.md bridge,
+   * push glob rules (.cursor/rules, .windsurf/rules), ast-grep enforcement config, and
+   * the claude-gated PostToolUse hook) from the single context-map source via
+   * the `ai-context` generator — the sole writer of these files. The baseline
+   * AGENTS.md + CLAUDE.md ship on every init regardless of `aiTools`; the
+   * tool-specific layers gate themselves inside `buildAIContextPlan`.
+   */
   private async generateAIToolFiles(): Promise<void> {
-    if (!this.initConfig.aiTools || this.initConfig.aiTools.length === 0) {
-      return;
-    }
-
-    const templatePath = path.join(TEMPLATE_DIR, 'shared/AGENTS.md.ejs');
-    if (!(await fs.pathExists(templatePath))) {
-      return;
-    }
-    const templateContent = await fs.readFile(templatePath, 'utf-8');
-
-    for (const tool of this.initConfig.aiTools) {
-      const fileName = AI_TOOL_FILES[tool];
-      const rendered = ejs.render(templateContent, {
-        projectName: this.initConfig.projectName,
-        packageManager: this.initConfig.packageManager,
-        orm: this.initConfig.orm,
-        services: this.initConfig.services,
-        aiTools: this.initConfig.aiTools,
-        guidelineFileName: fileName,
-      });
-      await fs.writeFile(path.join(this.targetDir, fileName), rendered);
-    }
+    const plan = buildAIContextPlan(this.targetDir, this.initConfig);
+    await writeAIContextPlan(plan);
   }
 
   private async initializeGit(): Promise<void> {

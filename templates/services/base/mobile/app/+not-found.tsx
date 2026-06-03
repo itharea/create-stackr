@@ -1,9 +1,13 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { Button } from '../src/components/ui/button';
+import { useAppTheme, AppTheme } from '@/context/theme-context';
 
 export default function NotFoundScreen() {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   const handleGoHome = () => {
     router.replace('/(tabs)');
   };
@@ -23,7 +27,7 @@ export default function NotFoundScreen() {
       <Text style={styles.description}>
         The page you're looking for doesn't exist or has been moved.
       </Text>
-      
+
       <View style={styles.actions}>
         <Button
           title="Go Back"
@@ -41,44 +45,44 @@ export default function NotFoundScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.background,
   },
-  
+
   title: {
     fontSize: 72,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: theme.colors.primary,
     marginBottom: 16,
   },
-  
+
   message: {
     fontSize: 24,
     fontWeight: '600',
-    color: '#000000',
+    color: theme.colors.text,
     marginBottom: 8,
     textAlign: 'center',
   },
-  
+
   description: {
     fontSize: 16,
-    color: '#8E8E93',
+    color: theme.colors.textSecondary,
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 32,
   },
-  
+
   actions: {
     gap: 12,
     width: '100%',
     maxWidth: 300,
   },
-  
+
   button: {
     width: '100%',
   },

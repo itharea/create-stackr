@@ -43,6 +43,10 @@ export default defineConfig({
       'smoke-test/**',
       'smoke-tests/**',
       'tmp/**',
+      // The eval harness scaffolds a throwaway app under eval/.work/ (gitignored)
+      // that ships its own Postgres/Redis-backed suite — not part of the CLI's
+      // own tests. Same rationale as smoke-test/** above.
+      'eval/.work/**',
       // Exclude build tests in watch mode
       ...(process.env.VITEST_WATCH ? ['**/tests/e2e/build-verification.test.ts'] : []),
     ],

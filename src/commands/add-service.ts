@@ -22,6 +22,7 @@ import { coreEntry, noIntegrations } from '../config/presets.js';
 import { stackrConfigToInitConfig } from '../generators/service-context.js';
 import { ServiceGenerator } from '../generators/service.js';
 import { buildServiceContext } from '../generators/service-context.js';
+import { buildAIContextPlan, writeAIContextPlan } from '../generators/ai-context.js';
 import { renderDockerCompose } from '../generators/docker-compose.js';
 import { renderDockerComposeTest } from '../generators/docker-compose-test.js';
 import { writeEnvFilesWithCredentials } from '../generators/env-files.js';
@@ -337,14 +338,25 @@ export async function runAddService(
     // re-derive the flag from whether the file already exists on disk.
     // A project that opted in stays opted in (and the new service lands
     // in the matrix); a project without the workflow stays workflow-free.
-    const ciWorkflowPath = path.join(root, '.github/workflows/test.yml');
-    const ciWorkflow = await fs.pathExists(ciWorkflowPath);
+    // Opt-in is re-derived from disk: either CI workflow being present means
+    // the project chose `--ci-workflow` (lint.yml ships even with --no-tests,
+    // so check both — test.yml alone would miss that case).
+    const ciWorkflow =
+      (await fs.pathExists(path.join(root, '.github/workflows/test.yml'))) ||
+      (await fs.pathExists(path.join(root, '.github/workflows/lint.yml')));
     if (ciWorkflow) {
-      infos.push(
-        `Regenerated .github/workflows/test.yml with ${name} in the component matrix.`
-      );
+      infos.push(`Regenerated .github/workflows/{test,lint}.yml with ${name} in the matrix.`);
     }
     const plannedProjectE2E = await planProjectE2ERegen(root, newConfig, ciWorkflow);
+
+    // Agent-context regen from the single context-map source: the nested
+    // AGENTS.md tree, CLAUDE.md bridge, transitional cursor/windsurf rules, the
+    // ast-grep enforcement config, and the claude PostToolUse hook. Driving this
+    // here keeps every artifact in lockstep with the live service set — the
+    // drift gap the old standalone AI-tool pass left open. Pure (no I/O); the
+    // writes/deletes run in the Phase-D sweep below.
+    const plannedAIContext = buildAIContextPlan(root, newInitConfig);
+    infos.push('Regenerated agent context (AGENTS.md tree, CLAUDE.md, .stackr/sg-rules).');
 
     // =======================================================================
     // Phase C — dry-run validation
@@ -445,6 +457,11 @@ export async function runAddService(
         await fs.writeFile(entry.destPath, entry.contents!, 'utf-8');
       }
     }
+
+    // 4c. Agent-context regen — sole writer of the AGENTS.md tree, CLAUDE.md
+    //     bridge, transitional cursor/windsurf rules, ast-grep config, and the
+    //     claude hook. Staged (pure) in Phase B; committed here before config.
+    await writeAIContextPlan(plannedAIContext);
 
     // 5. Save stackr.config.json LAST so an interrupted run leaves the
     //    config as the reliable indicator of partial completion.
@@ -1138,7 +1155,20 @@ async function planProjectE2ERegen(
   const testAllScript = 'project/scripts/test-all.mjs.ejs';
   const pkgFile = 'project/package.json.ejs';
   const ciWorkflowFile = 'project/.github/workflows/test.yml.ejs';
-  const managed = [...e2eFiles, testE2eScript, testAllScript, pkgFile, ciWorkflowFile];
+  // Phase 7 — enforcement CI + the Prisma auth-boundary script. lint.yml is
+  // gated on `ciWorkflow` (not tests); the auth-check script is static but is
+  // refreshed here so projects created before it gain it on the next add.
+  const lintWorkflowFile = 'project/.github/workflows/lint.yml.ejs';
+  const checkAuthTablesScript = 'project/scripts/check-auth-tables.mjs';
+  const managed = [
+    ...e2eFiles,
+    testE2eScript,
+    testAllScript,
+    pkgFile,
+    ciWorkflowFile,
+    lintWorkflowFile,
+    checkAuthTablesScript,
+  ];
 
   for (const file of managed) {
     const absTemplatePath = path.join(TEMPLATE_DIR, file);

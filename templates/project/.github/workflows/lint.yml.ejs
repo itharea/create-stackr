@@ -1,0 +1,39 @@
+name: Lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  rules:
+    # Tool-agnostic structural enforcement: ast-grep + the Prisma auth-boundary
+    # check. Runs from the repo root.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - run: bun run lint:sg
+      - run: bun run check:auth-tables
+
+  backend:
+    # Per-service ESLint + typecheck. No workspaces in a stackr monorepo, so each
+    # backend installs and runs in its own working directory (mirrors test.yml).
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+<% services.forEach((s) => { -%>
+          - <%= s.name %>
+<% }); -%>
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+        working-directory: ${{ matrix.service }}/backend
+      - run: bun run lint
+        working-directory: ${{ matrix.service }}/backend
+      - run: bun run typecheck
+        working-directory: ${{ matrix.service }}/backend

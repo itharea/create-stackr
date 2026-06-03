@@ -26,7 +26,7 @@ export default function HomeScreen() {
   // Gradient colors based on theme
   const gradientColors = theme.mode === 'dark'
     ? [theme.colors.card, 'transparent'] as const
-    : ['#ffffff', '#f8fafc'] as const;
+    : [theme.colors.background, theme.colors.backgroundSecondary] as const;
 
 <% if (features.authentication.enabled) { %>  const handleLogout = async () => {
     const result = await signOut();

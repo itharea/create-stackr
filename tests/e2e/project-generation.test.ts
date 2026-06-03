@@ -40,7 +40,7 @@ describe('E2E — project generation file-level assertions (minimal)', () => {
   });
 
   it('no unreplaced EJS tokens in any generated .ts/.md/.json', async () => {
-    const files = await globby(['**/*.ts', '**/*.tsx', '**/*.md', '**/*.json'], {
+    const files = await globby(['**/*.ts', '**/*.tsx', '**/*.md', '**/*.json', '**/*.mjs', '**/*.yml'], {
       cwd: projectDir,
       onlyFiles: true,
       dot: true,
@@ -165,7 +165,7 @@ describe('E2E — project generation file-level assertions (multi-service)', () 
   });
 
   it('no unreplaced EJS tokens in any .ts/.md/.json file', async () => {
-    const files = await globby(['**/*.ts', '**/*.tsx', '**/*.md', '**/*.json'], {
+    const files = await globby(['**/*.ts', '**/*.tsx', '**/*.md', '**/*.json', '**/*.mjs', '**/*.yml'], {
       cwd: projectDir,
       onlyFiles: true,
       dot: true,

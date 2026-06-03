@@ -4,6 +4,10 @@
     setup: 'node scripts/setup.mjs',
     'docker:dev': 'docker compose up -d',
     'docker:prod': 'docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d',
+    // Structural enforcement (see .stackr/sg-rules + AGENTS.md): ast-grep scans
+    // the whole tree; check-auth-tables enforces the auth boundary for Prisma.
+    'lint:sg': 'ast-grep scan',
+    'check:auth-tables': 'node scripts/check-auth-tables.mjs',
   };
   if (services.some((s) => s.backend.tests)) {
     scripts['test'] = 'node scripts/test-all.mjs';
@@ -15,8 +19,10 @@
   "version": "0.1.0",
   "private": true,
   "description": "Monorepo scaffolded with create-stackr",
+  "trustedDependencies": ["@ast-grep/cli"],
   "scripts": <%- JSON.stringify(scripts, null, 2).replace(/\n/g, '\n  ') %>,
   "devDependencies": {
+    "@ast-grep/cli": "^0.43.0",
     "create-stackr": "^<%= stackrVersion %>",
     "inquirer": "^10.0.0"
   }

@@ -7,7 +7,6 @@ import { MonorepoGenerator } from '../../src/generators/monorepo.js';
 import { loadStackrConfig } from '../../src/utils/config-file.js';
 import { PRESETS, loadPreset } from '../../src/config/presets.js';
 import { applyCliOptionsToPreset } from '../../src/prompts/index.js';
-import { AI_TOOL_FILES } from '../../src/types/index.js';
 import type { AITool, InitConfig } from '../../src/types/index.js';
 import { multiServiceConfig } from '../fixtures/configs/multi-service.js';
 import { cloneInitConfig } from '../fixtures/configs/index.js';
@@ -169,43 +168,44 @@ describe('MonorepoGenerator — AI tool file generation', () => {
     return projectDir;
   }
 
-  it('codex alone generates AGENTS.md and nothing else', async () => {
+  // Baseline AGENTS.md + CLAUDE.md ship on EVERY init (Resolved decision 2),
+  // decoupled from the codex/claude selection so the `@AGENTS.md` import in
+  // CLAUDE.md never dangles. Tool-specific layers gate themselves.
+  it('codex alone still gets the AGENTS.md + CLAUDE.md baseline, no cursor/windsurf/claude layers', async () => {
     const projectDir = await generateWithAiTools(['codex']);
     expect(await fs.pathExists(path.join(projectDir, 'AGENTS.md'))).toBe(true);
-    expect(await fs.pathExists(path.join(projectDir, 'CLAUDE.md'))).toBe(false);
+    expect(await fs.pathExists(path.join(projectDir, 'CLAUDE.md'))).toBe(true);
+    expect(await fs.pathExists(path.join(projectDir, '.cursorrules'))).toBe(false);
+    expect(await fs.pathExists(path.join(projectDir, '.windsurfrules'))).toBe(false);
+    expect(await fs.pathExists(path.join(projectDir, '.claude/settings.json'))).toBe(false);
+  });
+
+  it('empty aiTools still gets the AGENTS.md + CLAUDE.md baseline and no tool layers', async () => {
+    const projectDir = await generateWithAiTools([]);
+    expect(await fs.pathExists(path.join(projectDir, 'AGENTS.md'))).toBe(true);
+    expect(await fs.pathExists(path.join(projectDir, 'CLAUDE.md'))).toBe(true);
     expect(await fs.pathExists(path.join(projectDir, '.cursorrules'))).toBe(false);
     expect(await fs.pathExists(path.join(projectDir, '.windsurfrules'))).toBe(false);
   });
 
-  it('codex + claude generates both AGENTS.md and CLAUDE.md', async () => {
-    const projectDir = await generateWithAiTools(['codex', 'claude']);
+  it('cursor adds .cursor/rules/*.mdc, windsurf adds .windsurf/rules/*.md, claude adds the .claude hook — never the legacy flat files', async () => {
+    const projectDir = await generateWithAiTools(['codex', 'claude', 'cursor', 'windsurf']);
     expect(await fs.pathExists(path.join(projectDir, 'AGENTS.md'))).toBe(true);
     expect(await fs.pathExists(path.join(projectDir, 'CLAUDE.md'))).toBe(true);
+    // Push glob rules replace the retired flat single-file formats.
+    expect(await fs.pathExists(path.join(projectDir, '.cursor/rules/backend-domain.mdc'))).toBe(true);
+    expect(await fs.pathExists(path.join(projectDir, '.windsurf/rules/backend-domain.md'))).toBe(true);
+    expect(await fs.pathExists(path.join(projectDir, '.cursorrules'))).toBe(false);
+    expect(await fs.pathExists(path.join(projectDir, '.windsurfrules'))).toBe(false);
+    expect(await fs.pathExists(path.join(projectDir, '.claude/settings.json'))).toBe(true);
+    expect(await fs.pathExists(path.join(projectDir, '.claude/hooks/check-edited.mjs'))).toBe(true);
   });
 
-  it('empty aiTools generates none of the four files', async () => {
+  it('always ships the ast-grep enforcement config regardless of aiTools', async () => {
     const projectDir = await generateWithAiTools([]);
-    for (const fileName of Object.values(AI_TOOL_FILES)) {
-      expect(await fs.pathExists(path.join(projectDir, fileName))).toBe(false);
-    }
-  });
-
-  it('all four tools generates all four files', async () => {
-    const projectDir = await generateWithAiTools(['codex', 'claude', 'cursor', 'windsurf']);
-    for (const fileName of Object.values(AI_TOOL_FILES)) {
-      expect(await fs.pathExists(path.join(projectDir, fileName))).toBe(true);
-    }
-  });
-
-  it('all rendered AI tool files share the same content (single source of truth)', async () => {
-    const projectDir = await generateWithAiTools(['codex', 'claude', 'cursor', 'windsurf']);
-    // All 4 files must come from templates/shared/AGENTS.md.ejs and must
-    // contain the fix-#2 regression-lock phrases.
-    for (const fileName of Object.values(AI_TOOL_FILES)) {
-      const contents = await fs.readFile(path.join(projectDir, fileName), 'utf-8');
-      expect(contents).toMatch(/upward/i);
-      expect(contents).toMatch(/parent DESIGN\.md/);
-      expect(contents).not.toMatch(/monorepo-root/);
-    }
+    expect(await fs.pathExists(path.join(projectDir, 'sgconfig.yml'))).toBe(true);
+    expect(
+      await fs.pathExists(path.join(projectDir, '.stackr/sg-rules/repo-catch-database-error.yml'))
+    ).toBe(true);
   });
 });
