@@ -1,0 +1,14 @@
+{
+  "//": "Type-checks the eval harness's TS files (suite.ts, harness/generate-app.ts) WITHOUT emitting. The root build (tsconfig.json) scopes itself to src/**, so it never touches eval/; this project checks it. The generated app under .work/ holds hundreds of generated .ts files and MUST stay excluded. Run via `npm run typecheck:eval`.",
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "..",
+    "allowImportingTsExtensions": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false
+  },
+  "include": ["**/*.ts", "**/*.mts"],
+  "exclude": ["node_modules", ".work"]
+}

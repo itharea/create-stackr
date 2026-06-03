@@ -30,6 +30,7 @@
     "lint": "eslint src tests",
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
     "typecheck": "tsc --noEmit",
+    "typecheck:eval": "tsc -p eval",
     "prepublishOnly": "bun run build"
   },
   "keywords": [
