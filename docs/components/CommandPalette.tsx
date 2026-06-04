@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Command } from 'cmdk';
 import { useRouter } from 'next/navigation';
-import { Search, FileText, Settings, Laptop, Moon, Sun } from 'lucide-react';
+import { Search, FileText, Settings, Laptop, Moon, Sun, Boxes, Sparkles } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
@@ -67,6 +67,13 @@ export default function CommandPalette() {
                     </Command.Item>
                     <Command.Item
                         className={styles.item}
+                        onSelect={() => runCommand(() => router.push('/docs/quick-start'))}
+                    >
+                        <FileText size={16} />
+                        <span>Quick Start</span>
+                    </Command.Item>
+                    <Command.Item
+                        className={styles.item}
                         onSelect={() => runCommand(() => router.push('/docs/configuration'))}
                     >
                         <Settings size={16} />
@@ -74,20 +81,37 @@ export default function CommandPalette() {
                     </Command.Item>
                 </Command.Group>
 
-                <Command.Group heading="Features">
+                <Command.Group heading="Architecture">
                     <Command.Item
                         className={styles.item}
-                        onSelect={() => runCommand(() => router.push('/docs/features/authentication'))}
+                        onSelect={() => runCommand(() => router.push('/docs/architecture'))}
                     >
-                        <FileText size={16} />
-                        <span>Authentication</span>
+                        <Boxes size={16} />
+                        <span>Architecture Overview</span>
                     </Command.Item>
                     <Command.Item
                         className={styles.item}
-                        onSelect={() => runCommand(() => router.push('/docs/features/paywall'))}
+                        onSelect={() => runCommand(() => router.push('/docs/architecture/auth-flow'))}
                     >
-                        <FileText size={16} />
-                        <span>Paywall</span>
+                        <Boxes size={16} />
+                        <span>Cross-Service Auth</span>
+                    </Command.Item>
+                </Command.Group>
+
+                <Command.Group heading="The Context Harness">
+                    <Command.Item
+                        className={styles.item}
+                        onSelect={() => runCommand(() => router.push('/docs/harness'))}
+                    >
+                        <Sparkles size={16} />
+                        <span>Why a Harness</span>
+                    </Command.Item>
+                    <Command.Item
+                        className={styles.item}
+                        onSelect={() => runCommand(() => router.push('/docs/harness/enforcement'))}
+                    >
+                        <Sparkles size={16} />
+                        <span>Enforcement</span>
                     </Command.Item>
                 </Command.Group>
 

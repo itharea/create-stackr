@@ -1,0 +1,79 @@
+export const metadata = {
+    title: 'Adding a Service',
+    description: 'Use stackr add service to add an isolated microservice to an existing monorepo — atomically, without breaking your edits.',
+};
+
+<div className="prose">
+
+# Adding a Service
+
+You don't have to decide your whole architecture up front. `stackr add service` adds a
+new, fully isolated microservice to an existing monorepo and wires it into Docker
+Compose, the root `.env`, `stackr.config.json`, and — if present — the CI matrix.
+
+<CodeBlock code="npx stackr add service wallet" language="bash" />
+
+## Flags
+
+<Table
+    headers={['Flag', 'Effect']}
+    rows={[
+        ['--auth-middleware <type>', 'standard | role-gated | flexible | none (default: standard when auth exists)'],
+        ['--web', 'Also scaffold a per-service Next.js frontend'],
+        ['--mobile', 'Also scaffold an Expo mobile app'],
+        ['--event-queue / --no-event-queue', 'Enable / disable a BullMQ + Redis worker'],
+        ['--port <n>', 'Explicit REST API port (otherwise auto-allocated above 8080)'],
+        ['--no-install', 'Skip the package-manager install step'],
+        ['--no-tests', 'Skip Vitest scaffolding for this service'],
+        ['--force', 'Bypass the pending-migration refusal'],
+        ['--verbose', 'Detailed output'],
+    ]}
+/>
+
+<CodeBlock
+    code={`# A role-gated service with a web frontend on an explicit port
+npx stackr add service billing --auth-middleware role-gated --web --port 8083
+
+# A mobile-enabled service with an event queue
+npx stackr add service notifications --mobile --event-queue`}
+    language="bash"
+/>
+
+## It's atomic
+
+Adding a service touches managed files you may have hand-edited (`docker-compose.yml`,
+the ORM schema, `backend/package.json`). stackr does this safely:
+
+1. **Validate** the request against `stackr.config.json` (read-only).
+2. **Stage** every write into a tempdir and **dry-run** the merged YAML and schema.
+3. **Merge** new blocks with an [additive AST merge](/docs/architecture/infrastructure#regeneration-without-clobbering-your-edits)
+   — your existing services, comments, and formatting are preserved.
+4. **Commit** atomically. If any step fails, the project is left **byte-identical**.
+
+The same generator that runs at init regenerates the
+[harness artifacts](/docs/harness), so the new service's `AGENTS.md`, rules, and skills
+appear automatically.
+
+## Pending migrations
+
+If adding a service changes the auth schema (for example, a new
+`has<Service>Account` flag), stackr records a **pending migration** and refuses further
+`stackr` subcommands until you run it and acknowledge:
+
+<CodeBlock
+    code={`# run the printed migration, then:
+npx stackr migrations ack auth`}
+    language="bash"
+/>
+
+This guarantees the database and the config never silently diverge. Use `--force` only if
+you know the schema is already migrated.
+
+## After it runs
+
+1. `npm run setup` (or your package manager) to install the new workspace's deps if you
+   passed `--no-install`.
+2. `npm run docker:dev` to boot the expanded stack.
+3. Build out the service's domain with [`stackr add entity`](/docs/guides/add-entity).
+
+</div>

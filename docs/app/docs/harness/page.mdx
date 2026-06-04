@@ -1,0 +1,91 @@
+export const metadata = {
+    title: 'Why a Harness',
+    description: 'The push-based context harness keeps a stackr project on-convention after generation — by delivering and enforcing rules from a single source of truth.',
+};
+
+<div className="prose">
+
+# Why a Harness
+
+A scaffold gives you a correct *starting point*. The hard problem is keeping the
+architecture correct through hundreds of edits — especially when an AI agent is making
+many of them. stackr's answer is the **context harness**: the set of files, rules, and
+hooks that deliver the project's conventions to your editor and your agents, and
+mechanically enforce the parts that can be checked.
+
+<ContextHarnessVisual />
+
+## The problem it solves
+
+Conventions written in a README are advisory. The moment work starts, drift creeps in:
+business logic slips into a route handler, a second service grows a `user` table, error
+handling diverges, a mobile component hardcodes a color. A human reviewer might catch
+some of it; an AI agent generating code at speed will reproduce whatever it isn't
+actively told not to.
+
+The harness exists to make the conventions **present at the moment of action** — and to
+**fail loudly** when the mechanically-checkable ones are violated.
+
+## Push, not pull (and no MCP server)
+
+stackr delivers context by **writing it into the repository** as files your tools
+already read — nested `AGENTS.md`, editor rule files, Claude skills. The agent
+encounters the right rule because it's editing a matching file, not because it
+remembered to ask a server.
+
+That's a deliberate choice over an **MCP server** the agent must query:
+
+- **No runtime dependency.** The rules are plain text on disk — always available, no
+  process to run, no port to manage.
+- **Nothing to forget.** Push delivery doesn't rely on the agent deciding to fetch
+  context; the editor surfaces it by glob match.
+- **Always in sync.** Every artifact is regenerated from one source whenever the
+  project shape changes, so the rules can't go stale against the code.
+
+## One source of truth
+
+Every agent-facing artifact is rendered from a single table — `CONTEXT_RULES` in
+`src/config/context-map.ts` — by one generator. The nested `AGENTS.md`, the `CLAUDE.md`
+bridge, the Cursor and Windsurf glob rules, the Claude skills, and the `ast-grep` rules
+all derive from the same rule definitions. **They cannot disagree** about which rules
+apply or what they say. And because both `create-stackr` and `stackr add service` drive
+that one generator, the artifacts never drift from the live set of services.
+
+## Salience vs. enforcement (an honest split)
+
+The harness has two distinct jobs, and stackr is careful not to overstate the first:
+
+<Table
+    headers={['Layer', 'What it does', 'Examples']}
+    rows={[
+        ['Salience', 'Raises first-pass compliance by putting the right rule in front of the agent. Probabilistic — it does not enforce.', 'AGENTS.md, CLAUDE.md, Cursor/Windsurf rules, Claude skills'],
+        ['Enforcement', 'Mechanically catches violations and feeds them back for self-repair — for the checkable subset, once deps are installed.', 'ast-grep rules, the PostToolUse hook, check:auth-tables'],
+    ]}
+/>
+
+Salience makes the agent *more likely* to get it right; enforcement makes a checkable
+mistake *fail*. Codegen is a third lever — [`stackr add entity`](/docs/harness/codegen)
+sidesteps both by generating correct-by-construction code.
+
+## It's measured, not asserted
+
+stackr ships an evaluation suite (`eval/`) that runs coding tasks under three
+conditions — context **off**, **salience** (rules present), and **enforcement** (rules
++ reinject hook) — and scores the agent's diff with the project's own `ast-grep` rules.
+The two headline deltas, `Δ off→salience` and `Δ salience→enforcement`, separate "does
+push delivery help" from "does the check-and-reinject loop add reliability on top." The
+point isn't a marketing number — it's that the harness's value is treated as something
+to measure and improve, not a claim.
+
+## The pieces
+
+<Table
+    headers={['Page', 'Layer']}
+    rows={[
+        [<a key="context" href="/docs/harness/context">Convention Layer</a>, 'AGENTS.md, the CLAUDE.md bridge, Cursor/Windsurf rules, Claude skills'],
+        [<a key="enforcement" href="/docs/harness/enforcement">Enforcement</a>, 'ast-grep rules, lint:sg, check:auth-tables, the PostToolUse hook'],
+        [<a key="codegen" href="/docs/harness/codegen">Codegen & Anti-Drift</a>, 'stackr add entity, idempotent regeneration, doctor'],
+    ]}
+/>
+
+</div>

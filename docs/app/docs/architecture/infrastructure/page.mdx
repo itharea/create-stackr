@@ -1,0 +1,97 @@
+export const metadata = {
+    title: 'Infrastructure',
+    description: 'Docker Compose, deterministic ports, generated credentials, and how stackr regenerates managed files without clobbering your edits.',
+};
+
+<div className="prose">
+
+# Infrastructure
+
+The monorepo is wired together by Docker Compose and a small set of root scripts. The
+goal is that one command brings up every service — each with its own database and
+Redis — reproducibly.
+
+## Docker Compose
+
+stackr generates three compose files:
+
+<Table
+    headers={['File', 'Purpose']}
+    rows={[
+        ['docker-compose.yml', 'Local development — every service backend + its own Postgres and Redis'],
+        ['docker-compose.test.yml', 'Ephemeral databases for the component and e2e test profiles'],
+        ['docker-compose.prod.yml', 'Production overlay, applied on top of the base file'],
+    ]}
+/>
+
+<CodeBlock
+    code={`npm run docker:dev    # docker compose up -d
+npm run docker:prod   # base + prod overlay`}
+    language="bash"
+/>
+
+## Setup
+
+`npm run setup` (run once after generating) installs dependencies in every workspace,
+generates `.env` files, and offers to reset stale Docker volumes left over from a
+previous run.
+
+## Ports
+
+Ports are allocated deterministically so committed scripts and CI stay reproducible:
+
+<Table
+    headers={['Port', 'Assignment']}
+    rows={[
+        ['8082 / 3002', 'Auth backend / admin dashboard (fixed)'],
+        ['8080, 8081, …', 'Base backends (skip 8082)'],
+        ['3000, 3001, …', 'Base web frontends (skip 3002)'],
+        ['+10000', 'Test profile offset (db 15432+, redis 16379+, app 18080+)'],
+    ]}
+/>
+
+## Credentials
+
+At init, stackr generates **strong random credentials** — a 24-character database
+password per service and a 64-character hex `BETTER_AUTH_SECRET` — and writes them into
+a root `.env` plus per-service `backend/.env`. A committed `.env.example` carries
+placeholders. The real `.env` files are git-ignored.
+
+## Regeneration without clobbering your edits
+
+When you run [`stackr add service`](/docs/guides/add-service), stackr must touch files
+you may have hand-edited — `docker-compose.yml`, the ORM schema, each
+`backend/package.json`. It does this with an **additive AST merge**, not text
+templating or marker comments:
+
+- **TypeScript** files are merged with `ts-morph`,
+- **Prisma** schema with `@mrleebo/prisma-ast`,
+- **Docker Compose** YAML with a source-preserving parser.
+
+New blocks are appended; your existing services, comments, and formatting are
+preserved. The whole operation is staged in a tempdir, dry-run validated, and committed
+atomically — if anything fails, the project is left byte-identical.
+
+<Callout type="info" title="Why this matters">
+    Older versions regenerated compose with marker-comment blocks. The current model is
+    a true additive merge: there are no magic comment fences to preserve, and your
+    customizations survive every <code>stackr add service</code>.
+</Callout>
+
+## Root scripts
+
+<Table
+    headers={['Script', 'What it does']}
+    rows={[
+        ['setup', 'Install deps, generate .env, reset stale volumes'],
+        ['docker:dev / docker:prod', 'Bring the stack up (dev or prod overlay)'],
+        ['test / test:e2e', 'Component tests / cross-service e2e tests'],
+        ['lint:sg', 'Run the ast-grep convention rules (ast-grep scan)'],
+        ['check:auth-tables', 'Enforce the auth-table boundary on Prisma schemas'],
+    ]}
+/>
+
+The last two are part of the [context harness](/docs/harness/enforcement) — they keep
+the architecture's invariants enforceable in CI, not just documented.
+
+</div>

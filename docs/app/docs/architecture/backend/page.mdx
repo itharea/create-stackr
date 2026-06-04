@@ -1,0 +1,157 @@
+export const metadata = {
+    title: 'Backend',
+    description: 'The layered Fastify backend — controller, domain, and data-access (ORM) layers, with TypeBox and ErrorFactory.',
+};
+
+<div className="prose">
+
+# Backend
+
+Every service ships a **Fastify** backend with a strict, three-layer structure. A request
+flows in one direction — **controller → domain → data-access** — and each layer has one
+job. The layering isn't decoration: the [context harness](/docs/harness) enforces several
+of these conventions mechanically, and [codegen](/docs/harness/codegen) produces code that
+already obeys them.
+
+## Layout
+
+<CodeBlock
+    code={`<service>/backend/
+├── controllers/                  # ── Controller layer
+│   ├── rest-api/
+│   │   ├── index.ts              #    Fastify app bootstrap
+│   │   ├── plugins/              #    config, error-handler, cors, auth, redis
+│   │   └── routes/               #    thin HTTP handlers
+│   └── event-queue/
+│       └── workers/              #    BullMQ workers (if enabled)
+├── domain/                       # ── Domain layer
+│   └── <entity>/
+│       ├── schema.ts             #    TypeBox schema + Static type
+│       ├── repository.ts         #    pure DB access
+│       └── service.ts            #    orchestration / business logic
+├── drizzle/ | prisma/            # ── Data-access layer
+│   └── schema                    #    the ORM schema
+├── utils/
+│   ├── db.ts                     #    the singleton DB client
+│   ├── redis.ts                  #    the Redis client
+│   └── errors.ts                 #    ErrorFactory
+└── lib/                          #    constants & integration wiring`}
+    language="text"
+/>
+
+## The three layers
+
+### 1. Controller layer — `controllers/`
+
+The transport edge. It owns *how* a request arrives, never *what the business rule is*.
+Two controllers ship:
+
+- **`rest-api/`** — the HTTP server. `index.ts` boots Fastify and registers plugins in a
+  fixed order so decorators exist before routes use them:
+
+<CodeBlock code={`config → error-handler → cors → auth → redis → routes`} language="text" />
+
+  Plugins are wrapped with `fastify-plugin` (`fp`). **Routes are thin**: they import a
+  TypeBox schema for validation, guard with an `onRequest` hook (e.g. `requireAuth`), and
+  delegate to a domain service. They contain **no `try/catch`** — the error-handler plugin
+  turns thrown `ErrorFactory` errors into consistent API responses.
+
+<CodeBlock
+    code={`server.get('/comments', {
+  onRequest: [server.requireAuth],
+  schema: { response: { 200: Type.Array(CommentSchema) } },
+}, async () => listComments());   // delegate straight to the service`}
+    language="typescript"
+/>
+
+- **`event-queue/workers/`** — optional **BullMQ** workers for async work (only when the
+  service has an event queue). A worker is just another entry point into the same domain
+  layer; it never reimplements business logic.
+
+### 2. Domain layer — `domain/<entity>/`
+
+The business logic, one folder per entity, split into three files with sharp
+responsibilities:
+
+- **`schema.ts`** — a **TypeBox** schema that exports *both* the runtime schema and its
+  static type, so routes validate with it and code imports the type:
+
+<CodeBlock
+    code={`import { Type, type Static } from '@sinclair/typebox';
+
+export const CommentSchema = Type.Object({
+  id: Type.String(),
+  body: Type.String(),
+  createdAt: Type.String({ format: 'date-time' }),
+});
+
+export type Comment = Static<typeof CommentSchema>;`}
+    language="typescript"
+/>
+
+- **`repository.ts`** — **pure** database access (`find*` / `insert*` / `update*` /
+  `delete*`). Every operation sits in its own `try/catch` that rethrows a typed
+  `ErrorFactory.databaseError` — a raw driver error must never escape:
+
+<CodeBlock
+    code={`export const listComments = async () => {
+  try {
+    return await db.select().from(schema.comment);
+  } catch (error) {
+    throw ErrorFactory.databaseError({
+      operation: 'listComments',
+      originalError: error instanceof Error ? error.message : String(error),
+    });
+  }
+};`}
+    language="typescript"
+/>
+
+- **`service.ts`** — **orchestration**: multi-step logic, token/expiry handling, and calls
+  to other systems. Routes call services; services call repositories. Token logic and
+  external calls never live in the repository.
+
+<Callout type="info" title="Where domains come from">
+    The <code>auth</code> service ships domains for <code>user</code>, <code>session</code>,
+    and <code>device-session</code>. A base service starts with <em>no</em> domain folder —
+    you add slices with <a href="/docs/guides/add-entity"><code>stackr add entity</code></a>,
+    which generates all three files correct-by-construction.
+</Callout>
+
+### 3. Data-access layer — the ORM
+
+The single source of persistence, shared by every repository:
+
+- **`drizzle/` or `prisma/`** holds the **ORM schema** — the table/model definitions.
+  `stackr add entity` merges new tables here additively.
+- **`utils/db.ts`** is the **singleton DB client** (one connection pool per service),
+  imported wherever a repository needs it. **`utils/redis.ts`** is the Redis client.
+- Migrations are per-service: run `db:generate` / `db:migrate` inside the service, then
+  `stackr migrations ack <service>` (see [Development](/docs/development#database-orm-scripts)).
+
+The ORM — Drizzle (default) or Prisma — is **locked monorepo-wide**, and every query is
+parameterized, so the data-access layer is uniform and injection-safe across services.
+
+## Why TypeBox (not Zod)
+
+TypeBox compiles to JSON Schema, which Fastify validates with Ajv natively and at high
+speed — request validation happens in the framework, not a separate parsing pass. The
+`Static<typeof Schema>` type means the validated payload and the TypeScript type can never
+drift.
+
+## Layer rules at a glance
+
+<Table
+    headers={['Layer', 'Owns', 'Never']}
+    rows={[
+        ['Controller', 'Transport, validation, auth guard, delegation', 'Business logic or try/catch around DB calls'],
+        ['Domain', 'Business rules; repository = pure DB, service = orchestration', 'Reaches into another service or hand-edits the ORM schema'],
+        ['Data-access', 'The ORM schema + singleton db/redis clients', 'Raw errors escaping; a bare new Error()'],
+    ]}
+/>
+
+To add a new domain slice the correct way, use
+[`stackr add entity`](/docs/guides/add-entity) — it writes the schema, repository, and
+service and merges the ORM table, already following every rule above.
+
+</div>

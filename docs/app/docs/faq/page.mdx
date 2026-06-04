@@ -1,61 +1,79 @@
 export const metadata = {
     title: 'FAQ',
-    description: 'Frequently Asked Questions.',
+    description: 'Frequently asked questions about stackr — the architecture, the harness, and how to use it.',
 };
 
 <div className="prose">
 
 # Frequently Asked Questions
 
-## Is it free?
+## How is stackr more than a scaffolding tool?
 
-Yes, `create-stackr` is open source and free to use.
+Two things. First, it generates a real **multi-service architecture** — isolated
+backends, databases, and an auth trust anchor — not a flat starter you outgrow. Second,
+it ships a [context harness](/docs/harness): files and rules that keep your project
+on-convention after generation, even when an AI agent writes the code. The scaffold is the
+starting point; the harness is what keeps it coherent.
 
-## Can I use it for commercial projects?
+## What is the context harness?
 
-Absolutely! It is licensed under the MIT license.
+A set of generated artifacts — nested `AGENTS.md`, a `CLAUDE.md` bridge, Cursor/Windsurf
+glob rules, Claude skills, `ast-grep` lint rules, and a post-edit hook — all derived from
+one source of truth. They deliver the project's conventions to your editor and agents
+(salience) and mechanically enforce the checkable ones (enforcement). See
+[Why a Harness](/docs/harness).
 
-## Do you support Web?
+## Why files instead of an MCP server?
 
-Yes! We support both Expo for mobile (iOS & Android) and Next.js for web. Both share the same
-backend and authentication. See the [Web Platform](/docs/features/web-platform) documentation
-for details.
+Push delivery has no runtime dependency, nothing for the agent to forget to query, and
+can't go stale: the files are regenerated from `stackr.config.json` whenever the project
+shape changes. See [Push, not pull](/docs/harness#push-not-pull-and-no-mcp-server).
 
-## Can I use the web app without mobile?
+## Is it free? Can I use it commercially?
 
-Yes! During CLI setup, select "web" as your only platform. This generates just the web app
-and backend, without any mobile code.
+Yes — stackr is open source under the **MIT** license, free for commercial use.
 
-## Why does web use cookies instead of tokens?
+## Can I add services after the first scaffold?
 
-Cookie-based sessions are more secure for web applications - they're HTTP-only (no JavaScript
-access), automatically included in requests, and protected against XSS attacks. Mobile apps
-use secure token storage because they don't have cookie support.
+Yes. [`stackr add service <name>`](/docs/guides/add-service) wires a new isolated service
+into Docker Compose, the root `.env`, `stackr.config.json`, and the CI matrix — atomically.
 
-## Can I share authentication between web and mobile?
+## Is Docker required?
 
-Yes, both platforms authenticate against the same backend and share the same user database.
-However, sessions are separate - logging in on web doesn't log you in on mobile and vice versa.
+For local development (`docker:dev`) and the test profiles, yes. The CLI itself runs
+without Docker, and you can run a single service's backend against a host-mode database if
+you prefer.
 
-## Why doesn't Apple Sign In work on localhost?
+## Which package manager should I use?
 
-Apple requires HTTPS for OAuth redirect URIs. Use ngrok or a similar tunneling service for
-local development, or test Apple Sign In in a staging environment with a valid SSL certificate.
+npm, yarn, and bun are all first-class — you pick at init and every script branches on your
+choice. **bun** is the recommended default.
 
-## How do I add more pages to the web app?
+## Which ORM is the default?
 
-Create new files in `web/src/app/`. For protected pages, put them in `(app)/`. For public
-pages, put them directly in `app/`. See the
-[Next.js App Router docs](https://nextjs.org/docs/app/building-your-application/routing).
+**Drizzle.** Prisma is fully supported — choose it in the wizard. The ORM is locked
+monorepo-wide.
 
-## How do I customize the web design?
+## Can I build web-only or mobile-only?
 
-The web app uses Tailwind CSS and shadcn/ui components. Edit `globals.css` for color scheme
-changes, or modify individual components in `src/components/ui/`.
+Yes — platforms are **per service**. Enable web and/or mobile (or neither) on each base
+service. `--no-auth` produces a backend-only project with no auth service at all.
 
-## Does the web app support SSR?
+## Why do base services forward cookies instead of verifying a token themselves?
 
-Yes, Next.js App Router uses React Server Components by default. Client components (marked
-with `"use client"`) handle interactive features like forms and auth state.
+So identity has exactly one owner. The auth service issues httpOnly cookies and is the only
+place that validates them; base services ask it `/api/auth/get-session` rather than trusting
+a token a client could forge. See [Cross-Service Auth](/docs/architecture/auth-flow).
+
+## Why doesn't Apple Sign-In work on localhost?
+
+Apple requires HTTPS redirect URIs. Use a tunnel (e.g. ngrok) for local development, or test
+it on a staging host with a valid certificate.
+
+## How do I add a new backend feature the "right" way?
+
+Use [`stackr add entity`](/docs/guides/add-entity) for a domain slice — it generates the
+schema, repository, and service together and follows every backend convention. For HTTP,
+add a thin route that imports the generated TypeBox schema.
 
 </div>

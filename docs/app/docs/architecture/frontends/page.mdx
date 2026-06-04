@@ -1,0 +1,67 @@
+export const metadata = {
+    title: 'Frontends',
+    description: 'Per-service Next.js web apps, the auth admin dashboard, and Expo mobile — all thin clients over the backends.',
+};
+
+<div className="prose">
+
+# Frontends
+
+Frontends in a stackr monorepo are **thin presentation layers**. A service's web or
+mobile app talks only to that service's backend; authentication is handled by the
+BetterAuth client, whose cookies point at the auth service. No frontend ever touches
+a database directly.
+
+Frontends are **opt-in per service** — you enable web and/or mobile for each base
+service in the [wizard](/docs/configuration) or with the `--web` / `--mobile` flags on
+[`stackr add service`](/docs/guides/add-service).
+
+## Web (Next.js, App Router)
+
+Each web frontend is a Next.js App Router app styled with **Tailwind CSS** and
+**shadcn/ui**, with **Zustand** for client state.
+
+- **Server Components by default.** Data fetching happens on the server; `'use client'`
+  is added only where interactivity requires it.
+- **Session reads are server-only and cached.** The session helper is wrapped in
+  `React.cache()` so a single request doesn't fetch the session twice.
+- **Mutations are Server Actions.** Actions run with the `'use server'` directive and
+  revalidate cached data with `updateTag()` / `revalidateTag()`.
+
+<CodeBlock
+    code={`<service>/web/
+├── src/app/          # routes (Server Components by default)
+├── src/components/   # UI (shadcn/ui)
+├── src/lib/
+│   ├── session.ts    # server-only, React.cache() wrapped
+│   └── actions.ts    # 'use server' mutations
+└── src/store/        # Zustand stores`}
+    language="text"
+/>
+
+## The admin dashboard
+
+When you enable the auth service's dashboard (on by default), stackr generates a
+full Next.js admin app on port **`:3002`** — login, a user list, role management, and
+user deletion — wired to the auth service. It's a working surface for managing your
+users on day one, and a reference for how a stackr web app consumes the auth backend.
+
+## Mobile (Expo)
+
+Mobile frontends are **Expo** / React Native apps using **Expo Router** for navigation,
+**Zustand** for state, and **Axios** for HTTP. The BetterAuth client manages session
+cookies; for token-based native flows, the backend's
+[`flexible` middleware](/docs/architecture/auth-flow#middleware-flavors) accepts an
+`x-device-session-token` header.
+
+Mobile apps also carry the optional integration surface — onboarding, paywall,
+RevenueCat, Adjust, Scate, and ATT. Those are covered in the
+[Mobile guide](/docs/guides/mobile).
+
+<Callout type="info" title="Conventions are enforced here too">
+    The harness ships subsystem rules and skills for both web and mobile (theme
+    tokens, no direct <code>fetch</code> in components, memoized styles, secure token
+    storage). See <a href="/docs/harness/context">Convention Layer</a>.
+</Callout>
+
+</div>

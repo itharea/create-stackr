@@ -1,0 +1,83 @@
+export const metadata = {
+    title: 'Services & Isolation',
+    description: 'The auth trust anchor and base services — what each owns, and why isolation matters.',
+};
+
+<div className="prose">
+
+# Services & Isolation
+
+A stackr monorepo is made of two kinds of service. The distinction is not cosmetic
+— it defines who is allowed to own which data.
+
+## The auth service (trust anchor)
+
+There is exactly one auth service, and it is the **only** service permitted to own
+identity data: the `user`, `session`, `account`, and `verification` tables. It runs
+**BetterAuth**, issues httpOnly session cookies, and handles OAuth, email
+verification, password reset, and two-factor auth.
+
+Every other service treats it as the source of truth for "who is this request?".
+
+<Callout type="error" title="The hard rule">
+    Never declare <code>user</code>, <code>session</code>, <code>account</code>, or
+    <code>verification</code> tables outside the auth service. This isn't a style
+    preference — it's mechanically enforced by an
+    <a href="/docs/harness/enforcement"><code>ast-grep</code> rule</a>
+    (<code>no-auth-tables-outside-auth</code>) and a Prisma-side check.
+</Callout>
+
+It also ships an optional **admin dashboard** (Next.js) on port `:3002` for managing
+users and roles — see [Frontends](/docs/architecture/frontends).
+
+## Base services
+
+A base service owns a slice of your product's domain logic and its **own** tables.
+It is fully self-contained:
+
+- a Fastify backend on its own port (`:8080`, `:8081`, …),
+- its own isolated PostgreSQL database,
+- its own isolated Redis instance,
+- optional Next.js web and Expo mobile frontends,
+- an optional BullMQ event queue.
+
+A base service authenticates callers by forwarding their cookie to the auth service
+— it never grows its own copy of the user table. What a base service *does* track is
+a per-service link to the user (a `has<Service>Account` flag and, typically, a domain
+record keyed by `user.id`), provisioned on the user's first authenticated call.
+
+## Isolation in practice
+
+Because each service owns its data outright, a failure stays local:
+
+<Table
+    headers={['Property', 'What it means in practice']}
+    rows={[
+        ['Bounded blast radius', "A bad migration or a runaway query in wallet can't corrupt core's data — they're different databases."],
+        ['Independent schemas', 'Each service migrates on its own cadence. There is no monorepo-wide schema lockstep.'],
+        ['Decoupled deployment', 'Scale, redeploy, or rewrite one service without coordinating the others.'],
+        ['Clear ownership', 'Every table has exactly one owning service. Cross-service reads go over HTTP, never into a foreign database.'],
+    ]}
+/>
+
+## What services never do
+
+- **Reach into another service's database.** Cross-service data flows over REST with
+  cookie forwarding, not SQL.
+- **Import another service's `domain/**` code.** There is no shared package; a
+  service is a black box to its neighbors.
+- **Trust a client-supplied user id or a bare header.** Identity always comes from
+  the auth service's verified response.
+
+These invariants are written into the project's root `AGENTS.md` so your agent reads
+them before touching cross-service code — see
+[The Context Harness](/docs/harness/context).
+
+## Adding and shaping services
+
+You declare your initial services in the [wizard](/docs/configuration), and add more
+later with [`stackr add service`](/docs/guides/add-service). The full list — names,
+ports, ORM, middleware flavors — lives in `stackr.config.json`, the source of truth
+the `stackr` CLI keeps in sync.
+
+</div>

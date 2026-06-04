@@ -1,0 +1,120 @@
+export const metadata = {
+    title: 'Quick Start',
+    description: 'Generate a stackr monorepo with the interactive wizard, boot the full stack, and run the component and e2e tests — step by step.',
+};
+
+<div className="prose">
+
+# Quick Start
+
+This walkthrough takes you from nothing to a running, tested multi-service stack: you'll
+make your selections in the wizard, install and boot the project, then run both the
+per-service component tests and the cross-service end-to-end tests.
+
+<Callout type="info" title="Prerequisites">
+    Node.js 22+, Docker (for booting the stack and the test profiles), and a package
+    manager. See <a href="/docs/installation">Installation</a>. These examples use
+    <code>npm</code> — substitute <code>yarn</code> or <code>bun</code> if you pick one of
+    those in the wizard.
+</Callout>
+
+## 1. Generate the project
+
+Run the CLI and answer the prompts. A typical run looks like this:
+
+<CodeBlock
+    code={`$ npx create-stackr@latest my-app
+
+? Include a dedicated auth service? Yes
+?   OAuth providers? Google, GitHub
+?   Auth features? Email verification, Password reset
+?   Include the Next.js admin dashboard? Yes
+? First base service name? core
+?   Platforms for core? Web
+?   Event queue (BullMQ) for core? No
+?   Auth middleware for core? standard
+? Add another base service? No
+? ORM? Drizzle
+? AI coding tools? Claude Code, Cursor
+? Package manager? npm
+
+✔ Generated a 2-service monorepo (auth + core) with the context harness`}
+    language="bash"
+/>
+
+That produces an `auth` service (with the admin dashboard) and a `core` base service with
+a Next.js web frontend — plus the [context harness](/docs/harness) for the tools you
+selected. Every prompt is explained in [Configuration](/docs/configuration). In a hurry?
+`npx create-stackr@latest my-app --defaults` skips the wizard.
+
+## 2. Install dependencies & generate env
+
+<CodeBlock
+    code={`cd my-app
+npm run setup`}
+    language="bash"
+/>
+
+`setup` installs dependencies in every workspace, generates `.env` files with **strong
+random credentials**, and — if it finds stale Docker volumes from a previous run — offers
+to reset them.
+
+<Callout type="warning" title="Stale volumes">
+    If you re-generate or rename a project, old PostgreSQL volumes can carry the wrong
+    credentials. Say <strong>yes</strong> to the reset prompt for a clean first boot.
+</Callout>
+
+## 3. Boot the stack
+
+<CodeBlock code="npm run docker:dev" language="bash" />
+
+Docker Compose brings up every service with its **own** database and Redis. For the
+selections above you get:
+
+<Table
+    headers={['Service', 'Backend', 'Web']}
+    rows={[
+        ['auth (trust anchor)', 'http://localhost:8082', 'http://localhost:3002 (admin dashboard)'],
+        ['core (base service)', 'http://localhost:8080', 'http://localhost:3000'],
+    ]}
+/>
+
+<Callout type="info" title="Port convention">
+    The auth backend is fixed at <code>:8082</code> and its dashboard at <code>:3002</code>.
+    Base services start at <code>:8080</code> (backends) and <code>:3000</code> (web). See
+    <a href="/docs/configuration#ports">Configuration → Ports</a>.
+</Callout>
+
+## 4. Run the component tests
+
+Each service has its own Vitest suite that runs against an **ephemeral** Postgres + Redis
+(the `component` Docker profile), exercising the full route → service → repository path:
+
+<CodeBlock code="npm test" language="bash" />
+
+This walks every service and runs its component tests in isolation — a base service's tests
+mock the auth call, so they don't need the auth service running. See how it's built in
+[Architecture → Testing](/docs/architecture/testing).
+
+## 5. Run the end-to-end tests
+
+The e2e suite boots the **whole stack** (the `e2e` profile) and verifies the services work
+together — most importantly that a session minted by `auth` is accepted by `core` via
+cookie forwarding:
+
+<CodeBlock code="npm run test:e2e" language="bash" />
+
+It waits for every service to report healthy, then runs the cross-service checks.
+
+## What you have now
+
+A running two-service monorepo with isolated databases, working auth, a web frontend, a
+green test suite, and an AI context harness wired in. From here:
+
+- **Extend it:** add a service with [`stackr add service`](/docs/guides/add-service) or a
+  domain entity with [`stackr add entity`](/docs/guides/add-entity).
+- **Understand it:** read the [Architecture](/docs/architecture) section.
+- **Stay on-convention:** point your AI agent (Claude Code, Cursor) at the repo — the
+  [harness](/docs/harness) already tells it the rules.
+
+</div>

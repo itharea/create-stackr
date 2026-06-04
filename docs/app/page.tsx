@@ -50,7 +50,7 @@ export default function Home() {
               transition={{ duration: 0.5 }}
             >
               <span className={styles.badgeDot} />
-              v0.2.0 is now available
+              v0.7.0 is now available
             </motion.div>
 
             <motion.h1
@@ -181,13 +181,19 @@ export default function Home() {
           </div>
           <div className={styles.techItem}>
             <Shield size={20} className={styles.techIcon} />
-            <span>Zod</span>
+            <span>TypeBox</span>
           </div>
           <div className={styles.techItem}>
-            <svg viewBox="0 0 24 24" className={styles.techIcon}>
-              <path fill="currentColor" d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z" />
-            </svg>
-            <span>JWT</span>
+            <Layers size={20} className={styles.techIcon} />
+            <span>BullMQ</span>
+          </div>
+          <div className={styles.techItem}>
+            <Check size={20} className={styles.techIcon} />
+            <span>Vitest</span>
+          </div>
+          <div className={styles.techItem}>
+            <Command size={20} className={styles.techIcon} />
+            <span>ast-grep</span>
           </div>
           <div className={styles.techItem}>
             <svg viewBox="0 0 24 24" className={styles.techIcon}>
@@ -210,35 +216,37 @@ export default function Home() {
 
       {/* Feature 1: The Universal Stack */}
       <FeatureSection
-        title="One Stack, Every Platform"
-        description="Generate mobile (Expo), web (Next.js), and backend (Fastify) from a single command. Shared authentication, unified database, and Docker-ready infrastructure — everything wired together."
+        title="One Monorepo, Isolated Services"
+        description="Generate an auth service plus any number of base services — each with its own Fastify backend, PostgreSQL, and Redis. Blast radius stays bounded: a runaway migration in one service can't touch another's data."
         visual={<UniversalStackVisual />}
       >
         <ul className={styles.featureList}>
-          <li><Check size={16} className={styles.checkIcon} /> Mobile + Web + Backend in one project</li>
-          <li><Check size={16} className={styles.checkIcon} /> Shared auth across all platforms</li>
-          <li><Check size={16} className={styles.checkIcon} /> Docker dev & production configs included</li>
+          <li><Check size={16} className={styles.checkIcon} /> Isolated database + Redis per service</li>
+          <li><Check size={16} className={styles.checkIcon} /> Cross-service auth via cookie forwarding</li>
+          <li><Check size={16} className={styles.checkIcon} /> Add services later with <code>stackr add service</code></li>
         </ul>
       </FeatureSection>
 
       {/* Feature 2: Developer Experience */}
       <FeatureSection
         title="World-Class DX"
-        description="Stop fighting with configuration. Choose from battle-tested templates and let our CLI handle the heavy lifting, generating fully typed components, screens, and API endpoints in seconds."
+        description="Stop wiring boilerplate. One command generates typed services, BetterAuth, Docker Compose, and a full Vitest setup — then stackr add service and stackr add entity keep extending it without breaking what's there."
         align="right"
         visual={
           <CodeWindow
             title="Terminal"
-            code={`$ npx create-stackr@latest
+            code={`$ npx create-stackr@latest my-app
 
-? What is your project name? my-app
-? Choose a starting template: Full-Featured
+? Include a dedicated auth service? Yes
+? ORM? Drizzle
+? Base service name? core
+? Platforms for core? Web, Mobile
+? AI coding tools? Claude Code, Cursor
 
-✔ Project created successfully!
+✔ Generated a 2-service monorepo + context harness
 
-Next steps:
   cd my-app
-  npm run dev`}
+  npm run setup && npm run docker:dev`}
           />
         }
       >
@@ -257,32 +265,32 @@ Next steps:
       {/* Feature 3: Seamless Integrations */}
       <FeatureSection
         title="Seamless Integrations"
-        description="Don't reinvent the wheel. Enable industry-standard integrations like RevenueCat, Adjust, and BetterAuth directly during project generation. Pre-configured, fully typed, and ready to scale."
+        description="Don't reinvent the wheel. Enable industry-standard integrations like BetterAuth, RevenueCat, and Adjust during generation — pre-configured, fully typed, and scoped per service so nothing is bolted on after the fact."
         visual={<ModulesVisual />}
       >
       </FeatureSection>
 
-      {/* Feature 3: Backend & Security */}
+      {/* Feature 4: The Context Harness */}
       <FeatureSection
-        title="Production-Grade Infrastructure"
-        description="Docker-ready from day one. PostgreSQL with your choice of ORM (Prisma or Drizzle), Redis for caching and queues, and BetterAuth for enterprise authentication with OAuth, 2FA, and session management."
+        title="Built to Stay On-Convention"
+        description="stackr ships a push-based context harness — nested AGENTS.md, Cursor & Windsurf rules, Claude skills, and ast-grep lints, all derived from one source of truth. The architecture survives long after generation, even when AI agents write the code."
         visual={
           <div className={styles.backendVisual}>
             <div className={styles.backendCard}>
               <Shield size={32} className={styles.backendIcon} />
-              <h3>Enterprise Auth</h3>
-              <p>OAuth, 2FA, email verification, sessions.</p>
+              <h3>Convention Layer</h3>
+              <p>AGENTS.md, editor rules, and Claude skills, auto-generated.</p>
             </div>
             <div className={styles.backendCard}>
               <Zap size={32} className={styles.backendIcon} />
-              <h3>Deploy-Ready</h3>
-              <p>Docker Compose for dev & production.</p>
+              <h3>Enforcement</h3>
+              <p>ast-grep rules and a post-edit hook catch drift.</p>
             </div>
           </div>
         }
       >
-        <Button variant="outline" href="/docs/getting-started">
-          View Full Stack
+        <Button variant="outline" href="/docs/harness">
+          Explore the harness
         </Button>
       </FeatureSection>
 

@@ -1,0 +1,129 @@
+.wrapper {
+    --accent: #10b981;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    margin: var(--space-6) 0;
+}
+
+.flow {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    max-width: 540px;
+}
+
+.stepItem {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.node {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 14px;
+    transition: border-color var(--transition-base);
+}
+
+.node:hover {
+    border-color: var(--border-DEFAULT);
+}
+
+.accent {
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--border-subtle));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.num {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    display: grid;
+    place-items: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--fg-tertiary);
+    background: var(--bg-canvas);
+    border: 1px solid var(--border-subtle);
+    border-radius: 100px;
+}
+
+.nodeIcon {
+    flex-shrink: 0;
+    color: var(--fg-secondary);
+    margin-top: 1px;
+}
+
+.accent .nodeIcon {
+    color: var(--accent);
+}
+
+.nodeBody {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--fg-primary);
+    font-family: var(--font-mono, monospace);
+}
+
+.detail {
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--fg-tertiary);
+}
+
+.edge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 0;
+    color: var(--fg-tertiary);
+}
+
+.edge code {
+    font-family: var(--font-mono, monospace);
+    font-size: 11.5px;
+    color: var(--fg-secondary);
+    background: var(--bg-canvas);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    padding: 3px 8px;
+}
+
+.note {
+    max-width: 540px;
+    margin: var(--space-6) auto 0;
+    text-align: center;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--fg-tertiary);
+}
+
+.note code {
+    font-family: var(--font-mono, monospace);
+    font-size: 12px;
+    padding: 1px 5px;
+    margin: 0 1px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 5px;
+}
+
+[data-theme='dark'] .accent {
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent);
+}

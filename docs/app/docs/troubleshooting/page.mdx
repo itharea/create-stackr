@@ -1,133 +1,91 @@
 export const metadata = {
     title: 'Troubleshooting',
-    description: 'Common issues and solutions.',
+    description: 'Common issues with a stackr monorepo — migrations, ports, Docker volumes, cross-service auth, and mobile.',
 };
 
 <div className="prose">
 
 # Troubleshooting
 
-Here are some common issues you might encounter and how to fix them.
+## A `stackr` command refuses to run
 
-## Mobile Issues
+> "There is a pending migration for service X."
 
-### CocoaPods Issues
-
-If you see errors related to CocoaPods, try cleaning the build folder and reinstalling pods.
+A schema change (from `add entity` or `add service`) is recorded as pending and blocks
+further `stackr` subcommands until you run and acknowledge it:
 
 <CodeBlock
-    code={`cd ios
-pod deintegrate
-pod install`}
+    code={`cd <service>/backend && <db:migrate command>
+npx stackr migrations ack <service>`}
     language="bash"
 />
 
-### Metro Bundler Issues
+This is intentional — it stops the config and the database from drifting apart.
 
-If the bundler gets stuck, try clearing the cache.
+## Port already in use
+
+Services use deterministic ports: auth `:8082` / `:3002`, base backends from `:8080`, base
+web from `:3000`. If another process holds one, stop it, or pass an explicit `--port` when
+adding a service. The test profiles use a `+10000` offset so they never collide with a dev
+stack.
+
+## Stale Docker volumes after re-generating
+
+If a freshly generated or renamed project fails to connect to its database, an old volume
+is carrying the wrong credentials. Let `setup` reset them:
+
+<CodeBlock
+    code={`npm run setup     # answer "yes" to the volume reset prompt
+# or manually:
+docker compose down -v && npm run docker:dev`}
+    language="bash"
+/>
+
+## Cross-service auth fails (401 from a base service)
+
+A base service authenticates by forwarding the cookie to the auth service. If protected
+routes 401:
+
+1. **`AUTH_SERVICE_URL`** on the base service must point at the running auth service.
+2. **The cookie must reach the base service** — check CORS and that the client sends
+   credentials.
+3. **The auth service must be up** — a base service can't verify sessions if `auth` is
+   down (you'll get an external-service error).
+
+<CodeBlock
+    code={`# from the base service container, the auth check is essentially:
+curl -i http://auth:8082/api/auth/get-session -H "cookie: <session cookie>"`}
+    language="bash"
+/>
+
+## Migrations don't apply
+
+Make sure you're running the migrate command **inside the right service's** `backend/`
+directory — each service has its own database and its own migration history. The script is
+`db:migrate` (Drizzle Kit or Prisma depending on your locked ORM).
+
+## OAuth callback fails
+
+Usually a redirect-URI mismatch or CORS. Check that the redirect URI exactly matches the
+provider config, that the auth service's CORS allows your web origin, and that
+third-party cookies aren't blocked in dev. **Apple Sign-In requires HTTPS** and won't work
+on `http://localhost` — use a tunnel (e.g. `ngrok http 8082`) or test it on a staging host.
+
+## Mobile: Metro bundler is stuck
 
 <CodeBlock code="npx expo start -c" language="bash" />
 
-## Web Platform Issues
-
-### Hydration Mismatch Errors
-
-If you see "Hydration failed because the initial UI does not match" errors:
-
-1. **Theme-related**: Ensure `suppressHydrationWarning` is on the `<html>` tag in `layout.tsx`
-2. **Auth state**: The `AuthHydrator` component handles this - don't access auth state in server components
-3. **Date/time rendering**: Use `useEffect` for time-sensitive content
+## Build fails with module errors (web)
 
 <CodeBlock
-    code={`// Bad - causes hydration mismatch
-const date = new Date().toLocaleDateString();
-
-// Good - renders client-side only
-const [date, setDate] = useState<string>();
-useEffect(() => {
-  setDate(new Date().toLocaleDateString());
-}, []);`}
-    language="typescript"
-/>
-
-### OAuth Callback Fails
-
-<Callout type="warning" title="Common OAuth Issues">
-    OAuth problems are usually caused by redirect URI mismatches or CORS configuration.
-</Callout>
-
-1. **Check redirect URI**: Must exactly match what's configured in OAuth provider
-2. **Check CORS**: Backend must allow your web origin
-3. **Check cookies**: Ensure you're not blocking third-party cookies in development
-4. **Apple Sign In**: Remember that Apple requires HTTPS - won't work on localhost
-
-Debug with:
-
-<CodeBlock
-    code={`# Check backend logs
-docker logs backend-container
-
-# Verify CORS headers
-curl -I http://localhost:8080/api/auth/session`}
-    language="bash"
-/>
-
-### Apple Sign In Not Working in Development
-
-Apple Sign In requires HTTPS redirect URIs and will not work with `http://localhost`. Options:
-
-1. **Use ngrok or Cloudflare Tunnel**: Create an HTTPS tunnel to your backend
-
-<CodeBlock
-    code={`ngrok http 8080
-# Use the https://xxx.ngrok.io/api/auth/callback/apple URL as your redirect URI`}
-    language="bash"
-/>
-
-2. **Skip Apple in dev**: Test Apple Sign In only in staging/production environments
-3. **Use mobile**: Apple Sign In works in development on the mobile app via native SDKs
-
-### Session Not Persisting
-
-1. **Cookie settings**: In development, cookies require `SameSite=Lax` and `Secure=false`
-2. **Domain mismatch**: Ensure frontend and backend are on the same domain (or properly configured for cross-domain)
-3. **Check browser DevTools**: Network tab -> Cookies to see if session cookie is being set
-
-### 404 on Refresh (Deployed)
-
-If routes work initially but 404 on refresh:
-
-1. **Vercel**: Should work out of the box
-2. **Netlify**: Install the `@netlify/plugin-nextjs` plugin
-
-<CodeBlock
-    code={`[[plugins]]
-  package = "@netlify/plugin-nextjs"`}
-    language="toml"
-    filename="netlify.toml"
-/>
-
-<Callout type="warning" title="Avoid SPA Redirects">
-    Do NOT use SPA-style redirects on Netlify - Next.js uses SSR, not static file serving.
-</Callout>
-
-3. **Self-hosted Node.js**: Ensure you're running `next start` (not serving static files)
-4. **Docker/Nginx**: Use a reverse proxy to the Node.js server, not static file serving
-
-### Build Fails with Module Errors
-
-<CodeBlock
-    code={`# Clear Next.js cache
-rm -rf web/.next
-
-# Reinstall dependencies
-rm -rf web/node_modules
-bun install`}
+    code={`rm -rf <service>/web/.next <service>/web/node_modules
+npm install`}
     language="bash"
 />
 
 <Callout type="info" title="Still stuck?">
-    Join our Discord server for help from the community.
+    Open an issue on <a href="https://github.com/itharea/create-stackr">GitHub</a> with
+    your <code>stackr.config.json</code> and the failing command's output.
 </Callout>
 
 </div>

@@ -1,0 +1,98 @@
+export const metadata = {
+    title: 'Enforcement',
+    description: 'ast-grep rules, the auth-table check, and the PostToolUse hook — the mechanically-checkable half of the harness.',
+};
+
+<div className="prose">
+
+# Enforcement
+
+Enforcement is where the harness stops *suggesting* and starts *checking*. It covers the
+mechanically-verifiable subset of the conventions — the rules a parser can confirm — and
+fails on a violation instead of hoping the agent read the docs.
+
+## ast-grep rules
+
+stackr generates structural lint rules as `ast-grep` patterns under
+`.stackr/sg-rules/*.yml`, registered by a root `sgconfig.yml`. Run them with:
+
+<CodeBlock code="npm run lint:sg   # ast-grep scan" language="bash" />
+
+A rule matches the AST, not text — so it catches the real construct regardless of
+formatting. For example, the always-shipped repository rule:
+
+<CodeBlock
+    code={`id: repo-catch-database-error
+language: TypeScript
+files:
+  - "**/backend/domain/**/repository.ts"
+rule:
+  kind: catch_clause
+  not:
+    has:
+      stopBy: end
+      pattern: throw ErrorFactory.databaseError($$$)
+message: "Repository catch blocks must throw ErrorFactory.databaseError(...)."
+severity: error`}
+    language="yaml"
+    filename=".stackr/sg-rules/repo-catch-database-error.yml"
+/>
+
+Which rules ship depends on the project shape:
+
+<Table
+    headers={['Rule', 'When', 'Catches']}
+    rows={[
+        ['repo-catch-database-error', 'always', 'A repository catch that doesn’t rethrow ErrorFactory.databaseError'],
+        ['no-auth-tables-outside-auth', 'Drizzle + multiple services', 'user/session/account/verification tables declared outside auth'],
+        ['mobile-animated-native-driver', 'mobile present', 'Animated.timing/spring without useNativeDriver'],
+        ['mobile-no-direct-fetch', 'mobile present', 'A bare fetch() in presentation-layer components'],
+        ['mobile-no-hardcoded-color', 'mobile present', 'Hardcoded hex colors instead of theme tokens'],
+    ]}
+/>
+
+The `files:` globs are generated from the actual service paths, so
+`no-auth-tables-outside-auth` lists your real non-auth services precisely rather than
+using a fuzzy ignore.
+
+## The auth-table check
+
+`ast-grep` covers the Drizzle path for the auth-table boundary; for **Prisma**, the same
+invariant is enforced by a script:
+
+<CodeBlock code="npm run check:auth-tables" language="bash" />
+
+It parses each non-auth service's Prisma schema and fails if it declares an identity
+table. Either way, the "only auth owns identity" rule is enforceable in CI.
+
+## The PostToolUse hook
+
+When Claude Code is a selected tool, stackr installs a **PostToolUse hook** at
+`.claude/hooks/check-edited.mjs` (wired in `.claude/settings.json`). After Claude edits a
+file, the hook lints it and, on a violation, exits non-zero so the agent sees the error
+and self-repairs in the same turn — a tight check-and-reinject loop.
+
+<Callout type="warning" title="Honest scope of the hook">
+    The generated hook runs <strong>backend ESLint</strong> against the nearest
+    <code>eslint.config.mjs</code>. Two honest limits: it <strong>no-ops on mobile
+    edits</strong> (the mobile subsystem uses <code>expo lint</code> with no flat ESLint
+    config — the three mobile <code>ast-grep</code> rules gate at <code>lint:sg</code>/CI
+    instead), and it <strong>no-ops before dependencies are installed</strong>. It is a
+    real-time backstop for the backend, not a universal gate.
+</Callout>
+
+## Put it in CI
+
+Because the rules are files, not a service, they run anywhere:
+
+<CodeBlock
+    code={`npm run lint:sg            # structural conventions (ast-grep)
+npm run check:auth-tables  # auth-table boundary (Prisma)`}
+    language="bash"
+/>
+
+Adding these to CI turns "we have conventions" into "violations fail the build." Pair
+them with [`stackr doctor`](/docs/harness/codegen#anti-drift) to also fail on artifact
+drift.
+
+</div>

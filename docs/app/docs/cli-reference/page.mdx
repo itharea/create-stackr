@@ -1,78 +1,117 @@
 export const metadata = {
     title: 'CLI Reference',
-    description: 'Command line interface reference.',
+    description: 'Every command and flag for the create-stackr generator and the stackr in-project CLI.',
 };
 
 <div className="prose">
 
 # CLI Reference
 
-The `create-stackr` CLI is your primary tool for generating new projects.
+The package ships two binaries:
 
-## Create a New Project
+- **`create-stackr`** — generate a new monorepo (run via `npx`).
+- **`stackr`** — operate *inside* an existing project (add services and entities, manage
+  migrations, check for drift).
 
-Initialize a new project with the interactive wizard:
+## `create-stackr <name>`
 
-<CodeBlock code="npx create-stackr@latest [project-name]" language="bash" />
+```bash
+npx create-stackr@latest my-app
+```
 
-## Command Options
+Run with no flags to use the [interactive wizard](/docs/configuration). The flags below
+shape a non-interactive run:
 
-### -t, --template
-
-Skip the interactive prompts and use a predefined configuration:
+<Table
+    headers={['Flag', 'Description']}
+    rows={[
+        ['--defaults', 'Skip all prompts; built-in default (Drizzle, auth + admin dashboard, one core service)'],
+        ['--service-name <name>', 'Rename the initial base service (default: core)'],
+        ['--no-auth', 'Skip the auth service entirely'],
+        ['--with-services <list>', 'Comma-separated extra base services, e.g. scout,manage'],
+        ['--no-tests', 'Skip the Vitest scaffolding'],
+        ['--ci-workflow', 'Generate .github/workflows/test.yml'],
+        ['--verbose', 'Detailed generation output'],
+    ]}
+/>
 
 <CodeBlock
-    code={`npx create-stackr@latest my-app --template minimal
-npx create-stackr@latest my-app --template full-featured
-npx create-stackr@latest my-app -t analytics-focused`}
+    code={`# Non-interactive default config
+npx create-stackr@latest my-app --defaults
+
+# Extra services + CI workflow
+npx create-stackr@latest my-app --defaults --with-services scout,manage --ci-workflow
+
+# Backend-only, no auth
+npx create-stackr@latest my-app --no-auth --service-name api`}
     language="bash"
 />
 
-### --defaults
+## `stackr`
 
-Use the default configuration (minimal preset with npm) without any prompts:
+Run inside a generated project. It reads and updates `stackr.config.json`.
 
-<CodeBlock code="npx create-stackr@latest my-app --defaults" language="bash" />
+### `stackr add service <name>`
 
-### --verbose
+Add a new isolated microservice. Staged in a tempdir, dry-run validated, committed
+atomically. See the [guide](/docs/guides/add-service).
 
-Show detailed output during project generation:
-
-<CodeBlock code="npx create-stackr@latest my-app --verbose" language="bash" />
-
-### --skip-install
-
-Skip automatic dependency installation after project generation:
-
-<CodeBlock code="npx create-stackr@latest my-app --skip-install" language="bash" />
-
-### --help
-
-Display help information about available commands and options:
-
-<CodeBlock code="npx create-stackr@latest --help" language="bash" />
-
-### --version
-
-Display the current version of the CLI:
-
-<CodeBlock code="npx create-stackr@latest --version" language="bash" />
-
-## Package Managers
-
-The CLI supports multiple package managers. During interactive mode, you can choose between:
-
-<CodeBlock
-    code={`• npm (default)
-• yarn
-• bun`}
-    language="text"
+<Table
+    headers={['Flag', 'Description']}
+    rows={[
+        ['--auth-middleware <type>', 'standard | role-gated | flexible | none'],
+        ['--web', 'Also scaffold a Next.js frontend'],
+        ['--mobile', 'Also scaffold an Expo mobile app'],
+        ['--event-queue / --no-event-queue', 'Enable / disable BullMQ + Redis'],
+        ['--port <n>', 'Explicit REST API port (otherwise auto-allocated above 8080)'],
+        ['--no-install', 'Skip the package-manager install'],
+        ['--no-tests', 'Skip Vitest scaffolding for this service'],
+        ['--force', 'Bypass the pending-migration refusal'],
+        ['--verbose', 'Detailed output'],
+    ]}
 />
 
-When using `--defaults`, npm is used automatically.
+### `stackr add entity <service> <entity>`
 
-<Callout type="info" title="Interactive Mode">
-    Running the CLI without any options will start the interactive wizard, which guides you through selecting features, integrations, and package manager for your project.
-</Callout>
+Scaffold a domain slice — `schema.ts`, `repository.ts`, `service.ts` — and merge the ORM
+table, correct by construction. Records a pending migration. See the
+[guide](/docs/guides/add-entity).
+
+<CodeBlock code="npx stackr add entity blog comment" language="bash" />
+
+### `stackr migrations ack <service>`
+
+Clear a pending-migration entry from `stackr.config.json` after you've run the migration
+by hand. Required after a schema change; other `stackr` subcommands refuse until it's
+cleared.
+
+<CodeBlock code="npx stackr migrations ack blog" language="bash" />
+
+### `stackr doctor`
+
+Report drift between `stackr.config.json` and the generated artifacts; exits non-zero on
+drift (CI-gateable). `--fix` re-renders to resolve it.
+
+<CodeBlock
+    code={`npx stackr doctor
+npx stackr doctor --fix`}
+    language="bash"
+/>
+
+### `stackr migrate context`
+
+Re-render every agent-facing [harness artifact](/docs/harness) from
+`stackr.config.json`. Idempotent. `--dry-run` previews the changes.
+
+<CodeBlock
+    code={`npx stackr migrate context
+npx stackr migrate context --dry-run`}
+    language="bash"
+/>
+
+## Package managers
+
+npm, yarn, and bun are all first-class. You choose one at init and every generated script
+branches on it; bun is the recommended default.
 
 </div>

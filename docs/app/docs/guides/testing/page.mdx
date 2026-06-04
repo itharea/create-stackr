@@ -1,0 +1,63 @@
+export const metadata = {
+    title: 'Testing',
+    description: 'Per-service Vitest component tests and cross-service end-to-end tests, against ephemeral Docker databases.',
+};
+
+<div className="prose">
+
+# Testing
+
+stackr scaffolds a real test setup, not a placeholder. Each service gets **component
+tests** against an ephemeral database, and the monorepo gets **end-to-end tests** that
+exercise multiple services together — including the cross-service auth handshake.
+
+<CodeBlock
+    code={`npm test          # per-service component tests
+npm run test:e2e  # cross-service end-to-end tests`}
+    language="bash"
+/>
+
+## Component tests (per service)
+
+Component tests run a service's backend against a throwaway PostgreSQL and Redis brought
+up by the `component` profile of `docker-compose.test.yml`. They use **Vitest** and
+assert through the API, so they cover the real route → service → repository path.
+
+Conventions the harness encodes for tests: inline the test data, don't build fixture
+factories, don't hand-roll per-test cleanup (the ephemeral database is the isolation
+boundary), and assert via the API rather than poking the database directly.
+
+In test mode, side effects are stubbed — `sendEmail()` is a no-op and email-verified
+flags are set directly — so tests don't depend on external services.
+
+## End-to-end tests (cross-service)
+
+E2E tests run the whole stack via the `e2e` profile and verify it behaves as a system:
+
+- a **stack smoke test** — every service boots and responds,
+- a **cross-service auth test** — a session minted by `auth` is accepted by a base
+  service via cookie forwarding.
+
+They live under `tests/e2e/` with shared helpers (clients, wait-for-stack, verify-user).
+
+## Test ports
+
+The test profiles offset every host port by **+10000** so they never collide with a
+running dev stack — databases at `15432+`, Redis at `16379+`, app ports at `18080+`.
+
+## CI
+
+Generate a ready-to-use GitHub Actions workflow at init with `--ci-workflow` (or add it
+later). It runs a **matrix job per service** for the component tests plus a final
+**e2e job**:
+
+<CodeBlock code="npx create-stackr@latest my-app --defaults --ci-workflow" language="bash" />
+
+<Callout type="info" title="Gate conventions in the same pipeline">
+    Add <a href="/docs/harness/enforcement"><code>lint:sg</code></a>,
+    <code>check:auth-tables</code>, and <a href="/docs/harness/codegen#anti-drift"><code>stackr doctor</code></a>
+    to CI so a build fails on a convention violation or artifact drift — not just a
+    failing test.
+</Callout>
+
+</div>

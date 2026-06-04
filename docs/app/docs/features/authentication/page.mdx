@@ -1,50 +1,85 @@
 export const metadata = {
     title: 'Authentication',
-    description: 'Secure authentication with JWT, Google, and Apple Sign-In.',
+    description: 'BetterAuth in the auth service — OAuth, email verification, password reset, 2FA, and the admin dashboard.',
 };
 
 <div className="prose">
 
 # Authentication
 
-We provide a robust authentication system out of the box, supporting email/password,
-Google Sign-In, and Apple Sign-In.
+Authentication lives entirely in the **auth service**, powered by
+[BetterAuth](https://www.better-auth.com). It is the trust anchor: it owns the `user`,
+`session`, `account`, and `verification` tables, issues httpOnly session cookies, and is
+the only service permitted to manage identity. Every other service
+[verifies requests by forwarding cookies](/docs/architecture/auth-flow) to it.
 
-## Features
+## What you configure at init
 
-- JWT-based session management
-- Secure password hashing with Argon2
-- Social login integration
-- Refresh token rotation
+When you keep the auth service in the [wizard](/docs/configuration), you choose:
 
-## Setup
+<Table
+    headers={['Option', 'Choices']}
+    rows={[
+        ['OAuth providers', 'Google, Apple, GitHub (any combination)'],
+        ['Email verification', 'on / off'],
+        ['Password reset', 'on (default) / off'],
+        ['Two-factor authentication', 'on / off'],
+        ['Additional user fields', 'extra columns on the user record'],
+        ['Admin dashboard', 'on (default) / off'],
+    ]}
+/>
 
-To enable social login, you need to configure your client IDs in the `.env` file.
+Email/password is always available. Selecting email verification or password reset wires
+in transactional email (Nodemailer); in test mode, sending is a no-op.
+
+## OAuth setup
+
+OAuth client IDs and secrets are environment variables on the **auth service** — they
+ship as placeholders in `.env.example`:
 
 <CodeBlock
-    code={`GOOGLE_CLIENT_ID="your-google-client-id"
-APPLE_CLIENT_ID="your-apple-client-id"`}
+    code={`# auth/backend/.env
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+APPLE_CLIENT_ID=...
+GITHUB_CLIENT_ID=...
+GITHUB_CLIENT_SECRET=...`}
     language="bash"
 />
 
-## Usage
+## Sessions are httpOnly cookies
 
-Use the `useAuth` hook to access the current user and authentication methods.
+BetterAuth issues and rotates **httpOnly** session cookies — there is no client-held JWT
+to leak. A base service reads the principal by calling
+`/api/auth/get-session`; it never decodes a token itself. Native clients that can't carry
+cookies use the [`flexible` flavor's](/docs/architecture/auth-flow#middleware-flavors)
+device-session token instead.
 
-<CodeBlock
-    code={`import { useAuth } from '@/lib/auth';
+## The admin dashboard
 
-export default function ProfileScreen() {
-  const { user, signOut } = useAuth();
+With the dashboard enabled, the auth service ships a Next.js admin app on port
+**`:3002`** — sign in, list users, manage roles, and delete users out of the box. It
+doubles as a reference implementation for consuming the auth backend from a stackr web
+app.
 
-  return (
-    <View>
-      <Text>Welcome, {user?.name}</Text>
-      <Button onPress={signOut} title="Sign Out" />
-    </View>
-  );
-}`}
-    language="typescript"
-/>
+## Roles
+
+User roles drive the [`role-gated` middleware flavor](/docs/architecture/auth-flow#middleware-flavors):
+a role-gated service admits only users holding one of its allowed roles (with `admin`
+always permitted). You assign roles from the admin dashboard.
+
+## Provisioning into a service
+
+A user authenticated against `auth` may not yet have a record in a given base service.
+Each user carries a `has<Service>Account` flag; on the user's first authenticated call,
+a provisioning service creates the local record and flips the flag via
+`POST /api/auth/provision`. See [Cross-Service Auth](/docs/architecture/auth-flow#provisioning).
+
+<Callout type="error" title="Identity has exactly one owner">
+    Only the auth service may declare <code>user</code>, <code>session</code>,
+    <code>account</code>, or <code>verification</code> tables. This is enforced by
+    <a href="/docs/harness/enforcement"><code>ast-grep</code> and <code>check:auth-tables</code></a>,
+    not just convention.
+</Callout>
 
 </div>

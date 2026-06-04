@@ -1,0 +1,86 @@
+export const metadata = {
+    title: 'Codegen & Anti-Drift',
+    description: 'Correct-by-construction entity codegen, and the idempotent regeneration that keeps every harness artifact in sync with the project.',
+};
+
+<div className="prose">
+
+# Codegen & Anti-Drift
+
+Salience makes the agent more likely to follow a convention; enforcement catches it when
+it doesn't. **Codegen** is the third lever — it sidesteps both by generating code that is
+correct by construction, and it keeps every generated artifact from drifting away from
+the project's true shape.
+
+## Correct-by-construction entity codegen
+
+Adding a domain slice by hand means writing a schema, a repository, and a service, then
+remembering to add the table to the ORM schema — four chances to break a convention.
+`stackr add entity` does all of it the right way:
+
+<CodeBlock code="stackr add entity <service> <entity>   # e.g. stackr add entity blog comment" language="bash" />
+
+<EntityCodegenVisual />
+
+It generates `domain/<entity>/{schema,repository,service}.ts` and **merges** the new
+table into that service's ORM schema, so the new repository type-checks immediately. The
+generated code already follows every backend rule: the schema exports both the TypeBox
+schema and its `Static` type, and every repository operation wraps its `try/catch` in
+`ErrorFactory.databaseError`.
+
+The operation is **atomic**: it validates read-only, computes the full change set in
+memory, dry-runs it (re-parsing a merged Prisma schema to catch breakage), then commits
+with an atomic file swap. If anything fails, the project is left byte-identical.
+
+### Then run the migration
+
+A schema change needs a migration. `add entity` records a **pending migration** and
+prints the exact command. Run it, then acknowledge it:
+
+<CodeBlock
+    code={`cd blog/backend && drizzle-kit generate && drizzle-kit migrate
+stackr migrations ack blog`}
+    language="bash"
+/>
+
+Until you `ack`, subsequent `stackr` subcommands refuse to run — so a schema change can't
+silently fall out of sync with the database. (See the
+[add entity guide](/docs/guides/add-entity) for the full walkthrough.)
+
+## Anti-drift
+
+Every harness artifact — the nested `AGENTS.md`, the editor rules, the skills, the
+`ast-grep` config — is rendered by **one** generator from `stackr.config.json`. Both
+`create-stackr` and `stackr add service` drive that same generator, so the artifacts can
+never describe a service set that no longer exists.
+
+You can re-derive everything at any time:
+
+<CodeBlock
+    code={`stackr migrate context        # re-render all agent-facing artifacts from config
+stackr migrate context --dry-run
+
+stackr doctor                 # report drift between config and the project
+stackr doctor --fix           # re-render to resolve it`}
+    language="bash"
+/>
+
+Regeneration is **idempotent**: the generator computes the whole plan in memory and runs
+the same executor used at init, so running it again on the same `stackr.config.json`
+produces byte-identical output. Artifacts for a removed service are deleted, not left
+orphaned.
+
+<Callout type="info" title="Gate drift in CI">
+    <code>stackr doctor</code> exits non-zero when the artifacts have drifted from the
+    config, so you can run it as a CI check. Combined with
+    <a href="/docs/harness/enforcement"><code>lint:sg</code></a>, it keeps both the
+    conventions and the context files honest on every push.
+</Callout>
+
+## Why there's no version field
+
+Because the layout is detected from disk and every artifact is a pure function of
+`stackr.config.json`, there is no "context-layer version" to migrate. The current config
+*is* the spec; regenerating is always safe.
+
+</div>

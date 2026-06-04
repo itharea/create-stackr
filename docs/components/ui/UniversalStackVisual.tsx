@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Smartphone, Globe, Layers, Zap, MessageSquare, Share2, Database } from 'lucide-react';
+import { Smartphone, Globe, Layers, Zap, MessageSquare, Database } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import styles from './UniversalStackVisual.module.css';
 
@@ -19,7 +19,6 @@ const uiTechnologies: TechItem[] = [
 const controllers: TechItem[] = [
   { name: 'REST API', icon: Zap },
   { name: 'Event Queue', icon: MessageSquare },
-  { name: 'GraphQL', icon: Share2 },
 ];
 
 const backend: TechItem[] = [

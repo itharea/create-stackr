@@ -1,160 +1,108 @@
 export const metadata = {
     title: 'Project Structure',
-    description: 'Overview of the project directory structure.',
+    description: 'The layout of a generated stackr monorepo — services, per-service subsystems, and the harness artifacts.',
 };
 
 <div className="prose">
 
 # Project Structure
 
-The generated project contains three main directories: `mobile/` for the
-React Native (Expo) app, `web/` for the Next.js web app, and `backend/` for the Node.js API server.
+A stackr project is a monorepo of isolated services. Each service lives under its own
+top-level directory; there is no shared workspace package.
 
-## Root Level
+## Root
 
 <CodeBlock
     code={`my-app/
-├── mobile/              # React Native (Expo) app
-├── web/                 # Next.js web app
-├── backend/             # Node.js (Fastify) backend
-├── scripts/             # Setup and deployment scripts
-├── docker-compose.yml   # Development Docker config
-├── docker-compose.prod.yml  # Production Docker config
-└── README.md            # Project documentation`}
+├── auth/                   # auth service (trust anchor)
+├── core/                   # a base service
+├── wallet/                 # another base service…
+├── tests/e2e/              # cross-service end-to-end tests
+├── scripts/                # setup.mjs, test runners, check-auth-tables.mjs
+├── docker-compose.yml      # dev: all services + their DBs + Redis
+├── docker-compose.test.yml # component & e2e test profiles
+├── docker-compose.prod.yml # production overlay
+├── stackr.config.json      # source of truth for the monorepo shape
+├── AGENTS.md / CLAUDE.md   # harness: root conventions + bridge
+├── .cursor/ .windsurf/     # harness: editor glob rules
+├── .claude/                # harness: skills + PostToolUse hook (if Claude selected)
+├── .stackr/sg-rules/       # harness: ast-grep enforcement rules
+├── sgconfig.yml
+├── DESIGN.md               # generated system design
+└── package.json            # root scripts: setup, docker:dev, test, lint:sg…`}
     language="text"
 />
 
-## Mobile App Structure
+## A service
 
-The mobile app uses Expo Router for file-based navigation with a clean separation
-of concerns between app routes and reusable code.
+Each service contains the subsystems you enabled for it: always a backend, optionally web
+and mobile, plus its own nested `AGENTS.md` files.
 
 <CodeBlock
-    code={`mobile/
-├── app/                     # Expo Router pages
-│   ├── _layout.tsx          # Root layout (SDK init, auth check)
-│   ├── +not-found.tsx       # 404 screen
-│   ├── (auth)/              # Authentication screens
-│   │   ├── _layout.tsx
-│   │   ├── login.tsx
-│   │   └── register.tsx
-│   ├── (onboarding)/        # Onboarding flow (if enabled)
-│   │   ├── _layout.tsx
-│   │   ├── page-1.tsx
-│   │   ├── page-2.tsx
-│   │   └── page-3.tsx
-│   ├── (tabs)/              # Main tab navigation
-│   │   ├── _layout.tsx
-│   │   └── index.tsx
-│   └── paywall.tsx          # Paywall screen (if enabled)
-├── src/
-│   ├── services/            # API and SDK services
-│   │   ├── api.ts           # Axios API client
-│   │   ├── sdkInitializer.ts
-│   │   └── ...              # SDK-specific services
-│   ├── store/               # Zustand state stores
-│   │   ├── index.ts         # Store exports
-│   │   ├── auth.store.ts
-│   │   ├── session.store.ts
-│   │   └── ...              # Feature-specific stores
-│   ├── hooks/               # Custom React hooks
-│   ├── components/          # Reusable UI components
-│   │   ├── ui/              # Base UI components
-│   │   └── auth/            # Auth-specific components
-│   ├── constants/           # Theme and app constants
-│   └── utils/               # Utility functions
-├── assets/                  # Images, fonts, icons
-│   └── images/
-├── app.json                 # Expo configuration
-├── eas.json                 # EAS Build configuration
-└── package.json`}
+    code={`<service>/
+├── AGENTS.md               # service role + trust boundary
+├── backend/
+│   ├── AGENTS.md
+│   ├── controllers/
+│   │   ├── rest-api/
+│   │   │   ├── index.ts    # Fastify bootstrap
+│   │   │   ├── plugins/    # config, error-handler, cors, auth, redis
+│   │   │   └── routes/     # thin handlers
+│   │   └── event-queue/    # BullMQ workers (if enabled)
+│   ├── domain/
+│   │   └── <entity>/       # schema.ts, repository.ts, service.ts
+│   ├── drizzle/ | prisma/  # ORM schema
+│   ├── utils/              # db client, ErrorFactory
+│   ├── tests/              # Vitest component tests
+│   └── Dockerfile
+├── web/                    # optional Next.js app (App Router)
+│   └── AGENTS.md
+└── mobile/                 # optional Expo app
+    └── AGENTS.md`}
     language="text"
 />
 
-## Web App Structure
-
-The web app uses Next.js App Router with a clear separation between public and protected routes.
-
-<CodeBlock
-    code={`web/
-├── src/
-│   ├── app/                 # Next.js App Router
-│   │   ├── (auth)/          # Public auth pages
-│   │   │   ├── login/
-│   │   │   ├── register/
-│   │   │   └── forgot-password/
-│   │   ├── (app)/           # Protected app pages
-│   │   │   ├── dashboard/
-│   │   │   └── settings/
-│   │   ├── auth/            # OAuth callback routes
-│   │   │   └── callback/
-│   │   ├── globals.css      # Global styles with dark mode
-│   │   ├── layout.tsx       # Root layout with providers
-│   │   └── page.tsx         # Home page
-│   ├── components/
-│   │   ├── ui/              # shadcn/ui base components
-│   │   ├── auth/            # Auth forms and buttons
-│   │   ├── settings/        # Settings page components
-│   │   └── providers/       # React context providers
-│   ├── lib/
-│   │   ├── auth/            # Auth utilities and server actions
-│   │   └── utils.ts         # Helper functions
-│   └── store/               # Zustand state stores
-├── public/                  # Static assets
-├── tailwind.config.ts       # Tailwind configuration
-├── next.config.ts           # Next.js configuration
-└── package.json`}
-    language="text"
-/>
-
-<Callout type="info" title="Route Groups">
-    The `(auth)` and `(app)` folders are Next.js route groups. They organize routes without
-    affecting the URL structure. `(auth)` routes are public, while `(app)` routes require authentication.
+<Callout type="info" title="The auth service is special">
+    <code>auth/</code> has the same shape but runs BetterAuth and owns the
+    user/session/account/verification tables. Its <code>web/</code> is the admin
+    dashboard. No other service may declare identity tables. See
+    <a href="/docs/architecture/services">Services &amp; Isolation</a>.
 </Callout>
 
-## Backend Structure
-
-The backend follows a clean architecture with separate layers for controllers,
-domain logic, and infrastructure.
+## Web subsystem
 
 <CodeBlock
-    code={`backend/
-├── controllers/
-│   ├── rest-api/            # Fastify REST API
-│   │   ├── server.ts        # Server setup
-│   │   ├── index.ts         # Entry point
-│   │   ├── plugins/         # Fastify plugins
-│   │   │   ├── auth.ts      # JWT authentication
-│   │   │   ├── config.ts    # Configuration
-│   │   │   └── error-handler.ts
-│   │   └── routes/          # API route handlers
-│   │       ├── auth.ts
-│   │       └── sessions.ts
-│   └── event-queue/         # BullMQ workers (if enabled)
-│       ├── index.ts
-│       └── workers/
-├── domain/                  # Business logic
-│   ├── auth/
-│   │   ├── schema.ts        # Zod validation schemas
-│   │   └── repository.ts    # Data access
-│   ├── user/
-│   └── session/
-├── prisma/
-│   └── schema.prisma        # Database schema
-├── utils/                   # Shared utilities
-│   ├── jwt.ts
-│   ├── errors.ts
-│   └── db.ts
-├── Dockerfile
-└── package.json`}
+    code={`<service>/web/
+├── src/app/          # App Router routes (Server Components by default)
+├── src/components/   # shadcn/ui components
+├── src/lib/
+│   ├── session.ts    # server-only, React.cache() wrapped
+│   └── actions.ts    # 'use server' mutations (updateTag)
+└── src/store/        # Zustand`}
     language="text"
 />
 
-<Callout type="info" title="Conditional Files">
-    Some directories and files are only generated based on your selected features
-    and integrations. For example, `(onboarding)/` is only created if
-    onboarding is enabled, and `event-queue/` only appears if the event
-    queue is enabled.
-</Callout>
+Route groups like `(auth)` and `(app)` organize routes without affecting URLs — public
+vs. protected.
+
+## Mobile subsystem
+
+<CodeBlock
+    code={`<service>/mobile/
+├── app/              # Expo Router (incl. (onboarding), paywall if enabled)
+└── src/
+    ├── services/     # shared Axios api instance + integration services
+    ├── store/        # Zustand
+    ├── components/    # ui + feature components (theme tokens)
+    └── ...`}
+    language="text"
+/>
+
+## Harness artifacts
+
+The `AGENTS.md` files, `CLAUDE.md`, `.cursor/`, `.windsurf/`, `.claude/`, and
+`.stackr/sg-rules/` are all **generated** from `stackr.config.json` and regenerated by
+`stackr add service` and `stackr migrate context`. Treat them as output — see
+[The Context Harness](/docs/harness).
 
 </div>

@@ -1,0 +1,83 @@
+export const metadata = {
+    title: 'Architecture Overview',
+    description: 'How a stackr monorepo is structured — isolated services, an auth trust anchor, and a single locked ORM.',
+};
+
+<div className="prose">
+
+# Architecture Overview
+
+A stackr project is a **multi-microservice monorepo**. Every service owns its own
+PostgreSQL database, Redis instance, backend image, and deployment lifecycle. One
+service — `auth` — is the trust anchor; every other service verifies requests by
+forwarding the user's cookie to it.
+
+<ServiceIsolationVisual />
+
+## The shape
+
+```
+my-app/
+├── auth/          # trust anchor — users, sessions, OAuth, verification
+│   ├── backend/   # Fastify + BetterAuth
+│   └── web/       # admin dashboard (Next.js)
+├── core/          # a base service (domain logic)
+│   ├── backend/
+│   ├── web/       # optional
+│   └── mobile/    # optional
+├── wallet/        # another base service…
+├── tests/e2e/     # cross-service end-to-end tests
+├── docker-compose.yml
+└── stackr.config.json   # source of truth for the monorepo shape
+```
+
+## Core principles
+
+### Backend-driven
+
+The `auth` service owns users, sessions, and account provisioning. Base services
+own their domain logic and their own tables. Clients (web and mobile) are thin
+presentation layers — they never talk directly to another service's database.
+
+### Per-service isolation
+
+Each service has its own database and its own Redis instance, which buys three
+properties that ad-hoc full-stack projects rarely keep:
+
+- **Bounded blast radius.** A runaway migration in one service can't block or
+  corrupt another service's data.
+- **Independent schemas.** ORM schemas evolve at different cadences without
+  cross-service coordination.
+- **Decoupled deployment.** A service can be redeployed, scaled, or even rewritten
+  in a different stack without touching its neighbors.
+
+The cost is duplicated infrastructure (more containers) and slightly heavier local
+dev — which `setup` and the root Docker Compose file exist to absorb.
+
+### One ORM, locked monorepo-wide
+
+The whole monorepo uses **one ORM** — Drizzle (default) or Prisma — chosen at init
+and locked in `stackr.config.json`. Mixing ORMs per service is an explicit non-goal:
+it would multiply the template surface for marginal benefit and split the
+conventions the harness enforces.
+
+### No shared package
+
+Shared types live alongside each service. There is deliberately no shared workspace
+package — a service is a self-contained unit that communicates over HTTP, not by
+importing another service's code.
+
+## Read on
+
+<Table
+    headers={['Page', 'What it covers']}
+    rows={[
+        [<a key="services" href="/docs/architecture/services">Services & Isolation</a>, 'The auth trust anchor vs. base services, and what each owns'],
+        [<a key="auth-flow" href="/docs/architecture/auth-flow">Cross-Service Auth</a>, 'Cookie forwarding, the request flow, and the four middleware flavors'],
+        [<a key="backend" href="/docs/architecture/backend">Backend</a>, 'The layered routes → service → repository → schema structure'],
+        [<a key="frontends" href="/docs/architecture/frontends">Frontends</a>, 'Next.js (App Router) web, the admin dashboard, and Expo mobile'],
+        [<a key="infrastructure" href="/docs/architecture/infrastructure">Infrastructure</a>, 'Docker Compose, ports, credentials, and additive regeneration'],
+    ]}
+/>
+
+</div>

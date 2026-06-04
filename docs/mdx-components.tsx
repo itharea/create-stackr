@@ -3,8 +3,11 @@ import Link from 'next/link';
 import Image from 'next/image';
 import CodeBlock from '@/components/CodeBlock';
 import Callout from '@/components/Callout';
-import { PresetComparison } from '@/components/ui/PresetComparison';
 import { Table } from '@/components/ui/Table';
+import { ServiceIsolationVisual } from '@/components/ui/ServiceIsolationVisual';
+import { CrossServiceAuthVisual } from '@/components/ui/CrossServiceAuthVisual';
+import { ContextHarnessVisual } from '@/components/ui/ContextHarnessVisual';
+import { EntityCodegenVisual } from '@/components/ui/EntityCodegenVisual';
 
 export function useMDXComponents(components: MDXComponents): MDXComponents {
     return {
@@ -37,8 +40,11 @@ export function useMDXComponents(components: MDXComponents): MDXComponents {
         // Custom components available in MDX files
         CodeBlock,
         Callout,
-        PresetComparison,
         Table,
+        ServiceIsolationVisual,
+        CrossServiceAuthVisual,
+        ContextHarnessVisual,
+        EntityCodegenVisual,
         ...components,
     };
 }
