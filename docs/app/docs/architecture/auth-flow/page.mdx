@@ -1,0 +1,118 @@
+export const metadata = {
+    title: 'Cross-Service Auth',
+    description: 'How base services authenticate requests by forwarding cookies to the auth trust anchor, and the four middleware flavors.',
+};
+
+<div className="prose">
+
+# Cross-Service Auth
+
+Base services don't run their own auth. They verify each request by **forwarding the
+session cookie** to the auth service and reading back the verified principal. This is
+the single most important invariant in a stackr monorepo — and the one ad-hoc
+projects most often get wrong.
+
+## The request flow
+
+<CrossServiceAuthVisual />
+
+Step by step:
+
+1. The client authenticates against the **auth** service. BetterAuth sets an httpOnly
+   session cookie on the client.
+2. The client sends a request to a **base** service with that cookie attached.
+3. The base service's `requireAuth` hook forwards the cookie to the auth service's
+   `/api/auth/get-session` endpoint.
+4. If the session is valid, the hook decorates the request with `user` and `session`
+   from the response.
+5. The route handler runs with a **verified** `request.user` — never a
+   client-supplied id.
+
+The generated `requireAuth` decorator is essentially:
+
+<CodeBlock
+    code={`// base/backend/controllers/rest-api/plugins/auth.ts
+server.decorate('requireAuth', async (request, reply) => {
+  const res = await fetch(AUTH_SERVICE_URL + '/api/auth/get-session', {
+    method: 'GET',
+    headers: { cookie: request.headers.cookie || '' },
+  });
+  if (!res.ok) throw ErrorFactory.unauthorized();
+
+  const data = await res.json();           // { user, session } | null
+  if (!data || !data.user) throw ErrorFactory.unauthorized();
+
+  request.user = data.user;                // verified principal
+  request.session = data.session;
+});`}
+    language="typescript"
+/>
+
+## Guard at the hook, not in the handler
+
+`requireAuth` is registered as an `onRequest` hook on protected routes. Handlers stay
+thin and assume an already-authenticated `request.user` — they never re-check auth
+inline:
+
+<CodeBlock
+    code={`server.get('/me', { onRequest: [server.requireAuth] }, async (request) => {
+  // request.user is guaranteed here
+  return request.user;
+});`}
+    language="typescript"
+/>
+
+<Callout type="error" title="Never trust a header or a client id">
+    A base service must derive identity from the auth service's verified response.
+    Trusting an <code>x-user-id</code> header, a JWT the client minted, or a body
+    field is a privilege-escalation bug. This rule lives in the project's root
+    <code>AGENTS.md</code>.
+</Callout>
+
+## Provisioning
+
+A user authenticated against `auth` may not yet have a record in a given base
+service. Each user object carries a `has<Service>Account` flag. The first time a user
+hits a service that provisions (the `flexible` flavor), the service creates its local
+record and calls `POST /api/auth/provision` to tell the auth service to flip the flag:
+
+<CodeBlock
+    code={`if (!data.user.hasWalletAccount) {
+  await provisionWallet(data.user, request.headers.cookie || '');
+  // → POST \${AUTH_SERVICE_URL}/api/auth/provision  { app: 'wallet' }
+}`}
+    language="typescript"
+/>
+
+## Middleware flavors
+
+When you add a base service, you choose how strict its `requireAuth` is. The flavor is
+stored per service in `stackr.config.json`.
+
+<Table
+    headers={['Flavor', 'Behavior']}
+    rows={[
+        ['standard', 'Cookie forwarding only. Decorates request.user / request.session. The default when an auth service exists.'],
+        ['role-gated', 'Standard, plus a role check: the user must hold one of the allowed roles (admin always passes). Otherwise 403.'],
+        ['flexible', 'Standard, plus device-session support and first-call provisioning. Adds requireDeviceSession and requireAuthOrDeviceSession.'],
+        ['none', 'No auth plugin. A no-op is exported so the bootstrap still imports cleanly — for backend-only/internal services.'],
+    ]}
+/>
+
+### Device sessions (flexible)
+
+Native clients that can't carry browser cookies authenticate with an
+`x-device-session-token` header instead. The `flexible` flavor adds two more
+decorators:
+
+- `requireDeviceSession` — validates the `x-device-session-token` header against the
+  service's device-session store.
+- `requireAuthOrDeviceSession` — accepts **either** a valid auth cookie or a device
+  session, decorating `request.authType` with `"user"` or `"device"`.
+
+This is what lets an Expo app and a web app share one backend while using different
+credential transports. Choose the flavor per service in the
+[wizard](/docs/configuration) or via the `--auth-middleware` flag on
+[`stackr add service`](/docs/guides/add-service).
+
+</div>

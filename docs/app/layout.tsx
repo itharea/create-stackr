@@ -24,19 +24,25 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: 'create-stackr - Generate Production-Ready Mobile Apps',
-    template: '%s | create-stackr',
+    default: 'stackr — Production-grade full-stack monorepos that stay on-convention',
+    template: '%s | stackr',
   },
   description:
-    'Generate production-ready mobile applications with React Native, Expo, and Node.js backend. Built-in integrations, authentication, and more.',
+    'stackr scaffolds a multi-service TypeScript monorepo — isolated Fastify services, BetterAuth, Drizzle/Prisma, Docker — and ships a push-based context harness that keeps AI agents on-convention long after generation.',
   keywords: [
-    'React Native',
+    'TypeScript monorepo',
+    'microservices',
+    'Fastify',
+    'BetterAuth',
+    'Drizzle',
+    'Prisma',
+    'Next.js',
     'Expo',
-    'Node.js',
-    'Full-Stack',
-    'Mobile Development',
+    'Docker',
+    'AI agents',
+    'agentic coding',
     'CLI',
-    'Boilerplate',
+    'scaffolding',
   ],
   authors: [{ name: 'itharea' }],
   creator: 'itharea',
@@ -45,24 +51,24 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'en_US',
     url: 'https://stackr.sh',
-    title: 'create-stackr Documentation',
+    title: 'stackr — Production-grade full-stack monorepos that stay on-convention',
     description:
-      'Complete documentation for create-stackr - the fastest way to build production-ready mobile apps.',
-    siteName: 'create-stackr',
+      'A multi-service TypeScript monorepo generator with a built-in context harness that keeps the architecture and conventions intact — even under AI editing.',
+    siteName: 'stackr',
     images: [
       {
         url: '/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'create-stackr',
+        alt: 'stackr',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'create-stackr Documentation',
+    title: 'stackr — Production-grade full-stack monorepos that stay on-convention',
     description:
-      'Complete documentation for create-stackr - the fastest way to build production-ready mobile apps.',
+      'A multi-service TypeScript monorepo generator with a built-in context harness that keeps the architecture and conventions intact — even under AI editing.',
     images: ['/og-image.png'],
   },
   robots: {

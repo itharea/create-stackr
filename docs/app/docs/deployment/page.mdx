@@ -1,132 +1,102 @@
 export const metadata = {
     title: 'Deployment',
-    description: 'Deploying your mobile app, web app, and backend.',
+    description: 'Deploy each service independently — backends via Docker, web via Vercel/Node, mobile via EAS.',
 };
 
 <div className="prose">
 
 # Deployment
 
-This guide covers deploying all parts of your stack: mobile app, web app, and backend.
+Because services are isolated, they deploy **independently**. There's no single artifact
+to ship — you deploy each service's backend, and each enabled web/mobile frontend, on its
+own cadence.
 
-## Mobile App
+## Backends (Docker)
 
-We use EAS Build (Expo Application Services) for building and deploying your mobile app.
+Every service backend ships a `Dockerfile`. For a self-hosted stack, the production
+overlay composes them all with their databases and Redis:
 
-### Prerequisites
+<CodeBlock code="npm run docker:prod   # docker-compose.yml + docker-compose.prod.yml" language="bash" />
 
-1. Install EAS CLI: `npm install -g eas-cli`
-2. Log in to your Expo account: `eas login`
-
-### Building
-
-To build your app for production:
-
-<CodeBlock code="eas build --profile production" language="bash" />
-
-### Submitting
-
-To submit your app to the stores:
-
-<CodeBlock code="eas submit --profile production" language="bash" />
-
-## Web App
-
-The web app is a standard Next.js application that can be deployed to any hosting platform
-that supports Node.js or static exports.
-
-### Vercel (Recommended)
-
-Vercel is the easiest option for Next.js apps:
+To deploy services separately, build and push each image on its own:
 
 <CodeBlock
-    code={`# Install Vercel CLI
-npm install -g vercel
+    code={`docker build -t my-app-core ./core/backend
+docker build -t my-app-auth ./auth/backend
+# push to your registry, deploy each to its target`}
+    language="bash"
+/>
 
-# Deploy
+Any Node.js host works — Railway, Render, Fly.io, AWS/GCP/Azure, or your own VPS. Each
+service needs its own PostgreSQL and Redis.
+
+### Wiring services together
+
+The critical production setting is `AUTH_SERVICE_URL` on every **non-auth** service — it
+must point at the deployed auth service so cookie forwarding reaches the right place. Set
+CORS to include every frontend origin.
+
+<CodeBlock
+    code={`# core/backend production env
+DATABASE_URL=postgresql://user:password@core-db:5432/core
+REDIS_URL=redis://core-redis:6379
+AUTH_SERVICE_URL=https://auth.yourdomain.com
+CORS_ORIGINS=https://app.yourdomain.com`}
+    language="bash"
+/>
+
+<Callout type="warning" title="Secrets per service">
+    Each service has its own <code>.env</code> with its own random credentials. The
+    <code>BETTER_AUTH_SECRET</code> lives on the auth service. Don't share one database or
+    one secret across services — that defeats the isolation boundary.
+</Callout>
+
+## Web frontends
+
+Each web app is a standard Next.js (App Router) project.
+
+### Vercel (recommended)
+
+<CodeBlock
+    code={`cd core/web
 vercel deploy`}
     language="bash"
 />
 
-Or connect your Git repository for automatic deployments.
+Or connect the repo for automatic deployments and set the project root to the service's
+`web/` directory.
 
-### Netlify
-
-For Netlify deployment, add the Next.js plugin:
+### Node.js / Docker
 
 <CodeBlock
-    code={`[[plugins]]
-  package = "@netlify/plugin-nextjs"`}
-    language="toml"
-    filename="netlify.toml"
+    code={`cd core/web
+npm run build && npm start`}
+    language="bash"
 />
 
-<Callout type="warning" title="SSR Required">
-    Next.js App Router uses Server Components. Do not configure Netlify for static file
-    serving or SPA-style redirects.
+<Callout type="warning" title="SSR required">
+    Next.js App Router uses Server Components. Do not configure static-only hosting or
+    SPA-style redirects — run <code>next start</code> (or deploy to a platform that runs
+    it).
 </Callout>
 
-### Docker
+Point each web app at its backend and the auth service via its production env (e.g.
+`NEXT_PUBLIC_*` URLs).
 
-Build and run the web app in a container:
+## Mobile (EAS)
+
+Expo apps build and submit with **EAS**:
 
 <CodeBlock
-    code={`# Build the image
-docker build -t my-app-web ./web
+    code={`npm install -g eas-cli
+eas login
 
-# Run the container
-docker run -p 3000:3000 my-app-web`}
+eas build --profile production
+eas submit --profile production`}
     language="bash"
 />
 
-### Node.js Hosting
-
-For any Node.js hosting (Railway, Render, AWS, etc.):
-
-<CodeBlock
-    code={`cd web
-bun run build
-bun start`}
-    language="bash"
-/>
-
-### Production Environment Variables
-
-Update environment variables for production:
-
-<CodeBlock
-    code={`NEXT_PUBLIC_APP_URL=https://yourdomain.com
-BACKEND_URL=https://api.yourdomain.com`}
-    language="bash"
-    filename="web/.env.production"
-/>
-
-## Backend
-
-The backend can be deployed to any Node.js hosting platform.
-
-### Recommended Platforms
-
-- **Railway** - Simple Git-based deployments
-- **Render** - Free tier available
-- **Heroku** - Classic PaaS option
-- **AWS/GCP/Azure** - Enterprise-grade
-- **Your own VPS** - Full control
-
-### Configuration
-
-Configure environment variables from `.env.example`:
-
-<CodeBlock
-    code={`DATABASE_URL="postgresql://user:password@host:5432/mydb"
-REDIS_URL="redis://host:6379"
-CORS_ORIGINS="https://yourdomain.com,https://www.yourdomain.com"
-JWT_SECRET="your-production-secret"`}
-    language="bash"
-/>
-
-<Callout type="warning" title="CORS Configuration">
-    Make sure `CORS_ORIGINS` includes all your frontend URLs (both web and any mobile deep link origins).
-</Callout>
+Set production API URLs and integration keys in the app config before building. Apple
+Sign-In requires HTTPS redirect URIs — see [Troubleshooting](/docs/troubleshooting).
 
 </div>

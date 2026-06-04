@@ -1,0 +1,72 @@
+export const metadata = {
+    title: 'Adding a Domain Entity',
+    description: 'Scaffold a backend domain slice — schema, repository, service, and the ORM table — with stackr add entity.',
+};
+
+<div className="prose">
+
+# Adding a Domain Entity
+
+A domain entity is a slice of a service's backend: a TypeBox schema, a repository, a
+service, and a table in the ORM schema. Writing those by hand is four chances to break a
+convention. `stackr add entity` generates them together, correct by construction.
+
+<CodeBlock code="stackr add entity <service> <entity>" language="bash" />
+
+<EntityCodegenVisual />
+
+## Walkthrough
+
+### 1. Generate the slice
+
+<CodeBlock code="stackr add entity blog comment" language="bash" />
+
+This writes `blog/backend/domain/comment/{schema,repository,service}.ts` and merges a
+`comment` table into the `blog` service's ORM schema. The generated code already follows
+the [backend conventions](/docs/architecture/backend): the schema exports both
+`CommentSchema` and `type Comment = Static<typeof CommentSchema>`, and every repository
+operation wraps its `try/catch` in `ErrorFactory.databaseError`.
+
+The merge is additive and atomic — existing tables, comments, and formatting are
+untouched, and a collision (an entity that already exists) fails before anything is
+written.
+
+### 2. Run the migration
+
+The schema change needs a migration. stackr records it as pending and prints the command:
+
+<CodeBlock
+    code={`cd blog/backend && drizzle-kit generate && drizzle-kit migrate
+stackr migrations ack blog`}
+    language="bash"
+/>
+
+Until you `ack`, further `stackr` subcommands refuse to run — so a schema change can't
+quietly drift from the database.
+
+### 3. Wire it into a route
+
+Codegen produces the domain layer; you connect it to HTTP. Add a thin handler under
+`blog/backend/controllers/rest-api/routes/` that imports the generated TypeBox schema,
+guards with `requireAuth`, and calls the service:
+
+<CodeBlock
+    code={`server.get('/comments', { onRequest: [server.requireAuth] }, async () => {
+  return listComments();   // from domain/comment/service.ts
+});`}
+    language="typescript"
+/>
+
+<Callout type="error" title="Don't hand-write the slice">
+    Never hand-create the schema/repository/service files or hand-edit the ORM schema for
+    a new entity. Codegen keeps them consistent and compiling — that's the whole point.
+    See <a href="/docs/harness/codegen">Codegen &amp; Anti-Drift</a>.
+</Callout>
+
+## Using it from an agent
+
+If you use Claude Code, the generated `add-domain-entity` skill points your agent at this
+command instead of hand-writing the files — so "add a comment entity to blog" produces a
+correct slice, not an improvised one.
+
+</div>

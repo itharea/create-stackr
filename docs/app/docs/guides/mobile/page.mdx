@@ -1,0 +1,78 @@
+export const metadata = {
+    title: 'Mobile (Expo)',
+    description: 'The optional Expo mobile app — onboarding, paywall, and the RevenueCat, Adjust, Scate, and ATT integrations.',
+};
+
+<div className="prose">
+
+# Mobile (Expo)
+
+Any base service can include an **Expo / React Native** app. It's opt-in — enable it per
+service in the [wizard](/docs/configuration) or with `--mobile` on
+[`stackr add service`](/docs/guides/add-service). The mobile app talks only to its
+service's backend; the BetterAuth client manages session cookies, and for token-based
+native flows the backend's
+[`flexible` middleware](/docs/architecture/auth-flow#middleware-flavors) accepts an
+`x-device-session-token` header.
+
+## App structure
+
+The Expo app uses **Expo Router** for navigation, **Zustand** for state, and **Axios**
+for HTTP through a single shared `api` instance. The harness ships mobile conventions and
+(for Claude Code) a `stackr-mobile` skill covering them:
+
+- **Use theme tokens, never hardcoded colors** — enforced by `mobile-no-hardcoded-color`.
+- **No direct `fetch()` in components** — go through the shared `api` instance; enforced
+  by `mobile-no-direct-fetch`.
+- **Set `useNativeDriver` on animations** — enforced by `mobile-animated-native-driver`.
+- **Store tokens in `SecureStore`**, not `AsyncStorage`.
+
+<Callout type="warning" title="Mobile rules gate at lint, not at edit-time">
+    The PostToolUse hook lints backend code only — it no-ops on mobile edits. The three
+    mobile <code>ast-grep</code> rules above run at <code>npm run lint:sg</code> and in
+    CI. See <a href="/docs/harness/enforcement">Enforcement</a>.
+</Callout>
+
+## Onboarding & paywall
+
+Two ready-made flows ship with the mobile template:
+
+- **Onboarding** — a multi-screen intro flow (with a skip option) under
+  `app/(onboarding)`, using a generated `OnboardingLayout`.
+- **Paywall** — a `paywall.tsx` screen and `PaywallLayout`, typically shown after
+  onboarding. The paywall is backed by **RevenueCat**, so enable that integration if you
+  use it.
+
+## Integrations
+
+Each integration ships as a service module plus a Zustand store, initialized in the app
+and configured through `app.json` / environment values. They're optional and independent.
+
+<Table
+    headers={['Integration', 'What it does']}
+    rows={[
+        ['RevenueCat', 'In-app purchases and subscriptions; backs the paywall (per-platform API keys)'],
+        ['Adjust', 'Mobile attribution & analytics; sandbox or production environment'],
+        ['Scate', 'Media-buying optimization & engagement (single API key)'],
+        ['ATT', 'App Tracking Transparency — the iOS 14.5+ tracking prompt'],
+    ]}
+/>
+
+<Callout type="info" title="ATT and Adjust">
+    When Adjust is enabled, App Tracking Transparency is wired in so the tracking prompt
+    is requested before attribution initializes. The ATT state is exposed through a store
+    your screens can read.
+</Callout>
+
+Configure each provider's keys per its dashboard, then fill the corresponding values in
+your app config before building. Refer to each provider's own documentation —
+[RevenueCat](https://www.revenuecat.com/docs),
+[Adjust](https://dev.adjust.com), and
+[Scate](https://scate.io) — for obtaining credentials.
+
+## Building & shipping
+
+Mobile apps build and submit with **EAS**. See [Deployment](/docs/deployment#mobile-eas)
+for the build and submit commands.
+
+</div>

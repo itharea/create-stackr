@@ -15,28 +15,39 @@ export const navigation: NavSection[] = [
         items: [
             { title: 'Introduction', href: '/docs/getting-started' },
             { title: 'Installation', href: '/docs/installation' },
+            { title: 'Quick Start', href: '/docs/quick-start' },
             { title: 'Configuration', href: '/docs/configuration' },
-            { title: 'Presets', href: '/docs/presets' },
         ],
     },
     {
-        title: 'Features',
+        title: 'Architecture',
+        items: [
+            { title: 'Overview', href: '/docs/architecture' },
+            { title: 'Services & Isolation', href: '/docs/architecture/services' },
+            { title: 'Cross-Service Auth', href: '/docs/architecture/auth-flow' },
+            { title: 'Backend', href: '/docs/architecture/backend' },
+            { title: 'Frontends', href: '/docs/architecture/frontends' },
+            { title: 'Testing', href: '/docs/architecture/testing' },
+            { title: 'Infrastructure', href: '/docs/architecture/infrastructure' },
+        ],
+    },
+    {
+        title: 'The Context Harness',
+        items: [
+            { title: 'Why a Harness', href: '/docs/harness' },
+            { title: 'Convention Layer', href: '/docs/harness/context' },
+            { title: 'Enforcement', href: '/docs/harness/enforcement' },
+            { title: 'Codegen & Anti-Drift', href: '/docs/harness/codegen' },
+        ],
+    },
+    {
+        title: 'Guides',
         items: [
             { title: 'Authentication', href: '/docs/features/authentication' },
-            { title: 'Onboarding', href: '/docs/features/onboarding' },
-            { title: 'Paywall', href: '/docs/features/paywall' },
-            { title: 'Session Management', href: '/docs/features/session-management' },
-            { title: 'Web Platform', href: '/docs/features/web-platform' },
-            { title: 'Backend', href: '/docs/features/backend' },
-        ],
-    },
-    {
-        title: 'Integrations',
-        items: [
-            { title: 'RevenueCat', href: '/docs/integrations/revenuecat' },
-            { title: 'Adjust', href: '/docs/integrations/adjust' },
-            { title: 'Scate', href: '/docs/integrations/scate' },
-            { title: 'App Tracking Transparency', href: '/docs/integrations/att' },
+            { title: 'Adding a Service', href: '/docs/guides/add-service' },
+            { title: 'Adding a Domain Entity', href: '/docs/guides/add-entity' },
+            { title: 'Testing', href: '/docs/guides/testing' },
+            { title: 'Mobile (Expo)', href: '/docs/guides/mobile' },
         ],
     },
     {

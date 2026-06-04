@@ -1,0 +1,124 @@
+export const metadata = {
+    title: 'Testing',
+    description: 'The testing architecture stackr ships — unit, component, and cross-service e2e tests against ephemeral, isolated Docker databases.',
+};
+
+<div className="prose">
+
+# Testing
+
+Tests aren't an afterthought you bolt on — stackr generates a complete, layered test
+architecture with every project. It mirrors the runtime architecture: each service is
+tested in isolation against its own throwaway database, and the whole stack is tested
+together across service boundaries.
+
+## Three layers of tests
+
+<Table
+    headers={['Layer', 'Scope', 'Runs against']}
+    rows={[
+        ['Unit', 'Pure functions (e.g. ErrorFactory)', 'Nothing — in-process'],
+        ['Component', 'One service end-to-end (route → service → repository → DB)', 'An ephemeral Postgres + Redis for that service'],
+        ['E2E', 'Multiple services together, over HTTP', 'The whole stack booted by Docker Compose'],
+    ]}
+/>
+
+Everything uses **Vitest**.
+
+## Component tests (per service)
+
+Each service ships its own suite under `<service>/backend/tests/`:
+
+<CodeBlock
+    code={`<service>/backend/tests/
+├── unit/                     # pure unit tests
+├── component/
+│   ├── rest-api/             # health, root, session, sign-in/up (auth)…
+│   └── queue/                # BullMQ worker tests (if enabled)
+└── helpers/
+    ├── global-setup.ts       # migrate + seed the ephemeral DB once
+    ├── global-teardown.ts    # drop it after the run
+    ├── app.ts                # build the Fastify app in-process
+    ├── db.ts / seed.ts       # DB handle + deterministic seed data
+    ├── nock-defaults.ts      # mock cross-service HTTP (e.g. auth get-session)
+    ├── unique.ts             # collision-free test data
+    └── verify-user.ts        # assert DB state (auth)`}
+    language="text"
+/>
+
+A component test boots the **real Fastify app** in-process (via the `app` helper) and
+drives it through HTTP, so it exercises the full controller → domain → data-access path
+against a real database. Two design choices make this fast and reliable:
+
+- **External services are mocked, not booted.** A base service's component tests don't
+  need the auth service running — `nock-defaults` intercepts the cookie-forward call to
+  `/api/auth/get-session` and returns a canned principal. The suite tests *this* service.
+- **The database is the isolation boundary.** `global-setup` migrates and seeds a fresh
+  database; `unique` helpers keep rows from colliding. Tests assert **through the API**,
+  not by reaching into the DB — there's no per-test teardown to maintain.
+
+In test mode, side effects are stubbed — `sendEmail()` is a no-op and email-verified flags
+are set directly — so tests never depend on a mail server or network.
+
+## End-to-end tests (cross-service)
+
+The monorepo-level suite lives under `tests/e2e/` and verifies the system, not a unit:
+
+<CodeBlock
+    code={`tests/e2e/
+├── stack-smoke.test.ts        # every service boots and responds
+├── cross-service-auth.test.ts # a session from auth is accepted by a base service
+├── vitest.config.ts
+└── helpers/
+    ├── clients.ts             # typed HTTP clients per service
+    ├── cookies.ts             # capture & forward session cookies
+    ├── wait-for-stack.ts      # poll until the whole stack is healthy
+    ├── verify-user.ts
+    └── unique.ts`}
+    language="text"
+/>
+
+E2E tests run the **whole stack** and prove the contract that holds it together: that a
+cookie minted by `auth` is honored by a base service via
+[cookie forwarding](/docs/architecture/auth-flow). `wait-for-stack` polls health endpoints
+so the suite starts only once every service is ready.
+
+## Ephemeral, isolated infrastructure
+
+The databases tests run against are **disposable** and **per-service**, mirroring the
+isolation of production. stackr generates a `docker-compose.test.yml` with two profiles:
+
+<Table
+    headers={['Profile', 'Brings up', 'Used by']}
+    rows={[
+        ['component', 'An isolated Postgres + Redis per service', 'Per-service component tests'],
+        ['e2e', 'Every service + its DB and Redis', 'The cross-service e2e suite'],
+    ]}
+/>
+
+All test host-ports are offset by **+10000** from the dev ports (Postgres `15432+`, Redis
+`16379+`, apps `18080+`), so the test stack never collides with a running `docker:dev`.
+
+## How it runs
+
+Two root scripts orchestrate everything:
+
+<CodeBlock
+    code={`npm test          # scripts/test-all.mjs  → component tests for every service
+npm run test:e2e  # scripts/test-e2e.mjs   → the cross-service e2e suite`}
+    language="bash"
+/>
+
+`test-all` walks each service and runs its Vitest component suite against the `component`
+profile; `test-e2e` brings up the `e2e` profile, waits for health, and runs `tests/e2e/`.
+
+## CI
+
+Pass `--ci-workflow` at init (or add it later) to generate a GitHub Actions workflow that
+runs a **matrix job per service** for the component tests plus a final **e2e job** — the
+same two scripts, parallelized.
+
+For the day-to-day commands and CI tips, see the
+[Testing guide](/docs/guides/testing).
+
+</div>

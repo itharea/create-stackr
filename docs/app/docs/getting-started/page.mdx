@@ -1,41 +1,102 @@
 export const metadata = {
-    title: 'Getting Started',
-    description: 'Learn how to get started with create-stackr.',
+    title: 'Introduction',
+    description:
+        'stackr generates a production-grade multi-service TypeScript monorepo and ships a context harness that keeps the architecture on-convention — even under AI editing.',
 };
 
 <div className="prose">
 
-# Getting Started
+# Introduction
 
-Welcome to `create-stackr`, the CLI for scaffolding production-ready
-full-stack applications with Expo (mobile), Next.js (web), and Fastify (backend).
+**stackr** is a CLI that generates a production-grade, multi-service TypeScript
+monorepo — and, just as importantly, the tooling that keeps that architecture
+intact long after the code is generated.
 
-<Callout type="info" title="Prerequisites">
-    Before you begin, ensure you have Node.js 18+ and Docker installed on your machine.
+```bash
+npx create-stackr@latest my-app
+```
+
+It is not a starter template you clone and outgrow in a week. It scaffolds an
+opinionated, horizontally-scalable backend architecture and a **context harness**
+that encodes the conventions of that architecture into files your editor and your
+AI agents read on every edit.
+
+## What stackr generates
+
+A monorepo with one **auth service** — the trust anchor that owns user, session,
+account, and verification data — plus any number of **base services**. Each
+service is fully isolated:
+
+- its own **Fastify** backend (layered `routes → service → repository → schema`),
+- its own **PostgreSQL** database and **Redis** instance,
+- optional **Next.js** web and **Expo** mobile frontends,
+- an optional **BullMQ** event queue.
+
+Services never reach into each other's databases. The only cross-service call is a
+base service verifying a request by forwarding the session cookie to the auth
+service. Everything is wired together with **Docker Compose** and a full **Vitest**
+test setup.
+
+<ServiceIsolationVisual />
+
+## Why stackr?
+
+Spinning up "a full-stack app" is easy. Spinning up one that still has a coherent
+architecture after three months of features — and after an AI agent has written
+half of it — is the hard part. That is the gap stackr is built for.
+
+Most scaffolding tools stop at file generation. The moment you (or your agent)
+start writing features, the conventions the template encoded begin to drift:
+business logic leaks into route handlers, a second service quietly grows a `user`
+table, error handling becomes inconsistent, and the "architecture" becomes a
+folder layout nobody enforces.
+
+stackr addresses this with two pillars.
+
+### 1. A scalable architecture, not a scaffold
+
+stackr generates a **multi-microservice monorepo** with hard isolation
+boundaries. Each service owns its data and can be deployed, scaled, or rewritten
+independently — a runaway migration in one service can't corrupt another's. The
+auth service is the single trust anchor; base services authenticate by forwarding
+cookies, never by trusting a header or a client-supplied id. This is precisely the
+structure that ad-hoc and AI-generated projects fail to get right.
+
+→ Start with the [Architecture overview](/docs/architecture).
+
+### 2. A context harness that keeps conventions enforced
+
+After generation, stackr ships a **push-based context harness**: nested
+`AGENTS.md` files, a `CLAUDE.md` bridge, Cursor and Windsurf glob rules, Claude
+skills, `ast-grep` lint rules, and a post-edit hook — all derived from a single
+source of truth. Your editor and your agents are told the rules *as they edit the
+matching files*, and a subset of those rules is mechanically enforced. Codegen
+(`stackr add entity`) is **correct-by-construction**: the generated code always
+compiles and already follows the conventions.
+
+→ Learn how it works in [The Context Harness](/docs/harness).
+
+<Callout type="info" title="Designed for AI-assisted development">
+    The harness is what makes stackr different from a boilerplate. It exists so
+    that the architecture survives contact with autonomous coding — the area where
+    vibe-coded and agent-generated projects most often fall apart.
 </Callout>
 
-## Quick Start
+## Who it's for
 
-The fastest way to get started is by using our CLI tool. It will guide you through
-the setup process and generate a new project with your preferred configuration.
+- **Teams** that want a service-oriented backend with isolation and testing built
+  in from day one, instead of refactoring a monolith into one later.
+- **Engineers using AI agents** (Claude Code, Cursor, Codex, Windsurf) who want the
+  agent to stay on-architecture without hand-holding every prompt.
+- **Solo builders** who want a production-shaped foundation — auth, Docker, CI,
+  tests — without wiring it all by hand.
 
-<CodeBlock code="npx create-stackr@latest" language="bash" />
+## Next steps
 
-## What is included?
-
-This stack comes pre-configured with everything you need to build modern full-stack apps:
-
-- **Expo** for cross-platform mobile (iOS & Android)
-- **Next.js** for web applications
-- **Fastify Backend** with PostgreSQL, Redis, and Docker
-- **BetterAuth** for authentication (OAuth, 2FA, email verification)
-- **ORM Choice** between Prisma or Drizzle
-- **In-App Purchases** with RevenueCat
-- **Analytics** with Adjust & Scate
-
-## Next Steps
-
-Once you have generated your project, check out the [Installation](/docs/installation) guide
-to set up your development environment.
+- [Installation](/docs/installation) — prerequisites and getting the CLI.
+- [Quick Start](/docs/quick-start) — generate and boot a project in a few commands.
+- [Configuration](/docs/configuration) — the interactive wizard and every option.
+- [Architecture](/docs/architecture) — how the monorepo is structured and why.
+- [The Context Harness](/docs/harness) — how conventions stay enforced.
 
 </div>

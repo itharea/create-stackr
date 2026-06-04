@@ -1,0 +1,116 @@
+.wrapper {
+    --salience: #f59e0b;
+    --enforce: #10b981;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    margin: var(--space-6) 0;
+}
+
+.source {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-4) var(--space-6);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-DEFAULT);
+    border-radius: 14px;
+    color: var(--fg-secondary);
+}
+
+.sourceTitle {
+    display: block;
+    font-family: var(--font-mono, monospace);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--fg-primary);
+}
+
+.sourceSub {
+    display: block;
+    font-size: 11.5px;
+    color: var(--fg-tertiary);
+}
+
+.arrow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: var(--space-3) 0;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--fg-tertiary);
+}
+
+.groups {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-4);
+    width: 100%;
+}
+
+.group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 14px;
+}
+
+.groupLabel {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.salience {
+    color: var(--salience);
+}
+
+.enforce {
+    color: var(--enforce);
+}
+
+.chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+}
+
+.chip {
+    font-family: var(--font-mono, monospace);
+    font-size: 11.5px;
+    color: var(--fg-secondary);
+    background: var(--bg-canvas);
+    border: 1px solid var(--border-subtle);
+    border-radius: 7px;
+    padding: 5px 9px;
+}
+
+.chipEnforce {
+    border-color: color-mix(in srgb, var(--enforce) 35%, var(--border-subtle));
+}
+
+.caption {
+    max-width: 560px;
+    margin: var(--space-6) auto 0;
+    text-align: center;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--fg-tertiary);
+}
+
+@media (max-width: 720px) {
+    .groups {
+        grid-template-columns: 1fr;
+    }
+}

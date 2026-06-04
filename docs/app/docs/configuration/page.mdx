@@ -1,55 +1,136 @@
 export const metadata = {
     title: 'Configuration',
-    description: 'How to configure your create-stackr project.',
+    description: 'The interactive wizard, the create-stackr flags, generated credentials, port allocation, and stackr.config.json.',
 };
 
 <div className="prose">
 
 # Configuration
 
-Your project is configured via environment variables and configuration files.
+Running `create-stackr` **always prompts** for the shape of your monorepo — there
+are no presets to memorize. This page documents every prompt, the flags that skip
+them, and what the CLI generates.
 
-## Environment Variables
+## The interactive wizard
 
-The project uses a `.env` file for storing sensitive information.
-A `.env.example` file is included in the root directory.
+```bash
+npx create-stackr@latest my-app
+```
+
+The wizard asks, in order:
+
+1. **Project name** — directory and package name.
+2. **Include a dedicated auth service?** *(default: yes)* — the trust anchor. If
+   you say yes, you're then asked for:
+   - **OAuth providers** — Google, Apple, GitHub (any combination).
+   - **Auth features** — email verification, password reset *(default on)*, and
+     two-factor authentication.
+   - **Additional user fields** — extra columns on the user record.
+   - **Include the Next.js admin dashboard?** *(default: yes)* — a ready-made UI to
+     manage users and roles.
+3. **Base service(s)** — for each one:
+   - **Name** *(default: `core`)*.
+   - **Platforms** — add a Next.js **web** frontend and/or an Expo **mobile** app
+     (both optional).
+   - **Event queue** — a BullMQ + Redis worker *(default: off)*.
+   - **Auth middleware flavor** *(when an auth service exists)* — `standard`,
+     `role-gated` (you supply the allowed roles), `flexible`, or `none`. See
+     [Cross-Service Auth](/docs/architecture/auth-flow#middleware-flavors).
+   - **Add another base service?** — loops until you're done.
+4. **ORM** — **Drizzle** *(default)* or **Prisma**, locked across the whole
+   monorepo.
+5. **AI coding tools** — Claude Code, Codex, Cursor, Windsurf. Your selection
+   decides which harness artifacts are generated (see
+   [The Context Harness](/docs/harness)).
+6. **Package manager** — npm, yarn, or bun.
+
+<Callout type="info" title="The ORM is monorepo-wide">
+    You pick Drizzle or Prisma once. Every service uses the same ORM — mixing them
+    per service is intentionally not supported, so tooling and conventions stay
+    uniform.
+</Callout>
+
+## Non-interactive generation
+
+Pass `--defaults` to skip every prompt and generate the default shape: Drizzle, an
+auth service with the admin dashboard, and one `core` base service.
+
+<CodeBlock code="npx create-stackr@latest my-app --defaults" language="bash" />
+
+You can shape a non-interactive run further with flags:
+
+<Table
+    headers={['Flag', 'Effect']}
+    rows={[
+        ['--defaults', 'Skip all prompts; use the built-in default config'],
+        ['--service-name <name>', 'Rename the initial base service (default: core)'],
+        ['--no-auth', 'Skip the auth service entirely'],
+        ['--with-services <list>', 'Comma-separated extra base services, e.g. scout,manage'],
+        ['--no-tests', 'Skip the Vitest scaffolding'],
+        ['--ci-workflow', 'Generate .github/workflows/test.yml'],
+        ['--verbose', 'Detailed generation output'],
+    ]}
+/>
 
 <CodeBlock
-    code={`DATABASE_URL="postgresql://user:password@localhost:5432/mydb"
-JWT_SECRET="your-secret-key"
-GOOGLE_CLIENT_ID="your-google-client-id"
-APPLE_CLIENT_ID="your-apple-client-id"`}
+    code={`# Default config plus two extra services and a CI workflow
+npx create-stackr@latest my-app --defaults --with-services scout,manage --ci-workflow
+
+# Backend-only project, no auth, base service named "api"
+npx create-stackr@latest my-app --no-auth --service-name api`}
+    language="bash"
+/>
+
+## Generated environment & credentials
+
+stackr generates `.env` files (root and per-service `backend/.env`) at init, filled
+with **strong random credentials** — a 24-character database password and a
+64-character hex `BETTER_AUTH_SECRET`. A committed `.env.example` holds placeholders.
+
+<CodeBlock
+    code={`# Generated, never committed
+POSTGRES_PASSWORD=<24-char random>
+BETTER_AUTH_SECRET=<64 hex chars>
+AUTH_SERVICE_URL=http://auth:8082`}
     language="bash"
     filename=".env"
 />
 
-<Callout type="warning" title="Security Warning">
-    Never commit your `.env` file to version control.
+<Callout type="warning" title="Never commit .env">
+    The real <code>.env</code> files hold live secrets and are git-ignored. Commit
+    only <code>.env.example</code>.
 </Callout>
 
-## App Configuration
+OAuth client IDs and secrets (Google, Apple, GitHub) go into the **auth service's**
+environment — they are placeholders in `.env.example` until you fill them in.
 
-The `app.json` file contains configuration for Expo, including your app name,
-bundle identifier, and icon.
+## Ports
 
-<CodeBlock
-    code={`{
-  "expo": {
-    "name": "My App",
-    "slug": "my-app",
-    "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    }
-  }
-}`}
-    language="json"
-    filename="app.json"
+Ports are allocated deterministically so generated scripts, Docker Compose, and CI
+are reproducible:
+
+<Table
+    headers={['Port', 'Assignment']}
+    rows={[
+        ['8082', 'Auth backend (fixed)'],
+        ['3002', 'Auth admin dashboard (fixed)'],
+        ['8080, 8081, …', 'Base service backends (skip 8082)'],
+        ['3000, 3001, …', 'Base service web frontends (skip 3002)'],
+        ['+10000 offset', 'Test profile (e.g. db 15432, redis 16379, app 18080)'],
+    ]}
 />
+
+## stackr.config.json
+
+The generated `stackr.config.json` is the **source of truth** for the monorepo's
+shape — the service list, ORM, package manager, ports, and any pending migrations.
+The `stackr` CLI reads and updates it.
+
+<Callout type="error" title="Don't hand-edit it">
+    To add a service, run <a href="/docs/guides/add-service"><code>stackr add service</code></a>
+    rather than editing <code>stackr.config.json</code> directly — the command keeps
+    Docker Compose, the root <code>.env</code>, and each <code>backend/package.json</code>
+    in sync.
+</Callout>
 
 </div>

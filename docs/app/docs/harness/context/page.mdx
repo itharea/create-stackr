@@ -1,0 +1,103 @@
+export const metadata = {
+    title: 'Convention Layer',
+    description: 'Nested AGENTS.md, the CLAUDE.md bridge, Cursor/Windsurf glob rules, and Claude skills — the salience layer of the harness.',
+};
+
+<div className="prose">
+
+# Convention Layer
+
+The convention layer is the **salience** half of the harness: files that put the right
+rule in front of your agent at the moment it edits a matching file. Every artifact here
+is generated from the one `context-map` table, so the formats can't disagree.
+
+Which artifacts get written depends on the **AI tools** you selected in the
+[wizard](/docs/configuration) — Claude Code, Codex, Cursor, Windsurf — and on which
+subsystems each service actually has.
+
+## Nested AGENTS.md
+
+`AGENTS.md` files are generated at three levels, narrowing as you descend:
+
+<CodeBlock
+    code={`AGENTS.md                     # project-wide invariants + service inventory
+<service>/AGENTS.md           # this service's role + trust boundary
+<service>/backend/AGENTS.md   # backend conventions for this subsystem
+<service>/web/AGENTS.md        # web conventions (if web is enabled)
+<service>/mobile/AGENTS.md     # mobile conventions (if mobile is enabled)`}
+    language="text"
+/>
+
+- The **root** file carries cross-service rules — the auth trust anchor, cookie
+  forwarding, "never add user tables outside auth," "never hand-edit
+  `stackr.config.json`."
+- The **service** file states what the service owns and its trust boundary.
+- The **subsystem** files carry the folder-level rules for backend, web, or mobile.
+
+An agent reads the nearest file as it works, so it sees general rules at the top and
+specific ones exactly where they apply.
+
+## The CLAUDE.md bridge
+
+Claude Code reads `CLAUDE.md`, not `AGENTS.md`. So stackr generates a root `CLAUDE.md`
+that simply imports the canonical file:
+
+<CodeBlock code={`@AGENTS.md`} language="text" />
+
+This keeps a single source of truth — Claude follows the import into the same nested
+`AGENTS.md` files every other tool reads.
+
+## Cursor & Windsurf glob rules
+
+For Cursor and Windsurf, stackr emits one **glob-attached** rule file per applicable
+folder rule:
+
+- `.cursor/rules/*.mdc` — Cursor format, attached by `globs:` with `alwaysApply: false`.
+- `.windsurf/rules/*.md` — Windsurf format, attached with `trigger: glob`.
+
+When you edit a file that matches a rule's globs, the editor auto-attaches that rule to
+the context — no prompting required. Both are generated from the same `triggerGlobs` as
+the matching `AGENTS.md` section.
+
+## Claude skills
+
+When Claude Code is selected, stackr writes **knowledge skills** under `.claude/skills/`,
+each path-scoped to the subsystem it documents:
+
+<CodeBlock
+    code={`---
+name: stackr-backend
+description: Fastify + TypeBox + Drizzle backend conventions — layered routes →
+  service → repository → schema, ErrorFactory handling, the auth trust-anchor boundary.
+paths:
+  - "**/backend/**/*.ts"
+---
+# backend conventions (MUST / NEVER)
+...`}
+    language="text"
+    filename=".claude/skills/stackr-backend/SKILL.md"
+/>
+
+The `paths:` frontmatter means Claude auto-loads the skill when you edit a matching
+file. stackr generates:
+
+- `stackr-backend`, and `stackr-web` / `stackr-mobile` **only when** the project has a
+  web or mobile subsystem,
+- `add-domain-entity` — a codegen wrapper skill that points the agent at
+  [`stackr add entity`](/docs/harness/codegen) instead of hand-writing a domain slice.
+
+<Callout type="info" title="Generated, never hand-edited">
+    Treat every file in this layer as generated output. To change a convention you
+    change the project shape (and regenerate) — running
+    <a href="/docs/harness/codegen"><code>stackr migrate context</code></a> re-derives all
+    of these artifacts from <code>stackr.config.json</code>, deleting any that no longer
+    apply.
+</Callout>
+
+## What this layer does *not* do
+
+These files raise compliance; they don't guarantee it. A rule an agent reads is a rule
+it's *more likely* to follow — not one it *must*. The mechanical guarantees live in the
+[Enforcement](/docs/harness/enforcement) layer.
+
+</div>

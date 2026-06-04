@@ -1,56 +1,69 @@
 export const metadata = {
     title: 'Installation',
-    description: 'Step-by-step guide to installing and setting up your project.',
+    description: 'Prerequisites and the binaries you need to generate and run a stackr monorepo.',
 };
 
 <div className="prose">
 
 # Installation
 
-Follow these steps to set up your development environment and create your first project.
+stackr is run through `npx` — there is nothing to install globally. This page
+covers the prerequisites for generating a project and booting it locally.
 
-## System Requirements
+## Prerequisites
 
-- Node.js 18.0.0 or higher
-- npm, yarn, or bun
-- Git
-- Watchman (for macOS users)
+<Table
+    headers={['Requirement', 'Version', 'Needed for']}
+    rows={[
+        ['Node.js', '22 or newer', 'Running the CLI and every service'],
+        ['A package manager', 'npm, yarn, or bun', 'Installing workspace dependencies'],
+        ['Docker', 'Recent', 'docker:dev and the test profiles'],
+        ['Git', 'Any', 'Version control (recommended)'],
+    ]}
+/>
 
-## Creating a New Project
+<Callout type="info" title="Docker is for running, not generating">
+    The CLI itself does not require Docker. You only need it to bring the stack up
+    with <code>docker:dev</code> or to run the Docker-based test profiles. If you
+    prefer, you can run a single service against a host-mode database instead.
+</Callout>
 
-Run the initialization command in your terminal:
+### Node.js
+
+stackr targets **Node.js 22+** (its `engines.node` floor), and the generated
+services are tested on the current LTS. Check your version:
+
+<CodeBlock code="node --version" language="bash" />
+
+### Package manager
+
+npm, yarn, and bun are all first-class — you pick one during generation and every
+generated script branches on that choice. **bun** is the recommended default for
+its speed, but nothing in the generated project is bun-only.
+
+## Generating a project
+
+Run the CLI with `npx`; it always uses the latest published version:
 
 <CodeBlock code="npx create-stackr@latest my-app" language="bash" />
 
-This will start the interactive setup wizard. You will be asked to choose:
+This launches the interactive wizard. To skip the prompts and generate the default
+shape (Drizzle, an auth service with admin dashboard, and one `core` base service),
+pass `--defaults`:
 
-- Project name
-- Preset (Minimal, Full-Featured, Analytics-Focused) or Custom
-- Features (Authentication, Onboarding, Paywall)
-- Integrations (RevenueCat, Adjust, Scate, ATT)
-- Package manager (npm, yarn, or bun)
+<CodeBlock code="npx create-stackr@latest my-app --defaults" language="bash" />
 
-<Callout type="info" title="Package Manager">
-    The CLI supports npm, yarn, and bun. Your chosen package manager will be used to install
-    dependencies after project generation. See the [CLI Reference](/docs/cli-reference#package-managers) for more details.
+<Callout type="info" title="Two binaries">
+    The package ships two commands: <code>create-stackr</code> generates a new
+    project, and <code>stackr</code> operates <em>inside</em> an existing one
+    (adding services, adding entities, checking for drift). See the
+    <a href="/docs/cli-reference">CLI Reference</a>.
 </Callout>
 
-## Running the Project
+## Next steps
 
-Navigate to your project directory and start the development server:
-
-<CodeBlock
-    code={`cd my-app
-npm run dev`}
-    language="bash"
-/>
-
-<Callout type="success" title="Success">
-    Your app should now be running! Open the Expo Go app on your phone and scan the QR code to view it.
-</Callout>
-
-## Troubleshooting
-
-If you encounter any issues during installation, please check our [Troubleshooting guide](/docs/troubleshooting) or open an issue on GitHub.
+Head to the [Quick Start](/docs/quick-start) to install dependencies, boot the
+stack, and run the tests — or jump to [Configuration](/docs/configuration) to walk
+through every option the wizard asks about.
 
 </div>

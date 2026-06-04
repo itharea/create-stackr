@@ -1,24 +1,87 @@
 export const metadata = {
     title: 'Development',
-    description: 'Development workflow and best practices.',
+    description: 'The local development workflow — booting the stack, per-service scripts, and ORM commands.',
 };
 
 <div className="prose">
 
 # Development
 
-Learn how to develop and test your application locally.
+## Boot the whole stack
 
-## Starting the Server
+The normal loop runs every service together under Docker Compose:
 
-Run the development server with:
+<CodeBlock
+    code={`npm run setup       # once: install deps, generate .env, reset stale volumes
+npm run docker:dev  # bring all services + their DBs and Redis up`}
+    language="bash"
+/>
 
-<CodeBlock code="npm run dev" language="bash" />
+With the default config, `auth` is on `:8082` (admin dashboard `:3002`) and `core` on
+`:8080`.
 
-## Linting
+## Run a single service
 
-We use ESLint and Prettier to maintain code quality.
+You can also run one service's backend directly against a host-mode database — useful for
+a fast inner loop:
 
-<CodeBlock code="npm run lint" language="bash" />
+<CodeBlock
+    code={`cd core/backend
+npm run dev:rest-api      # Fastify REST API (watch mode)
+npm run dev:event-queue   # BullMQ workers (if the service has an event queue)`}
+    language="bash"
+/>
+
+## Per-service backend scripts
+
+<Table
+    headers={['Script', 'What it does']}
+    rows={[
+        ['dev:rest-api', 'Run the Fastify API in watch mode'],
+        ['dev:event-queue', 'Run BullMQ workers (if enabled)'],
+        ['build', 'tsc build'],
+        ['lint / typecheck', 'ESLint (max-warnings 0) / tsc --noEmit'],
+        ['check', 'lint + typecheck'],
+        ['test / test:coverage', 'Vitest component tests'],
+    ]}
+/>
+
+## Database (ORM) scripts
+
+The scripts are the same names regardless of ORM; they call Drizzle Kit or Prisma under
+the hood depending on what the monorepo is locked to:
+
+<Table
+    headers={['Script', 'Drizzle', 'Prisma']}
+    rows={[
+        ['db:generate', 'drizzle-kit generate', 'prisma generate'],
+        ['db:migrate', 'drizzle-kit migrate', 'prisma migrate dev'],
+        ['db:push', 'drizzle-kit push', 'prisma db push'],
+        ['db:studio', 'drizzle-kit studio', 'prisma studio'],
+    ]}
+/>
+
+After a schema change from [`stackr add entity`](/docs/guides/add-entity), run the printed
+migrate command then `stackr migrations ack <service>`.
+
+## Root scripts
+
+<Table
+    headers={['Script', 'What it does']}
+    rows={[
+        ['setup', 'Install workspace deps, generate .env, reset stale volumes'],
+        ['docker:dev / docker:prod', 'Bring the stack up (dev / prod overlay)'],
+        ['test / test:e2e', 'Component tests / cross-service e2e tests'],
+        ['lint:sg', 'Run the ast-grep convention rules'],
+        ['check:auth-tables', 'Enforce the auth-table boundary (Prisma)'],
+    ]}
+/>
+
+## Code quality & conventions
+
+Every service ships ESLint + Prettier, and `typecheck` runs in strict mode. Beyond that,
+the [context harness](/docs/harness) carries the architectural conventions — run
+`npm run lint:sg` to check them structurally, and let the PostToolUse hook catch backend
+violations at edit-time if you use Claude Code.
 
 </div>
