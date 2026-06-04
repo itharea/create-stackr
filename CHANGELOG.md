@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-06-04
+
+### ⚠ BREAKING CHANGES
+
+- **The preset system is removed.** The `-t, --template <preset>` flag, the "Choose a starting template" menu, and the `PRESETS` / `loadPreset` / `PresetDefinition` machinery are gone — `create-stackr` now always prompts for what to build, and `--defaults` is the only non-interactive path. (#92)
+- **The default ORM changes from Prisma to Drizzle.** The ORM prompt lists Drizzle first and defaults to it, and `--defaults` generates a Drizzle project. Selecting Prisma is unchanged. (#92)
+
+### Added
+
+- **Push-based LLM context harness.** A single source of truth — `src/config/context-map.ts`, a pure-data `ContextRule[]` — is rendered by one generator (`src/generators/ai-context.ts`) into every agent-facing artifact, so the formats cannot disagree. It is wired into both `create-stackr` (init) and `stackr add service`, so the artifacts never drift from the live service set. Replaces the old "walk upward and read every `DESIGN.md`" pull model. (#90)
+  - **Nested `AGENTS.md`** (root + service-root + backend/web/mobile subsystems) plus a root **`CLAUDE.md` = `@AGENTS.md`** bridge, always emitted so the import never dangles.
+  - **Glob-scoped editor rules**: `.cursor/rules/*.mdc` (Cursor) and `.windsurf/rules/*.md` (Windsurf), one file per applicable folder rule, auto-attached by glob.
+  - **Claude skills** under `.claude/skills/` (`stackr-backend`, `stackr-web`, `stackr-mobile`, `add-domain-entity`), `paths:`-globbed so Claude auto-loads them on a matching edit.
+- **Deterministic enforcement layer (ships regardless of the selected AI tools).** Per-service `lint` / `typecheck` / `check` scripts with a validated-clean `eslint.config.mjs`; a root `@ast-grep/cli` + `sgconfig.yml` with the rules `repo-catch-database-error` and `no-auth-tables-outside-auth` (Drizzle), plus a `check-auth-tables.mjs` script for Prisma parity; a per-service-matrix `lint.yml` CI workflow; and a Claude `PostToolUse` hook that lints edited backend files (no-ops before deps are installed). Mobile rules: `mobile-animated-native-driver`, `mobile-no-direct-fetch`, `mobile-no-hardcoded-color`. (#90)
+- **`stackr add entity <service> <entity>`** — correct-by-construction codegen. Writes `domain/<entity>/{schema,repository,service}.ts` and AST-merges the table into the service's ORM schema (`ts-morph` for Drizzle, `@mrleebo/prisma-ast` for Prisma) so the generated repository type-checks. Atomic, mirroring `add service`, and records a pending migration. (#90)
+- **`stackr doctor [--fix]`** — a rendered-vs-disk diff of the agent-context layer (missing / modified / stale), with a non-zero exit on unfixed drift (CI-gateable); `--fix` regenerates via the same single generator. (#90)
+- **`stackr migrate context [--dry-run]`** — idempotent upgrade of an existing project's agent-context layer to the current format; retires the legacy flat rule files. (#90)
+- **Agent-context effectiveness eval harness** (`eval/`) — measures whether the context layers change a coding agent's first-pass compliance across three conditions (off / salience / salience+enforcement), scored with the project's own ast-grep rules. Full `P1`–`P18` task suite plus a standing per-release protocol. (#90)
+
+### Changed
+
+- **`create-stackr` always prompts for configuration.** The interactive flow asks what to build every time, and the admin-dashboard confirm now defaults to yes. `--defaults` (Drizzle + auth with admin dashboard + one `core` base service) is the only non-interactive path. (#92)
+- **Documentation website overhauled** to match the multi-service architecture and the context harness — new Architecture and Context Harness sections, a step-by-step Quick Start, and corrected references throughout. (#94)
+
+### Removed
+
+- The preset system: the `-t, --template` flag, the starting-template menu, and the `PRESETS` / `loadPreset` / `PresetDefinition` code. (#92)
+- The 35 co-located `DESIGN.md` / `BEST_PRACTICES.md` docs and the old `AGENTS.md.ejs` pull-router template — architecture prose now lives in the service-root `AGENTS.md`. (#90)
+- The transitional flat `.cursorrules` / `.windsurfrules` files — replaced by the glob-scoped rule directories and always cleaned up on regeneration. (#90)
+
 ## [0.6.1] - 2026-05-25
 
 ### Changed
