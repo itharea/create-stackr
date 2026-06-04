@@ -3,9 +3,10 @@ import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
 import { MonorepoGenerator } from '../../src/generators/monorepo.js';
-import { PRESETS, loadPreset } from '../../src/config/presets.js';
+import { defaultInitBody } from '../../src/config/presets.js';
 import { applyCliOptionsToPreset } from '../../src/prompts/index.js';
 import type { InitConfig } from '../../src/types/index.js';
+import { TEST_CONFIG_BODIES } from '../fixtures/configs/index.js';
 
 /**
  * Phase 5 Part C: per-service `tests/unit/` is deliberately minimal —
@@ -23,9 +24,8 @@ describe('MonorepoGenerator — unit/ scaffold', () => {
     await fs.remove(tempDir);
   });
 
-  describe.each(PRESETS.map((p) => [p.name] as const))('%s preset', (presetName) => {
+  describe.each(TEST_CONFIG_BODIES.map((c) => [c.name, c.body] as const))('%s', (presetName, body) => {
     async function generate(): Promise<{ projectDir: string; config: InitConfig }> {
-      const body = loadPreset(presetName);
       const config: InitConfig = applyCliOptionsToPreset(
         body,
         `unit-${presetName.toLowerCase()}`,
@@ -57,7 +57,7 @@ describe('MonorepoGenerator — unit/ scaffold', () => {
   });
 
   it('--no-tests backend has no tests/unit at all', async () => {
-    const body = loadPreset('minimal');
+    const body = defaultInitBody();
     const config: InitConfig = applyCliOptionsToPreset(
       body,
       'unit-notests',

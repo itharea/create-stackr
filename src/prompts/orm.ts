@@ -9,15 +9,15 @@ export async function promptORM(): Promise<ORMChoice> {
       message: 'Select your ORM:',
       choices: [
         {
-          name: 'Prisma - Type-safe ORM with auto-generated client',
-          value: 'prisma',
-        },
-        {
           name: 'Drizzle - Lightweight, SQL-first TypeScript ORM',
           value: 'drizzle',
         },
+        {
+          name: 'Prisma - Type-safe ORM with auto-generated client',
+          value: 'prisma',
+        },
       ],
-      default: 'prisma',
+      default: 'drizzle',
     },
   ]);
 

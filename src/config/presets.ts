@@ -1,19 +1,15 @@
 import type {
   AuthServiceConfig,
   InitConfig,
-  PresetDefinition,
   ServiceConfig,
 } from '../types/index.js';
 import { AUTH_BACKEND_PORT, AUTH_WEB_PORT } from '../utils/port-allocator.js';
 
 /**
- * Phase 2 presets are now `InitConfig` factories that produce a
- * `services[]` array instead of the single flat feature set of v0.4.
- * See `plans/phase2_multi_service_generation.md` §E5.
- *
- * Presets are not customizable interactively in v0.5 — picking `minimal`
- * applies the preset as-is; users who want tweaks either pick `custom` or
- * run `stackr add service` afterward.
+ * Reusable service-entry factories (`authEntry`, `coreEntry`, `noIntegrations`)
+ * plus `defaultInitBody()` — the internal config backing the `--defaults`
+ * flag. There are no user-facing presets: the interactive flow always asks
+ * the user what to build, and `--defaults` is the only non-interactive path.
  */
 
 type InitBody = Omit<InitConfig, 'projectName' | 'packageManager' | 'appScheme'>;
@@ -85,17 +81,22 @@ export function noIntegrations(): ServiceConfig['integrations'] {
   };
 }
 
-function minimal(): InitBody {
+/**
+ * Internal default config backing the `--defaults` flag (replaces the old
+ * user-facing `minimal` preset). Drizzle ORM, an auth service with the admin
+ * dashboard enabled, and one base service named "core".
+ */
+export function defaultInitBody(): InitBody {
   return {
-    orm: 'prisma',
+    orm: 'drizzle',
     aiTools: ['codex'],
-    preset: 'minimal',
+    preset: 'default',
     customized: false,
     services: [
       authEntry({
         emailVerification: false,
         passwordReset: true,
-        adminDashboard: false,
+        adminDashboard: true,
         provisioningTargets: ['core'],
       }),
       coreEntry({
@@ -112,119 +113,4 @@ function minimal(): InitBody {
       }),
     ],
   };
-}
-
-function fullFeatured(): InitBody {
-  const integrations: ServiceConfig['integrations'] = {
-    revenueCat: { enabled: true, iosKey: 'YOUR_IOS_API_KEY_HERE', androidKey: 'YOUR_ANDROID_API_KEY_HERE' },
-    adjust: { enabled: true, appToken: 'YOUR_ADJUST_APP_TOKEN_HERE', environment: 'sandbox' },
-    scate: { enabled: true, apiKey: 'YOUR_SCATE_API_KEY_HERE' },
-    att: { enabled: true },
-  };
-
-  return {
-    orm: 'prisma',
-    aiTools: ['codex'],
-    preset: 'full-featured',
-    customized: false,
-    services: [
-      authEntry({
-        providers: {
-          emailPassword: true,
-          google: true,
-          apple: true,
-          github: false,
-        },
-        emailVerification: true,
-        passwordReset: true,
-        twoFactor: false,
-        adminDashboard: true,
-        provisioningTargets: ['core'],
-      }),
-      coreEntry({
-        name: 'core',
-        backend: {
-          port: 8080,
-          eventQueue: true,
-          imageUploads: false,
-          authMiddleware: 'standard',
-          tests: true,
-        },
-        web: { enabled: true, port: 3000 },
-        mobile: { enabled: true },
-        integrations,
-      }),
-    ],
-  };
-}
-
-function analyticsFocused(): InitBody {
-  const integrations: ServiceConfig['integrations'] = {
-    revenueCat: { enabled: false, iosKey: '', androidKey: '' },
-    adjust: { enabled: true, appToken: 'YOUR_ADJUST_APP_TOKEN_HERE', environment: 'sandbox' },
-    scate: { enabled: true, apiKey: 'YOUR_SCATE_API_KEY_HERE' },
-    att: { enabled: true },
-  };
-
-  return {
-    orm: 'prisma',
-    aiTools: ['codex'],
-    preset: 'analytics-focused',
-    customized: false,
-    services: [
-      authEntry({
-        emailVerification: false,
-        passwordReset: true,
-        adminDashboard: false,
-        provisioningTargets: ['core'],
-      }),
-      coreEntry({
-        name: 'core',
-        backend: {
-          port: 8080,
-          eventQueue: true,
-          imageUploads: false,
-          authMiddleware: 'standard',
-          tests: true,
-        },
-        web: { enabled: true, port: 3000 },
-        mobile: { enabled: true },
-        integrations,
-      }),
-    ],
-  };
-}
-
-export const PRESETS: PresetDefinition[] = [
-  {
-    name: 'Minimal',
-    description: 'Auth service + one base service',
-    icon: '📱',
-    config: minimal(),
-  },
-  {
-    name: 'Full-Featured',
-    description: 'Auth + core with web/mobile/eventQueue and integrations',
-    icon: '🚀',
-    config: fullFeatured(),
-  },
-  {
-    name: 'Analytics-Focused',
-    description: 'Auth + core with Adjust + Scate analytics',
-    icon: '📊',
-    config: analyticsFocused(),
-  },
-];
-
-/**
- * Helper: look up a preset by case-insensitive name and return the body
- * ready to merge with per-invocation fields.
- */
-export function loadPreset(name: string): InitBody {
-  const preset = PRESETS.find((p) => p.name.toLowerCase() === name.toLowerCase());
-  if (!preset) {
-    const available = PRESETS.map((p) => p.name.toLowerCase()).join(', ');
-    throw new Error(`Unknown preset: ${name}. Available: ${available}`);
-  }
-  return preset.config;
 }

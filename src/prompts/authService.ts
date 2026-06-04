@@ -35,7 +35,7 @@ export async function promptAuthServiceConfig(): Promise<AuthServiceConfig> {
       type: 'confirm',
       name: 'adminDashboard',
       message: 'Include Next.js admin dashboard for the auth service?',
-      default: false,
+      default: true,
     },
   ]);
 

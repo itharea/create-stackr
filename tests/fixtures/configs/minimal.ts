@@ -12,7 +12,7 @@ export const minimalConfig: Readonly<InitConfig> = {
   appScheme: 'testminimal',
   orm: 'prisma',
   aiTools: ['codex'],
-  preset: 'minimal',
+  preset: 'default',
   customized: false,
   services: [
     authEntry({

@@ -4,9 +4,9 @@ import path from 'path';
 import os from 'os';
 import YAML from 'yaml';
 import { MonorepoGenerator } from '../../src/generators/monorepo.js';
-import { PRESETS, loadPreset } from '../../src/config/presets.js';
 import { applyCliOptionsToPreset } from '../../src/prompts/index.js';
 import type { InitConfig } from '../../src/types/index.js';
+import { TEST_CONFIG_BODIES } from '../fixtures/configs/index.js';
 
 /**
  * Phase 5 regression guard: dev compose and the e2e profile of the test
@@ -53,10 +53,9 @@ describe('dev vs e2e profile — host port disjointness', () => {
     return out;
   }
 
-  it.each(PRESETS.map((p) => [p.name] as const))(
-    '%s preset → dev ∩ e2e host ports is empty',
-    async (presetName) => {
-      const body = loadPreset(presetName);
+  it.each(TEST_CONFIG_BODIES.map((c) => [c.name, c.body] as const))(
+    '%s → dev ∩ e2e host ports is empty',
+    async (presetName, body) => {
       const config: InitConfig = applyCliOptionsToPreset(
         body,
         `port-overlap-${presetName.toLowerCase()}`,

@@ -51,8 +51,7 @@ Two binaries:
 
 | Flag | Description |
 |---|---|
-| `-t, --template <preset>` | `minimal` \| `full-featured` \| `analytics-focused` |
-| `--defaults` | Skip prompts, use the minimal preset |
+| `--defaults` | Skip prompts; use the built-in default (Drizzle, auth with admin dashboard, one `core` base service) |
 | `--service-name <name>` | Rename the initial base service (default: `core`) |
 | `--no-auth` | Skip the auth service |
 | `--with-services <list>` | Comma-separated extra base services (e.g. `scout,manage`) |
@@ -70,8 +69,8 @@ npx create-stackr my-app --defaults --with-services scout,manage
 # Backend-only project (no auth)
 npx create-stackr my-app --no-auth --service-name api
 
-# Full-featured preset with CI workflow
-npx create-stackr my-app --template full-featured --ci-workflow
+# Built-in default config with a CI workflow
+npx create-stackr my-app --defaults --ci-workflow
 ```
 
 ### `stackr add service <name>`
@@ -125,7 +124,7 @@ For local development (`docker:dev`) and the test profiles, yes. The CLI itself 
 All three (npm, yarn, bun) are supported. Bun is the recommended default; the generator branches every script on your choice.
 
 **Which ORM is the default?**
-Prisma. Drizzle is available — pick at init.
+Drizzle. Prisma is available — pick at init (or pass `--defaults` for Drizzle non-interactively).
 
 ## Contributing
 

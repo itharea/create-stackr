@@ -62,7 +62,7 @@ const cfg: InitConfig = {
   appScheme: 'm0eval',
   orm: ORM,
   aiTools: ['claude', 'codex', 'cursor', 'windsurf'],
-  preset: 'minimal',
+  preset: 'custom',
   customized: true,
   services: [
     authEntry({

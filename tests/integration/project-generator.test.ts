@@ -5,11 +5,10 @@ import os from 'os';
 import YAML from 'yaml';
 import { MonorepoGenerator } from '../../src/generators/monorepo.js';
 import { loadStackrConfig } from '../../src/utils/config-file.js';
-import { PRESETS, loadPreset } from '../../src/config/presets.js';
 import { applyCliOptionsToPreset } from '../../src/prompts/index.js';
 import type { AITool, InitConfig } from '../../src/types/index.js';
 import { multiServiceConfig } from '../fixtures/configs/multi-service.js';
-import { cloneInitConfig } from '../fixtures/configs/index.js';
+import { cloneInitConfig, TEST_CONFIG_BODIES } from '../fixtures/configs/index.js';
 
 describe('MonorepoGenerator — preset end-to-end', () => {
   let tempDir: string;
@@ -22,12 +21,11 @@ describe('MonorepoGenerator — preset end-to-end', () => {
     await fs.remove(tempDir);
   });
 
-  describe.each(PRESETS.map((p) => [p.name] as const))('%s preset', (presetName) => {
+  describe.each(TEST_CONFIG_BODIES.map((c) => [c.name, c.body] as const))('%s', (presetName, body) => {
     async function generateIntoTemp(): Promise<{
       projectDir: string;
       config: InitConfig;
     }> {
-      const body = loadPreset(presetName);
       const config: InitConfig = applyCliOptionsToPreset(
         body,
         `test-${presetName.toLowerCase()}`,

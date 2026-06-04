@@ -3,7 +3,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
 import { MonorepoGenerator } from '../../src/generators/monorepo.js';
-import { loadPreset } from '../../src/config/presets.js';
+import { defaultInitBody } from '../../src/config/presets.js';
 import { applyCliOptionsToPreset } from '../../src/prompts/index.js';
 
 /**
@@ -25,7 +25,7 @@ describe('setup.mjs — test commands hint', () => {
 
   it('default preset (tests on) → setup.mjs contains the "Run tests:" hint', async () => {
     const config = applyCliOptionsToPreset(
-      loadPreset('minimal'),
+      defaultInitBody(),
       'setup-hint-tests',
       'npm',
       {}
@@ -44,7 +44,7 @@ describe('setup.mjs — test commands hint', () => {
 
   it('--no-tests → setup.mjs has no "Run tests" line', async () => {
     const config = applyCliOptionsToPreset(
-      loadPreset('minimal'),
+      defaultInitBody(),
       'setup-hint-notests',
       'npm',
       { tests: false }
