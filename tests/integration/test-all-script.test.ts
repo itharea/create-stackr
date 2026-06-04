@@ -3,7 +3,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
 import { MonorepoGenerator } from '../../src/generators/monorepo.js';
-import { loadPreset } from '../../src/config/presets.js';
+import { defaultInitBody } from '../../src/config/presets.js';
 import { applyCliOptionsToPreset } from '../../src/prompts/index.js';
 
 /**
@@ -29,7 +29,7 @@ describe('scripts/test-all.mjs', () => {
 
   it('default preset → script exists and iterates every test-enabled service', async () => {
     const config = applyCliOptionsToPreset(
-      loadPreset('minimal'),
+      defaultInitBody(),
       'test-all-default',
       'npm',
       {}
@@ -54,7 +54,7 @@ describe('scripts/test-all.mjs', () => {
 
   it('--no-tests → script not generated', async () => {
     const config = applyCliOptionsToPreset(
-      loadPreset('minimal'),
+      defaultInitBody(),
       'test-all-notests',
       'npm',
       { tests: false }
@@ -72,7 +72,7 @@ describe('scripts/test-all.mjs', () => {
 
   it('default preset → root package.json has both "test" and "test:e2e" scripts', async () => {
     const config = applyCliOptionsToPreset(
-      loadPreset('minimal'),
+      defaultInitBody(),
       'test-all-pkg',
       'npm',
       {}

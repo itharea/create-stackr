@@ -23,7 +23,7 @@ export async function runCreateFlow(
 ): Promise<void> {
   console.log(chalk.cyan("\n🚀 Let's create your multi-service monorepo!\n"));
 
-  // Collect configuration (preset / defaults / interactive)
+  // Collect configuration (--defaults or interactive)
   const config = await collectConfiguration(projectName, options);
 
   // Validate project name

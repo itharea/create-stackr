@@ -1,10 +1,9 @@
-import inquirer from 'inquirer';
 import { promptProjectName } from './project.js';
 import { promptPackageManager } from './packageManager.js';
 import { promptORM } from './orm.js';
 import { promptAITools } from './aiTools.js';
 import { promptServices, buildExtraServicesFromFlag } from './services.js';
-import { PRESETS, loadPreset, coreEntry, noIntegrations } from '../config/presets.js';
+import { defaultInitBody, coreEntry, noIntegrations } from '../config/presets.js';
 import type {
   InitConfig,
   CLIOptions,
@@ -16,12 +15,11 @@ import { deriveAppScheme } from '../types/index.js';
  * Phase 2 prompt orchestrator. Produces a fully populated `InitConfig`.
  *
  * Flow:
- *   --template <preset>  → load preset, skip most prompts
- *   --defaults           → use minimal preset, skip all prompts
- *   interactive          → preset selection or custom loop
+ *   --defaults   → use the built-in default config, skip all prompts
+ *   interactive  → always ask the user what to build (no preset shortcuts)
  *
- * `--with-services` adds extra base services to whichever preset/custom
- * config came out the other end (per meta_phases.md §1 flag semantics).
+ * `--with-services` adds extra base services to whichever config came out
+ * the other end (per meta_phases.md §1 flag semantics).
  */
 export async function collectConfiguration(
   projectName: string | undefined,
@@ -29,65 +27,23 @@ export async function collectConfiguration(
 ): Promise<InitConfig> {
   const name = await promptProjectName(projectName);
 
-  // Non-interactive paths first.
+  // Non-interactive path: the built-in default config, no prompts.
   if (options.defaults) {
-    return applyCliOptionsToPreset(
-      loadPreset('minimal'),
-      name,
-      'npm',
-      options
-    );
+    return applyCliOptionsToPreset(defaultInitBody(), name, 'npm', options);
   }
 
-  if (options.template) {
-    const base = loadPreset(options.template);
-    const aiTools = await promptAITools();
-    const packageManager = await promptPackageManager();
-    return applyCliOptionsToPreset(
-      { ...base, aiTools },
-      name,
-      packageManager,
-      options
-    );
-  }
-
-  // Interactive: preset or custom
-  const { choice } = await inquirer.prompt([
-    {
-      type: 'list',
-      name: 'choice',
-      message: 'Choose a starting template:',
-      choices: [
-        ...PRESETS.map((preset) => ({
-          name: `${preset.icon} ${preset.name} - ${preset.description}`,
-          value: preset.name.toLowerCase(),
-          short: preset.name,
-        })),
-        { name: '⚙️  Custom - Pick exactly what you need', value: 'custom', short: 'Custom' },
-      ],
-      pageSize: 10,
-    },
-  ]);
-
-  let body: Omit<InitConfig, 'projectName' | 'packageManager' | 'appScheme'>;
-
-  if (choice === 'custom') {
-    const services = await promptServices();
-    const orm = await promptORM();
-    const aiTools = await promptAITools();
-    body = {
-      orm,
-      aiTools,
-      services,
-      preset: 'custom',
-      customized: true,
-    };
-  } else {
-    body = { ...loadPreset(choice) };
-    // Preset may still get AI tools / package manager collected below.
-    const aiTools = await promptAITools();
-    body.aiTools = aiTools;
-  }
+  // Interactive: always ask. There are no preset shortcuts — the user
+  // consciously chooses every part of what gets scaffolded.
+  const services = await promptServices();
+  const orm = await promptORM();
+  const aiTools = await promptAITools();
+  const body: Omit<InitConfig, 'projectName' | 'packageManager' | 'appScheme'> = {
+    orm,
+    aiTools,
+    services,
+    preset: 'custom',
+    customized: true,
+  };
 
   const packageManager = await promptPackageManager();
   return applyCliOptionsToPreset(body, name, packageManager, options);

@@ -5,10 +5,8 @@ import path from 'path';
 import os from 'os';
 import { fileURLToPath } from 'url';
 import { MonorepoGenerator } from '../../src/generators/monorepo.js';
-import { loadPreset, PRESETS } from '../../src/config/presets.js';
-import { applyCliOptionsToPreset } from '../../src/prompts/index.js';
 import { loadStackrConfig } from '../../src/utils/config-file.js';
-import type { InitConfig } from '../../src/types/index.js';
+import { TEST_CONFIGS } from '../fixtures/configs/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,30 +15,28 @@ const SRC_ENTRY = path.join(REPO_ROOT, 'src/entrypoints/create.ts');
 const TSX_BIN = path.join(REPO_ROOT, 'node_modules/.bin/tsx');
 
 /**
- * E2E preset generation — proves every preset yields a valid project
- * tree containing `stackr.config.json` with the expected services.
+ * E2E config generation — proves a generated project yields a valid tree
+ * containing `stackr.config.json` with the expected services.
  *
- * The minimal preset is exercised via a real CLI spawn (`tsx src/index.ts`)
- * with `--defaults` because that's the only preset the CLI can run
- * non-interactively today. Full-featured and analytics-focused presets
- * still require prompts for aiTools / packageManager when invoked via
- * `--template`, so for those we drive `MonorepoGenerator.generate`
- * directly — still an end-to-end project-on-disk assertion, just without
- * the subprocess.
+ * The built-in default config is exercised via a real CLI spawn
+ * (`tsx src/index.ts … --defaults`) — the only non-interactive path. The
+ * richer fixture configs (auth + web/mobile/eventQueue/integrations) drive
+ * `MonorepoGenerator.generate` directly — still an end-to-end
+ * project-on-disk assertion, just without the subprocess.
  */
-describe('E2E preset generation', () => {
+describe('E2E config generation', () => {
   let tempDir: string;
 
   beforeEach(async () => {
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'e2e-preset-'));
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'e2e-config-'));
   });
 
   afterEach(async () => {
     await fs.remove(tempDir);
   });
 
-  it('minimal preset via CLI spawn (--defaults) produces a valid project', async () => {
-    const projectName = 'minimal-cli-e2e';
+  it('--defaults via CLI spawn produces a valid Drizzle project', async () => {
+    const projectName = 'defaults-cli-e2e';
 
     const result = await execa(TSX_BIN, [SRC_ENTRY, projectName, '--defaults'], {
       cwd: tempDir,
@@ -57,23 +53,17 @@ describe('E2E preset generation', () => {
     const cfg = await loadStackrConfig(projectDir);
     expect(cfg).toBeTruthy();
     expect(cfg!.projectName).toBe(projectName);
+    expect(cfg!.orm).toBe('drizzle');
 
     const names = cfg!.services.map((s) => s.name).sort();
     expect(names).toContain('auth');
     expect(names).toContain('core');
   }, 90000);
 
-  describe.each(PRESETS.map((p) => [p.name] as const))(
-    '%s preset (direct generator)',
-    (presetName) => {
+  describe.each(TEST_CONFIGS.map((c) => [c.name, c.config] as const))(
+    '%s (direct generator)',
+    (_name, config) => {
       it('generates a valid project with expected services', async () => {
-        const body = loadPreset(presetName);
-        const config: InitConfig = applyCliOptionsToPreset(
-          body,
-          `preset-${presetName.toLowerCase()}`,
-          'npm',
-          {}
-        );
         const projectDir = path.join(tempDir, config.projectName);
 
         await new MonorepoGenerator(config).generate(projectDir);

@@ -39,10 +39,6 @@ program
   .description('Create a production-ready multi-microservice monorepo')
   .version(readStackrVersion())
   .argument('[project-name]', 'Name of the project')
-  .option(
-    '-t, --template <preset>',
-    'Use a preset template (minimal, full-featured, analytics-focused)'
-  )
   .option('--defaults', 'Use default configuration without prompts')
   .option('--verbose', 'Show detailed output')
   .option('--service-name <name>', 'Override the default initial base service name (default: "core")')
@@ -57,7 +53,6 @@ program
     try {
       displayWelcome();
       await runCreateFlow(projectName, {
-        template: options.template as string | undefined,
         defaults: options.defaults as boolean | undefined,
         verbose: options.verbose as boolean | undefined,
         serviceName: options.serviceName as string | undefined,

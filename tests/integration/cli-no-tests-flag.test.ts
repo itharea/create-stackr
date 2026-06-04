@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { applyCliOptionsToPreset } from '../../src/prompts/index.js';
-import { loadPreset } from '../../src/config/presets.js';
+import { defaultInitBody } from '../../src/config/presets.js';
 
 /**
  * `--no-tests` on `create-stackr` must set `backend.tests: false` on EVERY
@@ -13,7 +13,7 @@ import { loadPreset } from '../../src/config/presets.js';
 describe('--no-tests flag', () => {
   it('sets backend.tests: false on every service in --defaults + --no-tests run', () => {
     const cfg = applyCliOptionsToPreset(
-      loadPreset('minimal'),
+      defaultInitBody(),
       'foo-no-tests',
       'npm',
       { defaults: true, tests: false }
@@ -26,7 +26,7 @@ describe('--no-tests flag', () => {
 
   it('default --defaults run (no flag) leaves backend.tests: true on every service', () => {
     const cfg = applyCliOptionsToPreset(
-      loadPreset('minimal'),
+      defaultInitBody(),
       'foo-tests',
       'npm',
       { defaults: true }
@@ -39,7 +39,7 @@ describe('--no-tests flag', () => {
 
   it('--no-tests + --with-services reaches extras added by the CSV flag', () => {
     const cfg = applyCliOptionsToPreset(
-      loadPreset('minimal'),
+      defaultInitBody(),
       'foo-no-tests-extra',
       'npm',
       { defaults: true, tests: false, withServices: 'scout,manage' }
@@ -55,7 +55,7 @@ describe('--no-tests flag', () => {
   it('--no-tests + --service-name reaches a freshly-constructed base service', () => {
     // Start from a body that has no base service so --service-name has to
     // construct a fresh one via coreEntry.
-    const body = loadPreset('minimal');
+    const body = defaultInitBody();
     // Strip the base service so only auth remains — --no-auth would also
     // do this at runtime, but we simulate directly here.
     const bodyNoBase = {
@@ -79,7 +79,7 @@ describe('--no-tests flag', () => {
 
   it('--with-services extras without --no-tests default to tests: true', () => {
     const cfg = applyCliOptionsToPreset(
-      loadPreset('minimal'),
+      defaultInitBody(),
       'foo-extras-tests',
       'npm',
       { defaults: true, withServices: 'scout,manage' }

@@ -131,8 +131,8 @@ export interface ServiceConfig {
 }
 
 /**
- * Top-level runtime config assembled by the prompt layer (or by presets /
- * `--defaults`) and passed to the `MonorepoGenerator`.
+ * Top-level runtime config assembled by the prompt layer (or by `--defaults`)
+ * and passed to the `MonorepoGenerator`.
  */
 export interface InitConfig {
   projectName: string;
@@ -141,7 +141,7 @@ export interface InitConfig {
   appScheme: string;
   aiTools: AITool[];
   services: ServiceConfig[];
-  preset?: 'minimal' | 'full-featured' | 'analytics-focused' | 'custom';
+  preset?: 'custom' | 'default';
   customized: boolean;
   /**
    * Runtime-only monorepo-level flag: when `true`, emit
@@ -235,14 +235,6 @@ export interface LegacyBackendShim {
  */
 export type ProjectConfig = InitConfig;
 
-export interface PresetDefinition {
-  name: string;
-  description: string;
-  icon: string;
-  /** Everything except the fields set at invocation time. */
-  config: Omit<InitConfig, 'projectName' | 'packageManager' | 'appScheme'>;
-}
-
 /**
  * Derives a valid URL scheme from the project name
  * - Converts to lowercase
@@ -269,7 +261,6 @@ export function deriveAppScheme(projectName: string): string {
 }
 
 export interface CLIOptions {
-  template?: string;
   defaults?: boolean;
   verbose?: boolean;
   serviceName?: string;

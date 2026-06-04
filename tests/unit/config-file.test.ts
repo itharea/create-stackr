@@ -210,7 +210,7 @@ describe('config-file utils', () => {
         appScheme: 'leaktest',
         orm: 'prisma',
         aiTools: ['codex'],
-        preset: 'full-featured',
+        preset: 'custom',
         customized: false,
         services: [
           authEntry({

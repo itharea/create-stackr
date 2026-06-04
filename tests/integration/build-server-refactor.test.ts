@@ -3,8 +3,8 @@ import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
 import { MonorepoGenerator } from '../../src/generators/monorepo.js';
-import { PRESETS, loadPreset } from '../../src/config/presets.js';
 import { applyCliOptionsToPreset } from '../../src/prompts/index.js';
+import { TEST_CONFIG_BODIES } from '../fixtures/configs/index.js';
 
 /**
  * Phase 3 refactored `controllers/rest-api/server.ts` from a
@@ -24,9 +24,8 @@ describe('buildServer() factory refactor', () => {
     await fs.remove(tempDir);
   });
 
-  describe.each(PRESETS.map((p) => [p.name] as const))('%s preset', (presetName) => {
+  describe.each(TEST_CONFIG_BODIES.map((c) => [c.name, c.body] as const))('%s', (presetName, body) => {
     it('every backend exports buildServer and its index.ts imports it', async () => {
-      const body = loadPreset(presetName);
       const config = applyCliOptionsToPreset(
         body,
         `buildserver-${presetName.toLowerCase()}`,

@@ -4,7 +4,7 @@ import path from 'path';
 import os from 'os';
 import YAML from 'yaml';
 import { MonorepoGenerator } from '../../src/generators/monorepo.js';
-import { loadPreset } from '../../src/config/presets.js';
+import { defaultInitBody } from '../../src/config/presets.js';
 import { applyCliOptionsToPreset } from '../../src/prompts/index.js';
 
 /**
@@ -28,7 +28,7 @@ describe('--ci-workflow', () => {
 
   it('--ci-workflow → file exists, parses as YAML, has component matrix + e2e needs:component', async () => {
     const config = applyCliOptionsToPreset(
-      loadPreset('minimal'),
+      defaultInitBody(),
       'ci-workflow-on',
       'npm',
       { ciWorkflow: true }
@@ -60,7 +60,7 @@ describe('--ci-workflow', () => {
 
   it('without --ci-workflow → file not generated', async () => {
     const config = applyCliOptionsToPreset(
-      loadPreset('minimal'),
+      defaultInitBody(),
       'ci-workflow-off',
       'npm',
       {}
@@ -75,7 +75,7 @@ describe('--ci-workflow', () => {
 
   it('--ci-workflow + --no-tests → file not generated (empty matrix would be invalid)', async () => {
     const config = applyCliOptionsToPreset(
-      loadPreset('minimal'),
+      defaultInitBody(),
       'ci-workflow-no-tests',
       'npm',
       { ciWorkflow: true, tests: false }
