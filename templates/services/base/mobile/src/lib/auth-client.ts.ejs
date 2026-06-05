@@ -10,7 +10,7 @@ import * as SecureStore from "expo-secure-store";
 import Constants from "expo-constants";
 
 // Auth service URL — mobile talks directly to the central auth service
-const API_URL = Constants.expoConfig?.extra?.authServiceUrl || "http://localhost:<%= authServicePort || 8082 %>";
+const API_URL = Constants.expoConfig?.extra?.authServiceUrl || "http://localhost:<%= authServicePort || 8888 %>";
 
 // Get app scheme from Expo config (defined at expo.scheme in app.json)
 const APP_SCHEME = Constants.expoConfig?.scheme || "<%= appScheme %>";

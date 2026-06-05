@@ -24,7 +24,7 @@ This is intentional — it stops the config and the database from drifting apart
 
 ## Port already in use
 
-Services use deterministic ports: auth `:8082` / `:3002`, base backends from `:8080`, base
+Services use deterministic ports: auth `:8888` / `:3333`, base backends from `:8080`, base
 web from `:3000`. If another process holds one, stop it, or pass an explicit `--port` when
 adding a service. The test profiles use a `+10000` offset so they never collide with a dev
 stack.
@@ -54,7 +54,7 @@ routes 401:
 
 <CodeBlock
     code={`# from the base service container, the auth check is essentially:
-curl -i http://auth:8082/api/auth/get-session -H "cookie: <session cookie>"`}
+curl -i http://auth:8888/api/auth/get-session -H "cookie: <session cookie>"`}
     language="bash"
 />
 
@@ -69,7 +69,7 @@ directory — each service has its own database and its own migration history. T
 Usually a redirect-URI mismatch or CORS. Check that the redirect URI exactly matches the
 provider config, that the auth service's CORS allows your web origin, and that
 third-party cookies aren't blocked in dev. **Apple Sign-In requires HTTPS** and won't work
-on `http://localhost` — use a tunnel (e.g. `ngrok http 8082`) or test it on a staging host.
+on `http://localhost` — use a tunnel (e.g. `ngrok http 8888`) or test it on a staging host.
 
 ## Mobile: Metro bundler is stuck
 

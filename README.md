@@ -14,7 +14,7 @@ cd my-app
 npm run setup && npm run docker:dev
 ```
 
-That's it. The project boots on `http://localhost:8080` (auth) and `http://localhost:8081` (core service).
+That's it. The project boots with the auth service on `http://localhost:8888` and the core service on `http://localhost:8080`.
 
 ## Requirements
 

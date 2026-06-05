@@ -3,11 +3,17 @@ import type { ServiceConfig } from '../types/index.js';
 /**
  * Port allocation for services.
  *
- * Convention (see `plans/meta_phases.md` §1 decision #5):
- * - Auth backend is fixed at 8082.
- * - Base service backends start at 8080, increment by 1, skipping 8082.
- * - Base service web frontends start at 3000, increment by 1, skipping 3002.
- * - Auth web admin dashboard is fixed at 3002.
+ * Convention:
+ * - Auth backend is fixed at 8888.
+ * - Auth web admin dashboard is fixed at 3333.
+ * - Base service backends start at 8080 and increment by 1 (contiguous).
+ * - Base service web frontends start at 3000 and increment by 1 (contiguous).
+ *
+ * There is always exactly one auth service but a variable number of base
+ * services, so the auth ports sit well above the base ranges rather than
+ * inside them. Base allocation never walks far enough to reach 8888/3333,
+ * and the auth service is in the `taken` set at allocation time anyway, so
+ * the contiguous walk can't collide with it.
  *
  * `allocateBackendPort(services, preferred?)` returns the next free backend
  * port NOT already taken by a service in `services`. If `preferred` is
@@ -18,8 +24,8 @@ import type { ServiceConfig } from '../types/index.js';
  * why they're standalone rather than inlined into the generator.
  */
 
-const RESERVED_AUTH_BACKEND_PORT = 8082;
-const RESERVED_AUTH_WEB_PORT = 3002;
+export const AUTH_BACKEND_PORT = 8888;
+export const AUTH_WEB_PORT = 3333;
 const BASE_BACKEND_START = 8080;
 const BASE_WEB_START = 3000;
 
@@ -54,10 +60,10 @@ function collectWebPorts(services: readonly ServiceConfig[]): Set<number> {
  * Pick the next free backend port for a new base service.
  *
  * - If `preferred` is supplied, it must be free (not already used by an
- *   existing entry in `services`). `preferred` may equal 8082 — the caller
- *   is trusted to pass that only when allocating for the auth service.
- * - Otherwise, walk from 8080 upward, skipping any port already used or
- *   the auth-reserved 8082.
+ *   existing entry in `services`). The caller may pass the auth port (8888)
+ *   only when allocating for the auth service itself.
+ * - Otherwise, walk contiguously from 8080 upward, returning the first port
+ *   not already used by a service in `services`.
  */
 export function allocateBackendPort(
   services: readonly ServiceConfig[],
@@ -74,10 +80,6 @@ export function allocateBackendPort(
 
   let candidate = BASE_BACKEND_START;
   while (true) {
-    if (candidate === RESERVED_AUTH_BACKEND_PORT) {
-      candidate++;
-      continue;
-    }
     if (!taken.has(candidate)) {
       return candidate;
     }
@@ -89,7 +91,7 @@ export function allocateBackendPort(
 }
 
 /**
- * Pick the next free web port. Reserves 3002 for the auth admin dashboard.
+ * Pick the next free web port, walking contiguously from 3000 upward.
  */
 export function allocateWebPort(
   services: readonly ServiceConfig[],
@@ -106,10 +108,6 @@ export function allocateWebPort(
 
   let candidate = BASE_WEB_START;
   while (true) {
-    if (candidate === RESERVED_AUTH_WEB_PORT) {
-      candidate++;
-      continue;
-    }
     if (!taken.has(candidate)) {
       return candidate;
     }
@@ -120,17 +118,15 @@ export function allocateWebPort(
   }
 }
 
-export const AUTH_BACKEND_PORT = RESERVED_AUTH_BACKEND_PORT;
-export const AUTH_WEB_PORT = RESERVED_AUTH_WEB_PORT;
-
 /*
  * +10000 offset applied uniformly to DB, Redis, and app ports in the
  * unified test compose. Leaves headroom for ~1000 services before
  * crossing into ephemeral-port space (linux default `ip_local_port_range`
  * starts at 32768). No collision with dev compose: dev DB host ports are
  * `5432, 5433, …`, dev Redis host ports are `6379, 6380, …`, dev app
- * ports are `8080, 8082, 8081, …` — test equivalents are `15432+`,
- * `16379+`, and `18080+`, disjoint on every axis. If you relocate this
+ * ports are `8080, 8081, 8082, …` (base) plus `8888` (auth) — test
+ * equivalents are `15432+`, `16379+`, and `18080+` / `18888`, disjoint on
+ * every axis. If you relocate this
  * offset, existing generated projects' `.env.test` and
  * `docker-compose.test.yml` both hard-code it.
  */

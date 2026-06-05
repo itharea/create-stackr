@@ -17,7 +17,7 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 <% } %>
 
 // Auth service URL — custom auth endpoints (profile, account, 2FA) live on the auth service
-const API_URL = Constants.expoConfig?.extra?.authServiceUrl || 'http://localhost:<%= authServicePort || 8082 %>';
+const API_URL = Constants.expoConfig?.extra?.authServiceUrl || 'http://localhost:<%= authServicePort || 8888 %>';
 
 /**
  * Auth hook using BetterAuth's useSession() directly

@@ -272,7 +272,7 @@ describe('MonorepoGenerator — init-time credential generation', () => {
     expect(await fs.pathExists(envLocalPath)).toBe(true);
     const content = await fs.readFile(envLocalPath, 'utf-8');
 
-    expect(content).toMatch(/^BACKEND_URL=http:\/\/localhost:8082$/m);
+    expect(content).toMatch(/^BACKEND_URL=http:\/\/localhost:8888$/m);
   });
 
   it('core/web/.env.local includes AUTH_SERVICE_URL pointing at auth backend', async () => {
@@ -280,7 +280,7 @@ describe('MonorepoGenerator — init-time credential generation', () => {
       path.join(projectDir, 'core/web/.env.local'),
       'utf-8'
     );
-    expect(content).toMatch(/^AUTH_SERVICE_URL=http:\/\/localhost:8082$/m);
+    expect(content).toMatch(/^AUTH_SERVICE_URL=http:\/\/localhost:8888$/m);
   });
 
   it('web .env.example files are left untouched (not overwritten by .env.local generation)', async () => {
@@ -332,7 +332,7 @@ describe('MonorepoGenerator — init-time credential generation', () => {
     const pkgJson = JSON.parse(
       await fs.readFile(path.join(projectDir, 'auth/web/package.json'), 'utf-8')
     );
-    expect(pkgJson.scripts.dev).toContain('--port 3002');
+    expect(pkgJson.scripts.dev).toContain('--port 3333');
     expect(pkgJson.dependencies).toHaveProperty('sonner');
     expect(pkgJson.dependencies).toHaveProperty('@radix-ui/react-dialog');
   });
