@@ -32,7 +32,7 @@ function makeCore(port = 8080): ServiceConfig {
 }
 
 describe('computeTestPorts', () => {
-  it('[authEntry] alone returns { auth: { dbPort: 15432, redisPort: 16379, appPort: 18082 } }', () => {
+  it('[authEntry] alone returns { auth: { dbPort: 15432, redisPort: 16379, appPort: 18888 } }', () => {
     const auth = makeAuth();
     const result = computeTestPorts([auth]);
     expect(result).toEqual({
@@ -42,7 +42,7 @@ describe('computeTestPorts', () => {
         appPort: AUTH_BACKEND_PORT + TEST_PORT_OFFSET,
       },
     });
-    expect(result.auth.appPort).toBe(18082);
+    expect(result.auth.appPort).toBe(18888);
   });
 
   it('[core, auth] preserves declaration order for DB/Redis walk', () => {
@@ -58,7 +58,7 @@ describe('computeTestPorts', () => {
     expect(result.auth).toEqual({
       dbPort: 15433,
       redisPort: 16380,
-      appPort: 18082,
+      appPort: 18888,
     });
   });
 
@@ -70,7 +70,7 @@ describe('computeTestPorts', () => {
     expect(result.auth).toEqual({
       dbPort: 15432,
       redisPort: 16379,
-      appPort: 18082,
+      appPort: 18888,
     });
     expect(result.core).toEqual({
       dbPort: 15433,

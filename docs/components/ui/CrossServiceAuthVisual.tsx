@@ -27,7 +27,7 @@ const steps: Step[] = [
     },
     {
         icon: ShieldCheck,
-        title: 'auth :8082 · /api/auth/get-session',
+        title: 'auth :8888 · /api/auth/get-session',
         detail: 'The trust anchor validates the session and returns the principal.',
         edge: '← { user, session }',
         accent: true,

@@ -24,7 +24,7 @@ import { updateDeviceSessionActivity } from "../../../domain/device-session/repo
 import { DeviceSession } from "../../../domain/device-session/schema";
 import { ErrorFactory, normalizeError } from "../../../utils/errors";
 
-const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://localhost:<%= authServicePort || 8082 %>';
+const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://localhost:<%= authServicePort || 8888 %>';
 
 interface AuthUser {
   id: string;
@@ -223,7 +223,7 @@ import fp from "fastify-plugin";
 import { FastifyPluginAsync, FastifyRequest, FastifyReply } from "fastify";
 import { ErrorFactory, normalizeError } from "../../../utils/errors";
 
-const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://localhost:<%= authServicePort || 8082 %>';
+const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://localhost:<%= authServicePort || 8888 %>';
 const ALLOWED_ROLES = [<%- rolesList.map((r) => `'${r}'`).join(', ') %>];
 
 interface AuthUser {
@@ -304,7 +304,7 @@ import fp from "fastify-plugin";
 import { FastifyPluginAsync, FastifyRequest, FastifyReply } from "fastify";
 import { ErrorFactory, normalizeError } from "../../../utils/errors";
 
-const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://localhost:<%= authServicePort || 8082 %>';
+const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://localhost:<%= authServicePort || 8888 %>';
 
 interface AuthUser {
   id: string;

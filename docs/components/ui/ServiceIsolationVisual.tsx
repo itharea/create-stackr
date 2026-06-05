@@ -20,8 +20,8 @@ const services: ServiceCard[] = [
     {
         name: 'auth',
         role: 'trust anchor',
-        backendPort: ':8082',
-        webPort: ':3002',
+        backendPort: ':8888',
+        webPort: ':3333',
         trustAnchor: true,
         resources: [
             { label: 'Fastify · BetterAuth', icon: ShieldCheck },
@@ -39,7 +39,7 @@ const services: ServiceCard[] = [
             { label: 'PostgreSQL', icon: Database },
             { label: 'Redis', icon: Server },
         ],
-        footer: { label: 'verifies via auth:8082', icon: Lock },
+        footer: { label: 'verifies via auth:8888', icon: Lock },
     },
     {
         name: 'wallet',
@@ -50,7 +50,7 @@ const services: ServiceCard[] = [
             { label: 'PostgreSQL', icon: Database },
             { label: 'BullMQ + Redis', icon: MessageSquare },
         ],
-        footer: { label: 'verifies via auth:8082', icon: Lock },
+        footer: { label: 'verifies via auth:8888', icon: Lock },
     },
 ];
 

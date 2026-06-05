@@ -11,8 +11,8 @@ describe('buildServiceContext', () => {
 
     expect(ctx.hasAuthService).toBe(true);
     expect(ctx.authServiceName).toBe('auth');
-    expect(ctx.authServicePort).toBe(8082);
-    expect(ctx.authServiceUrl).toBe('http://auth_rest_api:8082');
+    expect(ctx.authServicePort).toBe(8888);
+    expect(ctx.authServiceUrl).toBe('http://auth_rest_api:8888');
     expect(ctx.peerServiceNames).toContain('auth');
   });
 

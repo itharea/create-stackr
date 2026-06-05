@@ -425,15 +425,15 @@ describe('promptServices', () => {
 // ---------------------------------------------------------------------------
 
 describe('buildExtraServicesFromFlag', () => {
-  it('parses comma-separated names and allocates sequential ports skipping 8082', () => {
+  it('parses comma-separated names and allocates sequential contiguous ports', () => {
     const existing = [authEntry({ provisioningTargets: [] })];
     const out = buildExtraServicesFromFlag('scout, wallet, manage', existing, true);
 
     expect(out.map((s) => s.name)).toEqual(['scout', 'wallet', 'manage']);
     expect(out[0].backend.port).toBe(8080);
     expect(out[1].backend.port).toBe(8081);
-    // 8082 is the reserved auth port, so the 3rd service gets 8083.
-    expect(out[2].backend.port).toBe(8083);
+    // Auth sits at 8888 (out of the base range), so allocation is contiguous.
+    expect(out[2].backend.port).toBe(8082);
     for (const svc of out) {
       expect(svc.backend.authMiddleware).toBe('standard');
       expect(svc.web).toBeNull();

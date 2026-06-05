@@ -36,7 +36,7 @@ const configPlugin: FastifyPluginAsync = async (server) => {
     NODE_ENV: process.env.NODE_ENV || 'development',
     LOG_LEVEL: process.env.LOG_LEVEL || 'info',
     API_HOST: process.env.API_HOST || '0.0.0.0',
-    API_PORT: process.env.API_PORT || '8080',
+    API_PORT: process.env.API_PORT || '8888',
     DATABASE_URL: process.env.DATABASE_URL,
     JWT_SECRET: process.env.JWT_SECRET || 'your-jwt-secret-here-change-in-production',
     ...process.env,

@@ -43,9 +43,9 @@ Ports are allocated deterministically so committed scripts and CI stay reproduci
 <Table
     headers={['Port', 'Assignment']}
     rows={[
-        ['8082 / 3002', 'Auth backend / admin dashboard (fixed)'],
-        ['8080, 8081, …', 'Base backends (skip 8082)'],
-        ['3000, 3001, …', 'Base web frontends (skip 3002)'],
+        ['8888 / 3333', 'Auth backend / admin dashboard (fixed)'],
+        ['8080, 8081, 8082, …', 'Base backends (contiguous)'],
+        ['3000, 3001, 3002, …', 'Base web frontends (contiguous)'],
         ['+10000', 'Test profile offset (db 15432+, redis 16379+, app 18080+)'],
     ]}
 />

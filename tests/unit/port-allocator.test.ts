@@ -23,18 +23,18 @@ describe('port-allocator', () => {
       expect(allocateBackendPort([])).toBe(8080);
     });
 
-    it('returns 8081 when only auth (8082) exists', () => {
-      expect(allocateBackendPort([svc('auth', 8082)])).toBe(8080);
+    it('returns 8080 when only the auth service (8888) exists', () => {
+      expect(allocateBackendPort([svc('auth', AUTH_BACKEND_PORT)])).toBe(8080);
     });
 
-    it('skips 8082 when auto-allocating around auth', () => {
-      const services = [svc('auth', 8082), svc('a', 8080), svc('b', 8081)];
-      expect(allocateBackendPort(services)).toBe(8083);
+    it('allocates contiguously around auth (8888 is out of the base range)', () => {
+      const services = [svc('auth', AUTH_BACKEND_PORT), svc('a', 8080), svc('b', 8081)];
+      expect(allocateBackendPort(services)).toBe(8082);
     });
 
-    it('returns the next free port after existing services', () => {
+    it('returns the next free port after existing services (8082 is no longer reserved)', () => {
       const services = [svc('a', 8080), svc('b', 8081)];
-      expect(allocateBackendPort(services)).toBe(8083); // skipping 8082
+      expect(allocateBackendPort(services)).toBe(8082);
     });
 
     it('honors an explicit preferred port', () => {
@@ -45,8 +45,8 @@ describe('port-allocator', () => {
       expect(() => allocateBackendPort([svc('a', 9090)], 9090)).toThrow(PortCollisionError);
     });
 
-    it('AUTH_BACKEND_PORT constant equals 8082', () => {
-      expect(AUTH_BACKEND_PORT).toBe(8082);
+    it('AUTH_BACKEND_PORT constant equals 8888', () => {
+      expect(AUTH_BACKEND_PORT).toBe(8888);
     });
   });
 
@@ -55,29 +55,29 @@ describe('port-allocator', () => {
       expect(allocateWebPort([])).toBe(3000);
     });
 
-    it('skips 3002 (reserved for auth web admin)', () => {
+    it('allocates web ports contiguously (3002 is no longer reserved)', () => {
       const services = [svc('a', 8080, 3000), svc('b', 8081, 3001)];
-      expect(allocateWebPort(services)).toBe(3003);
+      expect(allocateWebPort(services)).toBe(3002);
     });
 
-    it('AUTH_WEB_PORT constant equals 3002', () => {
-      expect(AUTH_WEB_PORT).toBe(3002);
+    it('AUTH_WEB_PORT constant equals 3333', () => {
+      expect(AUTH_WEB_PORT).toBe(3333);
     });
   });
 
   describe('determinism (phase 3)', () => {
     it('allocating a new port against the same config twice yields the same result', () => {
-      const services = [svc('auth', 8082), svc('core', 8080), svc('scout', 8081)];
+      const services = [svc('auth', AUTH_BACKEND_PORT), svc('core', 8080), svc('scout', 8081)];
       const first = allocateBackendPort(services);
       const second = allocateBackendPort(services);
       expect(first).toBe(second);
-      expect(first).toBe(8083);
+      expect(first).toBe(8082);
     });
 
     it('allocating after differently-ordered inputs yields the same next port', () => {
-      const servicesA = [svc('core', 8080), svc('auth', 8082), svc('scout', 8081)];
-      const servicesB = [svc('auth', 8082), svc('scout', 8081), svc('core', 8080)];
-      // Both fill 8080, 8081, 8082 — so the next free port is 8083 in both.
+      const servicesA = [svc('core', 8080), svc('auth', AUTH_BACKEND_PORT), svc('scout', 8081)];
+      const servicesB = [svc('auth', AUTH_BACKEND_PORT), svc('scout', 8081), svc('core', 8080)];
+      // Base fills 8080, 8081 (auth at 8888 is out of range) — next free is 8082 in both.
       expect(allocateBackendPort(servicesA)).toBe(allocateBackendPort(servicesB));
     });
 

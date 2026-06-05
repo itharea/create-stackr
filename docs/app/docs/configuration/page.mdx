@@ -91,7 +91,7 @@ with **strong random credentials** — a 24-character database password and a
     code={`# Generated, never committed
 POSTGRES_PASSWORD=<24-char random>
 BETTER_AUTH_SECRET=<64 hex chars>
-AUTH_SERVICE_URL=http://auth:8082`}
+AUTH_SERVICE_URL=http://auth:8888`}
     language="bash"
     filename=".env"
 />
@@ -112,10 +112,10 @@ are reproducible:
 <Table
     headers={['Port', 'Assignment']}
     rows={[
-        ['8082', 'Auth backend (fixed)'],
-        ['3002', 'Auth admin dashboard (fixed)'],
-        ['8080, 8081, …', 'Base service backends (skip 8082)'],
-        ['3000, 3001, …', 'Base service web frontends (skip 3002)'],
+        ['8888', 'Auth backend (fixed)'],
+        ['3333', 'Auth admin dashboard (fixed)'],
+        ['8080, 8081, 8082, …', 'Base service backends (contiguous)'],
+        ['3000, 3001, 3002, …', 'Base service web frontends (contiguous)'],
         ['+10000 offset', 'Test profile (e.g. db 15432, redis 16379, app 18080)'],
     ]}
 />

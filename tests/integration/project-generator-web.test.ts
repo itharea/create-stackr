@@ -288,8 +288,8 @@ describe('project generator — auth/web subtree (admin dashboard)', () => {
     const raw = await fs.readFile(path.join(projectDir, 'auth/web/package.json'), 'utf-8');
     const pkg = JSON.parse(raw);
     expect(pkg.name).toBe('test-auth-web-auth-web');
-    // Auth web dev server runs on its reserved port (3002)
-    expect(pkg.scripts?.dev).toBe('next dev --port 3002');
+    // Auth web dev server runs on its fixed port (3333)
+    expect(pkg.scripts?.dev).toBe('next dev --port 3333');
     expect(pkg.dependencies?.next).toBeDefined();
     expect(pkg.dependencies?.react).toBeDefined();
     // Auth dashboard dependencies
@@ -393,6 +393,6 @@ describe('project generator — auth/web subtree (admin dashboard)', () => {
       'utf-8'
     );
     expect(nextConfig).toMatch(/\/api\/:path\*/);
-    expect(nextConfig).toMatch(/8082/);
+    expect(nextConfig).toMatch(/8888/);
   });
 });

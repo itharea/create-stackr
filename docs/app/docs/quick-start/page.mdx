@@ -74,13 +74,13 @@ selections above you get:
 <Table
     headers={['Service', 'Backend', 'Web']}
     rows={[
-        ['auth (trust anchor)', 'http://localhost:8082', 'http://localhost:3002 (admin dashboard)'],
+        ['auth (trust anchor)', 'http://localhost:8888', 'http://localhost:3333 (admin dashboard)'],
         ['core (base service)', 'http://localhost:8080', 'http://localhost:3000'],
     ]}
 />
 
 <Callout type="info" title="Port convention">
-    The auth backend is fixed at <code>:8082</code> and its dashboard at <code>:3002</code>.
+    The auth backend is fixed at <code>:8888</code> and its dashboard at <code>:3333</code>.
     Base services start at <code>:8080</code> (backends) and <code>:3000</code> (web). See
     <a href="/docs/configuration#ports">Configuration → Ports</a>.
 </Callout>

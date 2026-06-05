@@ -18,8 +18,8 @@ describe('stackr add service — port handling', () => {
     await runAddService('wallet', { install: false });
     const cfg = await loadStackrConfig(fx.projectDir);
     const wallet = cfg.services.find((s) => s.name === 'wallet');
-    // Minimal fixture uses auth@8082, core@8080. Next free backend port
-    // skipping 8082 is 8081.
+    // Minimal fixture uses auth@8888, core@8080. Next free contiguous
+    // backend port above core is 8081.
     expect(wallet?.backend.port).toBe(8081);
   });
 

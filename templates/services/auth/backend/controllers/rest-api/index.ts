@@ -4,7 +4,7 @@ const start = async () => {
   const server = await buildServer();
   try {
     const host = server.config.API_HOST || '0.0.0.0';
-    const port = parseInt(server.config.API_PORT || '8080');
+    const port = parseInt(server.config.API_PORT || '8888');
 
     await server.listen({
       host,

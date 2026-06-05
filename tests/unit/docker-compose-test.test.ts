@@ -198,8 +198,8 @@ describe('renderDockerComposeTest', () => {
       const coreEnv = parsed.services.core_rest_api.environment;
       const envStr = typeof coreEnv === 'string' ? coreEnv : JSON.stringify(coreEnv);
       expect(envStr).toContain('AUTH_SERVICE_URL');
-      // Dev port for auth is 8082 (AUTH_BACKEND_PORT).
-      expect(envStr).toContain('http://auth_rest_api:8082');
+      // Dev port for auth is 8888 (AUTH_BACKEND_PORT).
+      expect(envStr).toContain('http://auth_rest_api:8888');
     });
 
     it('does NOT inject AUTH_SERVICE_URL on the auth service itself', () => {
