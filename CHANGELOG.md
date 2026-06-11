@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] - 2026-06-11
+
+### Changed
+
+- **Auth service now uses fixed ports `8888` (backend) / `3333` (admin dashboard), and base services are allocated contiguously** from `8080` (backends) and `3000` (web). Previously auth sat at `8082` / `3002` in the middle of the base range, forcing allocation to skip those ports and leave gaps (`8080, 8081, 8083, …`); base services now map cleanly to `8080 + index` / `3000 + index`, and a third base service simply uses `8082` like any other. The auth backend's default `API_PORT` and the templates' auth-URL fallbacks were updated to match, and the docs site/README now describe the new scheme. Affects newly scaffolded projects only — existing projects keep their ports frozen in `stackr.config.json`. (#98)
+
 ## [0.7.0] - 2026-06-04
 
 ### ⚠ BREAKING CHANGES
