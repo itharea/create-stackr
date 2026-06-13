@@ -8,8 +8,8 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
 import { useAppTheme, AppTheme } from "@/context/theme-context";
 import { emailOtp } from "@/lib/auth-client";
@@ -178,7 +178,7 @@ export default function VerifyEmailScreen() {
             {otp.map((digit, index) => (
               <TextInput
                 key={index}
-                ref={(el) => (inputRefs.current[index] = el)}
+                ref={(el) => { inputRefs.current[index] = el; }}
                 style={[
                   styles.otpInput,
                   {

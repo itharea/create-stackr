@@ -3,13 +3,16 @@ import {
   insertDeviceSession,
   deleteDeviceSession,
   deleteExpiredDeviceSessions,
+  migrateDeviceSessionToUser,
 } from "./repository";
 import {
   DeviceSession,
   CreateDeviceSessionBody,
   CreateDeviceSessionResponse,
   DeviceSessionMigrationEligibilityResponse,
+  MigrateDeviceSessionResponse,
 } from "./schema";
+import { ErrorFactory } from "../../utils/errors";
 
 /**
  * Device Session Service
@@ -106,6 +109,29 @@ export const validateDeviceSessionMigrationEligibility = async (
 
   return {
     canMigrate: true,
+  };
+};
+
+/**
+ * Migrate (attach) an anonymous device session to an authenticated user account.
+ * The userId comes from the caller's verified auth session; the sessionToken identifies
+ * which anonymous device session to attach. Validates eligibility before mutating.
+ */
+export const migrateDeviceSessionToUserAccount = async (
+  sessionToken: string,
+  userId: string
+): Promise<MigrateDeviceSessionResponse> => {
+  const eligibility = await validateDeviceSessionMigrationEligibility(sessionToken);
+
+  if (!eligibility.canMigrate) {
+    throw ErrorFactory.clientError(eligibility.reason || 'Device session cannot be migrated');
+  }
+
+  await migrateDeviceSessionToUser(sessionToken, userId);
+
+  return {
+    success: true,
+    message: 'Device session migrated successfully',
   };
 };
 

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import api from './api';
+import { authApi } from './api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logger } from '../utils/logger';
 import { Platform } from 'react-native';
@@ -23,6 +23,17 @@ export interface DeviceSessionMigrationEligibilityResponse {
   canMigrate: boolean;
   reason?: string;
 }
+
+export interface MigrateDeviceSessionResponse {
+  success: boolean;
+  message?: string;
+}
+
+// Device ID contract — MUST stay in sync with the auth backend's TypeBox schema
+// (services/auth/backend/domain/device-session/schema.ts: CreateDeviceSessionBodySchema,
+// `pattern: "^[a-zA-Z0-9_-]+$"`). An id that violates this is rejected with 400 and, if
+// persisted, breaks the install on every launch.
+const DEVICE_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
 
 class DeviceSessionService {
   private static instance: DeviceSessionService;
@@ -87,7 +98,7 @@ class DeviceSessionService {
     try {
       logger.info('DeviceSessionService: Creating new device session for device:', deviceId);
 
-      const response = await api.post<CreateDeviceSessionResponse>('/device-sessions', { deviceId });
+      const response = await authApi.post<CreateDeviceSessionResponse>('/device-sessions', { deviceId });
 
       logger.info('DeviceSessionService: Device session created successfully');
       return response.data;
@@ -107,7 +118,7 @@ class DeviceSessionService {
     try {
       logger.debug('DeviceSessionService: Validating device session token...');
 
-      const response = await api.post<DeviceSessionValidationResponse>('/device-sessions/validate', { sessionToken });
+      const response = await authApi.post<DeviceSessionValidationResponse>('/device-sessions/validate', { sessionToken });
 
       logger.debug('DeviceSessionService: Device session validation complete');
       return response.data;
@@ -130,7 +141,7 @@ class DeviceSessionService {
 
       logger.debug('SessionService: Updating session activity...');
       
-      await api.put('/device-sessions/activity', { sessionToken: token });
+      await authApi.put('/device-sessions/activity', { sessionToken: token });
       
       logger.debug('SessionService: Session activity updated');
       
@@ -150,7 +161,7 @@ class DeviceSessionService {
 
       logger.debug('DeviceSessionService: Checking migration eligibility...');
 
-      const response = await api.post<DeviceSessionMigrationEligibilityResponse>('/device-sessions/migration-eligibility', { sessionToken: token });
+      const response = await authApi.post<DeviceSessionMigrationEligibilityResponse>('/device-sessions/migration-eligibility', { sessionToken: token });
 
       logger.debug('DeviceSessionService: Migration eligibility checked');
       return response.data;
@@ -166,6 +177,33 @@ class DeviceSessionService {
     }
   }
 
+  async migrateSession(): Promise<MigrateDeviceSessionResponse> {
+    try {
+      const token = await this.getSessionToken();
+      if (!token) {
+        throw new Error('No device session token available');
+      }
+
+      logger.info('DeviceSessionService: Migrating device session to user account...');
+
+      // Requires an authenticated BetterAuth session (cookie sent by authApi); the auth
+      // service resolves the user from that session and attaches this device session.
+      const response = await authApi.post<MigrateDeviceSessionResponse>('/device-sessions/migrate', { sessionToken: token });
+
+      logger.info('DeviceSessionService: Device session migrated successfully');
+      return response.data;
+
+    } catch (error) {
+      logger.error('SessionService: Failed to migrate session', { error });
+
+      if (axios.isAxiosError(error)) {
+        throw new Error(error.response?.data?.error?.message || 'Failed to migrate session');
+      }
+
+      throw new Error('Session migration failed');
+    }
+  }
+
   async deleteSession(): Promise<void> {
     try {
       const token = await this.getSessionToken();
@@ -177,7 +215,7 @@ class DeviceSessionService {
       logger.info('SessionService: Deleting session...');
       
       try {
-        await api.delete('/device-sessions', { data: { sessionToken: token } });
+        await authApi.delete('/device-sessions', { data: { sessionToken: token } });
       } catch (error) {
         logger.warn('SessionService: Session deletion API call failed, continuing with local cleanup', { error });
       }
@@ -198,13 +236,18 @@ class DeviceSessionService {
     try {
       // Try to get existing device ID from secure storage
       let deviceId = await SecureStore.getItemAsync(this.DEVICE_ID_KEY);
-      
-      if (deviceId) {
+
+      if (deviceId && DEVICE_ID_PATTERN.test(deviceId)) {
         this.deviceId = deviceId;
         logger.debug('SessionService: Found existing device ID');
         return deviceId;
       }
-      
+      if (deviceId) {
+        // Stored id predates the sanitization fix and violates the backend contract —
+        // discard and regenerate so the install can heal itself instead of failing forever.
+        logger.warn('SessionService: Stored device ID is invalid, regenerating');
+      }
+
       // Generate new device ID
       deviceId = await this.generateDeviceId();
       await SecureStore.setItemAsync(this.DEVICE_ID_KEY, deviceId);
@@ -219,12 +262,12 @@ class DeviceSessionService {
       // Fallback to AsyncStorage if SecureStore fails
       try {
         let deviceId = await AsyncStorage.getItem(this.DEVICE_ID_KEY);
-        
-        if (deviceId) {
+
+        if (deviceId && DEVICE_ID_PATTERN.test(deviceId)) {
           this.deviceId = deviceId;
           return deviceId;
         }
-        
+
         deviceId = await this.generateDeviceId();
         await AsyncStorage.setItem(this.DEVICE_ID_KEY, deviceId);
         this.deviceId = deviceId;
@@ -246,16 +289,19 @@ class DeviceSessionService {
       const timestamp = Date.now().toString();
       const randomBytes = Math.random().toString(36).substring(2, 15);
       
-      const deviceId = `${platform}-${installId.replace(/\./g, '_')}-${buildId}-${timestamp}-${randomBytes}`;
-      
+      // Sanitize the ENTIRE composed id, not just installId — any segment can carry
+      // illegal characters (e.g. Application.nativeBuildVersion is "2.33.5" in Expo Go),
+      // and the backend rejects anything outside DEVICE_ID_PATTERN.
+      const deviceId = `${platform}-${installId}-${buildId}-${timestamp}-${randomBytes}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+
       logger.debug('SessionService: Generated device ID pattern:', deviceId.substring(0, 20) + '...');
       return deviceId;
       
     } catch (error) {
       logger.error('SessionService: Failed to generate device ID', { error });
       
-      // Fallback to simple random ID
-      const fallbackId = `${Platform.OS}-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+      // Fallback to simple random ID (sanitized to satisfy DEVICE_ID_PATTERN)
+      const fallbackId = `${Platform.OS}-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`.replace(/[^a-zA-Z0-9_-]/g, '_');
       logger.warn('SessionService: Using fallback device ID');
       return fallbackId;
     }
