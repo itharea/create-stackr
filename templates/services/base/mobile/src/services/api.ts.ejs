@@ -1,4 +1,5 @@
 import axios from 'axios';
+import type { AxiosInstance } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 <% if (features.authentication.enabled) { %>
@@ -9,63 +10,93 @@ import { authClient } from '../lib/auth-client';
 const DEVICE_SESSION_TOKEN_KEY = 'device_session_token';
 
 // API Configuration
+// `apiUrl` is this service's own backend; `authServiceUrl` is the auth service that owns
+// device sessions and the BetterAuth endpoints. When this mobile app *is* the auth service,
+// `authServiceUrl` is absent and `apiUrl` already points at the auth backend.
 const API_URL = Constants.expoConfig?.extra?.apiUrl || 'http://localhost:<%= service.backend.port %>';
-
-const api = axios.create({
-  baseURL: API_URL,
-  timeout: 10000, // 10 second timeout
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Request interceptor to add auth cookies and device session token
-api.interceptors.request.use(
-  async (config) => {
-    try {
 <% if (features.authentication.enabled) { %>
-      // Add BetterAuth session cookies for authenticated requests
-      const cookies = authClient.getCookie();
-      if (cookies) {
-        config.headers.Cookie = cookies;
-      }
+const AUTH_API_URL = Constants.expoConfig?.extra?.authServiceUrl || API_URL;
 <% } %>
 
-      // Add device session token if available (for anonymous sessions)
-      const deviceSessionToken = await AsyncStorage.getItem(DEVICE_SESSION_TOKEN_KEY);
-      if (deviceSessionToken) {
-        config.headers['X-Device-Session-Token'] = deviceSessionToken;
-      }
+/**
+ * Create an axios instance for a given backend base URL, wired with the shared
+ * cookie / device-session-token request interceptor and the response interceptor.
+ *
+ * Every endpoint lives on exactly one backend, so pick the instance that matches:
+ * `api` for this service's own backend, `authApi` for auth-service endpoints
+ * (device sessions, BetterAuth).
+ */
+function createServiceApi(baseURL: string): AxiosInstance {
+  const instance = axios.create({
+    baseURL,
+    timeout: 10000, // 10 second timeout
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
 
-      return config;
-    } catch (error) {
-      console.error('API Request Error:', error);
-      return config;
-    }
-  },
-  (error) => {
-    console.error('API Request Setup Error:', error);
-    return Promise.reject(error);
-  }
-);
-
-// Response interceptor for handling common responses and errors
-api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    // Handle 401 errors - session expired or invalid
-    if (error.response?.status === 401) {
-<% if (features.authentication.enabled) { %>
-      // Sign out to clear BetterAuth session
+  // Request interceptor to add auth cookies and device session token
+  instance.interceptors.request.use(
+    async (config) => {
       try {
-        await authClient.signOut();
-      } catch {
-        // Ignore sign out errors
-      }
+<% if (features.authentication.enabled) { %>
+        // Add BetterAuth session cookies for authenticated requests
+        const cookies = authClient.getCookie();
+        if (cookies) {
+          config.headers.Cookie = cookies;
+        }
 <% } %>
+
+        // Add device session token if available (for anonymous sessions)
+        const deviceSessionToken = await AsyncStorage.getItem(DEVICE_SESSION_TOKEN_KEY);
+        if (deviceSessionToken) {
+          config.headers['X-Device-Session-Token'] = deviceSessionToken;
+        }
+
+        return config;
+      } catch (error) {
+        console.error('API Request Error:', error);
+        return config;
+      }
+    },
+    (error) => {
+      console.error('API Request Setup Error:', error);
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
-  }
-);
+  );
+
+  // Response interceptor for handling common responses and errors
+  instance.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+      // Handle 401 errors - session expired or invalid
+      if (error.response?.status === 401) {
+<% if (features.authentication.enabled) { %>
+        // Only sign out when the failing request actually carried a BetterAuth session
+        // cookie. A transient 401 from an anonymous / device-session-only request (which
+        // may target a different backend) must not globally sign out a real user.
+        if (error.config?.headers?.Cookie) {
+          try {
+            await authClient.signOut();
+          } catch {
+            // Ignore sign out errors
+          }
+        }
+<% } %>
+      }
+      return Promise.reject(error);
+    }
+  );
+
+  return instance;
+}
+
+// Default instance → this service's own backend (core / domain endpoints).
+const api = createServiceApi(API_URL);
+<% if (features.authentication.enabled) { %>
+
+// Auth-service instance → device sessions + BetterAuth-owned endpoints.
+export const authApi = createServiceApi(AUTH_API_URL);
+<% } %>
 
 export default api;

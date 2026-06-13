@@ -1,29 +1,10 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { deviceSessionService, DeviceSessionMigrationEligibilityResponse } from '../services/device-session';
+import { deviceSessionService, DeviceSessionMigrationEligibilityResponse, MigrateDeviceSessionResponse } from '../services/device-session';
 import type { DeviceSession } from '../types/device-session';
 import { logger } from '../utils/logger';
 import { useUIStore } from '@/store/ui-store';
-
-export interface MigrateSessionData {
-  name: string;
-  email: string;
-  password: string;
-  passwordConfirmation: string;
-}
-
-export interface SessionMigrationResponse {
-  user: {
-    id: string;
-    email: string;
-    name: string;
-    preferredCurrency: string;
-    createdAt: string;
-    updatedAt: string;
-  };
-  token: string;
-}
 
 interface SessionState {
   // State
@@ -49,7 +30,7 @@ interface SessionState {
   deleteSession: () => Promise<void>;
   isSessionValid: () => Promise<boolean>;
   getMigrationEligibility: () => Promise<DeviceSessionMigrationEligibilityResponse>;
-  migrateSession: (data: MigrateSessionData) => Promise<SessionMigrationResponse>;
+  migrateSession: () => Promise<MigrateDeviceSessionResponse>;
   refreshSession: () => Promise<void>;
 
   // Computed values
@@ -207,55 +188,31 @@ export const useSessionStore = create<SessionState>()(
       }
     },
 
-    migrateSession: async (data: MigrateSessionData): Promise<SessionMigrationResponse> => {
+    migrateSession: async (): Promise<MigrateDeviceSessionResponse> => {
       try {
         logger.info('SessionStore: Migrating session to user account...');
         set({ isLoading: true, error: null });
-        
-        const sessionToken = get().sessionToken;
-        if (!sessionToken) {
-          throw new Error('No session token available for migration');
-        }
 
-        // Call the migration endpoint
-        const migrationData = {
-          sessionToken,
-          ...data,
-        };
+        // Caller must already be authenticated (BetterAuth cookie present). This attaches
+        // the existing anonymous device session to that user via the auth service — the
+        // user identity comes from the session, not from any data passed here.
+        const result = await deviceSessionService.migrateSession();
 
-        // This would be a direct API call since migration is a one-time operation
-        const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/sessions/migrate`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(migrationData),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json() as { error?: { message?: string } };
-          throw new Error(errorData.error?.message || 'Migration failed');
-        }
-
-        const result = await response.json() as SessionMigrationResponse;
-        
-        // Clear session data after successful migration
+        // Clear local anonymous session data after a successful migration
         set({ session: null, sessionToken: null, deviceId: null });
-        
-        logger.info('SessionStore: Session migrated successfully', {
-          userId: result.user.id,
-        });
-        
+
+        logger.info('SessionStore: Session migrated successfully');
+
         return result;
-        
+
       } catch (error) {
         logger.error('SessionStore: Failed to migrate session', { error });
-        
+
         const errorMessage = error instanceof Error ? error.message : 'Session migration failed';
         set({ error: errorMessage });
-        
+
         throw error;
-        
+
       } finally {
         set({ isLoading: false });
       }

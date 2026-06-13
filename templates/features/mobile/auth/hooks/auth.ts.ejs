@@ -10,7 +10,22 @@ const TWO_FACTOR_TIMEOUT_SECONDS = 180;
 const SAFETY_BUFFER_SECONDS = 5;
 <% } %>
 <% if (features.authentication.providers.google) { %>
-import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
+// `@react-native-google-signin/google-signin` is a native module with no JS implementation
+// in Expo Go — importing it at module scope throws at load time and, because useAuth is
+// imported across the route tree, cascades into bogus "missing default export" errors on
+// nearly every route. Load it lazily and fall back to browser OAuth when it's unavailable.
+type GoogleSigninModule = typeof import('@react-native-google-signin/google-signin');
+let _googleSignin: GoogleSigninModule | null | undefined;
+function getGoogleSignin(): GoogleSigninModule | null {
+  if (_googleSignin !== undefined) return _googleSignin;
+  try {
+    _googleSignin = require('@react-native-google-signin/google-signin');
+  } catch {
+    // Native module absent (Expo Go, web, etc.)
+    _googleSignin = null;
+  }
+  return _googleSignin;
+}
 <% } %>
 <% if (features.authentication.providers.apple) { %>
 import * as AppleAuthentication from 'expo-apple-authentication';
@@ -81,8 +96,9 @@ export const useAuth = () => {
         password: credentials.password,
       });
 <% if (features.authentication.twoFactor) { %>
-      // Check if 2FA is required (Better Auth returns twoFactorRedirect: true)
-      if (result.data?.twoFactorRedirect) {
+      // Check if 2FA is required (Better Auth returns twoFactorRedirect: true on the
+      // sign-in result, but it isn't part of the typed `data` shape — narrow it explicitly)
+      if ((result.data as { twoFactorRedirect?: boolean } | null | undefined)?.twoFactorRedirect) {
         // Calculate expiration: current time + backend timeout - safety buffer
         // The safety buffer ensures mobile expires BEFORE backend (same pattern as web's Max-Age fallback)
         const expiresAt = Math.floor(Date.now() / 1000) + TWO_FACTOR_TIMEOUT_SECONDS - SAFETY_BUFFER_SECONDS;
@@ -160,21 +176,37 @@ export const useAuth = () => {
     setError(null);
 
     try {
+      const google = getGoogleSignin();
+
+      // No native Google module (e.g. Expo Go) → use browser OAuth directly.
+      if (!google) {
+        const result = await authClient.signIn.social({
+          provider: 'google',
+          callbackURL,
+          errorCallbackURL,
+        });
+
+        if (result.error) {
+          throw new Error(result.error.message || 'Google sign in failed');
+        }
+        return { success: true };
+      }
+
       // Try native sign-in first
       let idToken: string | null = null;
 
       try {
-        GoogleSignin.configure({
+        google.GoogleSignin.configure({
           webClientId: Constants.expoConfig?.extra?.googleOAuth?.webClientId,
           iosClientId: Constants.expoConfig?.extra?.googleOAuth?.iosClientId,
         });
 
-        await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-        const userInfo = await GoogleSignin.signIn();
+        await google.GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+        const userInfo = await google.GoogleSignin.signIn();
         idToken = userInfo.data?.idToken || null;
       } catch (nativeError: any) {
         // Native failed - check if user cancelled
-        if (nativeError.code === statusCodes.SIGN_IN_CANCELLED) {
+        if (nativeError.code === google.statusCodes.SIGN_IN_CANCELLED) {
           throw new Error('Sign in cancelled');
         }
 
@@ -534,7 +566,7 @@ export const useAuth = () => {
         },
         credentials: 'omit',
       });
-      const data = await response.json();
+      const data = await response.json() as { hasPassword?: boolean };
       return data.hasPassword ?? false;
     } catch {
       return false;
@@ -556,7 +588,7 @@ export const useAuth = () => {
         body: JSON.stringify({ newPassword: password }),
       });
       if (!response.ok) {
-        const data = await response.json();
+        const data = await response.json() as { message?: string };
         throw new Error(data.message || 'Failed to set password');
       }
       return { success: true };

@@ -1,4 +1,4 @@
-import type { DeviceSessionFastifyRequest } from "fastify";
+import type { DeviceSessionFastifyRequest, AuthFastifyRequest } from "fastify";
 import { FastifyPluginAsync } from "fastify";
 import {
   CreateDeviceSessionBodySchema,
@@ -7,11 +7,14 @@ import {
   DeviceSessionValidationResponseSchema,
   UpdateDeviceSessionActivityBodySchema,
   DeviceSessionMigrationEligibilityResponseSchema,
+  MigrateDeviceSessionBodySchema,
+  MigrateDeviceSessionResponseSchema,
 } from "../../../domain/device-session/schema";
 import {
   createDeviceSession,
   validateDeviceSession,
   validateDeviceSessionMigrationEligibility,
+  migrateDeviceSessionToUserAccount,
   cleanupExpiredDeviceSessions,
 } from "../../../domain/device-session/service";
 import {
@@ -132,6 +135,32 @@ const deviceSessionRoutes: FastifyPluginAsync = async (server) => {
 
       const eligibility = await validateDeviceSessionMigrationEligibility(sessionToken);
       return reply.status(200).send(eligibility);
+    }
+  );
+
+  // Migrate (attach) this anonymous device session to the authenticated user.
+  // Requires a logged-in BetterAuth session; the user id is taken from that session,
+  // never from the request body.
+  server.post<{
+    Body: typeof MigrateDeviceSessionBodySchema._type;
+    Reply: typeof MigrateDeviceSessionResponseSchema._type;
+  }>(
+    "/migrate",
+    {
+      onRequest: server.requireAuth,
+      schema: {
+        body: MigrateDeviceSessionBodySchema,
+        response: {
+          200: MigrateDeviceSessionResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { sessionToken } = request.body as typeof MigrateDeviceSessionBodySchema._type;
+      const { user } = request as AuthFastifyRequest;
+
+      const result = await migrateDeviceSessionToUserAccount(sessionToken, user.id);
+      return reply.status(200).send(result);
     }
   );
 

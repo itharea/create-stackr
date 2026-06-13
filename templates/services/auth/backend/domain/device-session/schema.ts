@@ -70,3 +70,24 @@ export const DeviceSessionMigrationEligibilityResponseSchema = Type.Object({
 });
 
 export type DeviceSessionMigrationEligibilityResponse = Static<typeof DeviceSessionMigrationEligibilityResponseSchema>;
+
+// Migrate device session request schema — attaches an existing anonymous session to the
+// currently-authenticated user. The userId is NOT in the body; it comes from the verified
+// auth session on the request.
+export const MigrateDeviceSessionBodySchema = Type.Object({
+  sessionToken: Type.String({
+    minLength: 36,
+    maxLength: 36,
+    pattern: "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+  }),
+});
+
+export type MigrateDeviceSessionBody = Static<typeof MigrateDeviceSessionBodySchema>;
+
+// Migrate device session response schema
+export const MigrateDeviceSessionResponseSchema = Type.Object({
+  success: Type.Boolean(),
+  message: Type.Optional(Type.String()),
+});
+
+export type MigrateDeviceSessionResponse = Static<typeof MigrateDeviceSessionResponseSchema>;
